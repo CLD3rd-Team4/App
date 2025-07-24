@@ -281,6 +281,15 @@ sketch
 !.vscode/extensions.json
 !.vscode/*.code-snippets
 
+### Build output ###
+.next/
+dist/
+out/
+
+### Env files ###
+.env
+.env.*
+
 # Local History for Visual Studio Code
 .history/
 
