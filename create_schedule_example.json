@@ -1,0 +1,47 @@
+{
+  "user_id": "user-12345",
+  "title": "서울에서 부산까지 2박 3일 식도락 여행",
+  "departure_time": "오전 09:00",
+  "meal_slots": [
+    {
+      "meal_type": "MEAL",
+      "scheduled_time": "오후 12:30",
+      "radius": 1500
+    },
+    {
+      "meal_type": "SNACK",
+      "scheduled_time": "오후 03:30",
+      "radius": 1000
+    },
+    {
+      "meal_type": "MEAL",
+      "scheduled_time": "오후 07:00",
+      "radius": 2000
+    }
+  ],
+  "departure": {
+    "name": "서울역",
+    "address": "서울 용산구 한강대로 405",
+    "lat": 37.5547, 
+    "lng": 126.9706
+  },
+  "waypoints": [
+    {
+      "name": "대전역",
+      "lat": 36.3325,
+      "lng": 127.4342
+    }
+  ],
+  "destination": {
+    "name": "부산역",
+    "address": "부산 동구 중앙대로 206",
+    "lat": 35.1149,
+    "lng": 129.0422
+  },
+  "user_note": "맛집 위주로, 시간은 넉넉하게!",
+  "purpose": "식도락 여행",
+  "companions": [
+    "친구A",
+    "친구B"
+  ]
+}
