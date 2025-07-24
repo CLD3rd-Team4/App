@@ -1,0 +1,19 @@
+server:
+  port: 8888
+
+spring:
+  application:
+    name: config-server
+  cloud:
+    config:
+      server:
+        git:
+          uri: https://github.com/CLD3rd-Team4/App
+          default-label: main
+          search-paths: config-repo/{application}
+
+# 보안 설정 (선택사항)
+# security:
+#   user:
+#     name: configuser
+#     password: configpassword

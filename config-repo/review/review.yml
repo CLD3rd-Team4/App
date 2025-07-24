@@ -1,0 +1,17 @@
+# Review 서비스 설정
+
+server:
+  port: 8083
+
+spring:
+  application:
+    name: review
+  datasource:
+    url: jdbc:mysql://localhost:3306/mapzip_review
+    username: root
+    password: password
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true

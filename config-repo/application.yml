@@ -1,0 +1,25 @@
+# 모든 서비스에 공통으로 적용되는 설정
+
+# Eureka 서버 설정
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
+
+# Actuator 설정
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+
+# 로깅 설정
+logging:
+  level:
+    root: INFO
+    org.springframework.cloud.config: DEBUG
