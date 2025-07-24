@@ -9,8 +9,8 @@ spring:
       server:
         git:
           uri: https://github.com/CLD3rd-Team4/App
-          default-label: main
-          search-paths: config-repo/{application}
+          default-label: ECS-55-backend/config
+          search-paths: backend/config-repo/{application}
 
 # 보안 설정 (선택사항)
 # security:
