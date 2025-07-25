@@ -3,7 +3,6 @@ package com.mapzip.schedule.repository;
 import com.mapzip.schedule.entity.Schedule;
 import com.mapzip.schedule.entity.SelectedRestaurant;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
 
 import java.util.List;
 

@@ -172,4 +172,10 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
                     .asRuntimeException());
         }
     }
+
+    @Override
+    public void refreshSchedule(RefreshScheduleRequest request, StreamObserver<RefreshScheduleResponse> responseObserver) {
+        // TODO: Implement refresh logic
+        responseObserver.onError(Status.UNIMPLEMENTED.withDescription("Method not implemented").asRuntimeException());
+    }
 }
