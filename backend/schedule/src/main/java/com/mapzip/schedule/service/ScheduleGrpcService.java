@@ -84,7 +84,7 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
             // 4. 경로 정보 기반으로 식사/간식 시간별 예상 위치 계산
             List<RouteService.CalculatedLocation> calculatedLocations = routeService.calculateMealLocations(
                     tmapResponse,
-                    request.getMealSlotsList(),
+                    mealTimeSlotEntities,
                     departureDateTime
             );
 

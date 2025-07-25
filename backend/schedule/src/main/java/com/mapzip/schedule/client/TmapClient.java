@@ -62,6 +62,12 @@ public class TmapClient {
         try {
             ResponseEntity<TmapRouteResponse> response = restTemplate.postForEntity(uri, entity, TmapRouteResponse.class);
             if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+                // 파일에 응답 페이로드 저장
+                try (java.io.FileWriter file = new java.io.FileWriter("tmap_response_payload.json")) {
+                    file.write(objectMapper.writeValueAsString(response.getBody()));
+                } catch (java.io.IOException e) {
+                    log.error("Failed to write Tmap response payload to file", e);
+                }
                 return response.getBody();
             } else {
                 throw new RuntimeException("Tmap API request failed with status code: " + response.getStatusCode() + " and body: " + response.getBody());
