@@ -198,6 +198,8 @@ message SelectRestaurantRequest {
   string slot_id = 2;
   string restaurant_id = 3;
   string user_id = 4;
+  string name = 5;
+  string detail_url = 6;
 }
 
 message SelectRestaurantResponse {

@@ -60,6 +60,9 @@ public class MealTimeSlot {
     @Column(name = "calculated_location", columnDefinition = "jsonb")
     private String calculatedLocation;
 
+    @OneToOne(mappedBy = "mealTimeSlot", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private SelectedRestaurant selectedRestaurant;
+
     /**
      * 레코드 생성 시간
      */

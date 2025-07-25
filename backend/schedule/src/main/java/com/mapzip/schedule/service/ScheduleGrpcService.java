@@ -8,6 +8,7 @@ import com.mapzip.schedule.mapper.ScheduleMapper;
 import com.mapzip.schedule.repository.MealTimeSlotRepository;
 import com.mapzip.schedule.repository.ScheduleRepository;
 import com.mapzip.schedule.repository.SelectedRestaurantRepository;
+import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -126,66 +127,48 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
     @Transactional
     public void selectRestaurant(SelectRestaurantRequest request, StreamObserver<SelectRestaurantResponse> responseObserver) {
         try {
+            // 1. 스케줄과 시간 슬롯의 존재 여부 및 사용자 권한 확인
             Schedule schedule = scheduleRepository.findById(request.getScheduleId())
-                    .orElseThrow(() -> new IllegalArgumentException("스케줄을 찾을 수 없습니다."));
+                    .orElseThrow(() -> Status.NOT_FOUND.withDescription("스케줄을 찾을 수 없습니다: " + request.getScheduleId()).asRuntimeException());
 
             if (!schedule.getUserId().equals(request.getUserId())) {
-                responseObserver.onError(io.grpc.Status.PERMISSION_DENIED
-                        .withDescription("해당 스케줄에 접근할 권한이 없습니다.")
-                        .asRuntimeException());
-                return;
+                throw Status.PERMISSION_DENIED.withDescription("이 스케줄에 접근할 권한이 없습니다.").asRuntimeException();
             }
 
             MealTimeSlot mealTimeSlot = mealTimeSlotRepository.findById(request.getSlotId())
-                    .orElseThrow(() -> new IllegalArgumentException("식사 시간 슬롯을 찾을 수 없습니다."));
+                    .orElseThrow(() -> Status.NOT_FOUND.withDescription("시간 슬롯을 찾을 수 없습니다: " + request.getSlotId()).asRuntimeException());
 
-            // 맛집 정보는 임시 데이터 사용
-            String restaurantName = "선택된 맛집 (ID: " + request.getRestaurantId() + ")";
-            String detailUrl = "https://placeholder.url/for/" + request.getRestaurantId();
+            // 2. 기존에 선택된 맛집이 있는지 확인하고, 없다면 새로 생성
+            SelectedRestaurant selectedRestaurant = mealTimeSlot.getSelectedRestaurant();
+            if (selectedRestaurant == null) {
+                selectedRestaurant = new SelectedRestaurant();
+                selectedRestaurant.setMealTimeSlot(mealTimeSlot); // 관계 설정
+                selectedRestaurant.setSchedule(schedule); // 관계 설정
+                mealTimeSlot.setSelectedRestaurant(selectedRestaurant); // 양방향 관계 설정
+            }
 
-            // Check if SelectedRestaurant already exists for this slotId
-            SelectedRestaurant selectedRestaurant = selectedRestaurantRepository.findById(mealTimeSlot.getId())
-                    .orElseGet(() -> {
-                        SelectedRestaurant newSelectedRestaurant = new SelectedRestaurant();
-                        newSelectedRestaurant.setSlotId(mealTimeSlot.getId()); // Explicitly set ID for new entity
-                        newSelectedRestaurant.setMealTimeSlot(mealTimeSlot);
-                        newSelectedRestaurant.setSchedule(schedule);
-                        return newSelectedRestaurant;
-                    });
-
-            // Update fields (for both new and existing entities)
+            // 3. 맛집 정보 업데이트 (생성 또는 수정)
             selectedRestaurant.setRestaurantId(request.getRestaurantId());
-            selectedRestaurant.setName(restaurantName);
+            selectedRestaurant.setName(request.getName());
+            selectedRestaurant.setDetailUrl(request.getDetailUrl());
             selectedRestaurant.setScheduledTime(mealTimeSlot.getScheduledTime());
-            selectedRestaurant.setDetailUrl(detailUrl);
+            selectedRestaurant.setSelectedAt(java.time.LocalDateTime.now()); // 선택 시간을 현재로 갱신
 
-            selectedRestaurantRepository.save(selectedRestaurant);
+            // 4. mealTimeSlot을 저장하면 selectedRestaurant도 함께 저장됨 (CascadeType.ALL)
+            mealTimeSlotRepository.save(mealTimeSlot);
 
-            com.mapzip.schedule.grpc.SelectedRestaurant grpcSelectedRestaurant =
-                    com.mapzip.schedule.grpc.SelectedRestaurant.newBuilder()
-                            .setSlotId(selectedRestaurant.getSlotId())
-                            .setRestaurantId(selectedRestaurant.getRestaurantId())
-                            .setName(selectedRestaurant.getName())
-                            .setScheduledTime(selectedRestaurant.getScheduledTime())
-                            .setDetailUrl(selectedRestaurant.getDetailUrl())
-                            .build();
-
+            // 5. 성공 응답 전송
             SelectRestaurantResponse response = SelectRestaurantResponse.newBuilder()
                     .setSuccess(true)
                     .setMessage("맛집이 성공적으로 선택되었습니다.")
-                    .setSelectedRestaurant(grpcSelectedRestaurant)
                     .build();
 
             responseObserver.onNext(response);
             responseObserver.onCompleted();
-
-        } catch (IllegalArgumentException e) {
-            responseObserver.onError(io.grpc.Status.NOT_FOUND
-                    .withDescription(e.getMessage())
-                    .asRuntimeException());
         } catch (Exception e) {
-            responseObserver.onError(io.grpc.Status.INTERNAL
-                    .withDescription("맛집 선택 중 오류가 발생했습니다: " + e.getMessage())
+            responseObserver.onError(Status.INTERNAL
+                    .withDescription("맛집 선택 중 오류 발생: " + e.getMessage())
+                    .withCause(e)
                     .asRuntimeException());
         }
     }
