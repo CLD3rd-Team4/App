@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
@@ -27,7 +28,19 @@ public class RouteService {
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("No LineString feature in Tmap response"));
 
-        List<List<Double>> coordinates = (List<List<Double>>) (List<?>) routeFeature.getGeometry().getCoordinates();
+        List<List<Double>> coordinates;
+        Object rawCoordinates = routeFeature.getGeometry().getCoordinates();
+        if (rawCoordinates instanceof List) {
+            try {
+                coordinates = ((List<?>) rawCoordinates).stream()
+                        .map(item -> (List<Double>) item)
+                        .collect(Collectors.toList());
+            } catch (ClassCastException e) {
+                throw new IllegalArgumentException("Invalid coordinate format in LineString", e);
+            }
+        } else {
+            throw new IllegalArgumentException("Coordinates is not a List");
+        }
         int totalTimeInSeconds = routeFeature.getProperties().getTotalTime();
 
         List<CalculatedLocation> calculatedLocations = new ArrayList<>();

@@ -10,7 +10,7 @@ import java.util.Locale;
 public class TimeUtil {
 
     private static final DateTimeFormatter KOREAN_AM_PM_FORMATTER = DateTimeFormatter.ofPattern("a hh:mm", Locale.KOREAN);
-    private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
+    private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssZ");
     private static final ZoneId SEOUL_ZONE_ID = ZoneId.of("Asia/Seoul");
 
     /**

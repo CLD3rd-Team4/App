@@ -122,21 +122,26 @@ public class ScheduleMapper {
 
         TmapLocation departure = new TmapLocation(
                 grpcRequest.getDeparture().getName(),
-                grpcRequest.getDeparture().getLng(),
-                grpcRequest.getDeparture().getLat()
+                String.valueOf(grpcRequest.getDeparture().getLng()),
+                String.valueOf(grpcRequest.getDeparture().getLat())
         );
 
         TmapLocation destination = new TmapLocation(
                 grpcRequest.getDestination().getName(),
-                grpcRequest.getDestination().getLng(),
-                grpcRequest.getDestination().getLat()
+                String.valueOf(grpcRequest.getDestination().getLng()),
+                String.valueOf(grpcRequest.getDestination().getLat())
         );
 
-        List<TmapWaypoint> waypoints = grpcRequest.getWaypointsList().stream()
-                .map(wp -> new TmapWaypoint(String.valueOf(wp.getLng()), String.valueOf(wp.getLat())))
-                .collect(Collectors.toList());
-
-        WaypointsContainer waypointsContainer = new WaypointsContainer(waypoints);
+        WaypointsContainer waypointsContainer;
+        if (grpcRequest.getWaypointsList().isEmpty()) {
+            // 빈 경유지 리스트로 초기화
+            waypointsContainer = new WaypointsContainer(Collections.emptyList());
+        } else {
+            List<TmapWaypoint> waypoints = grpcRequest.getWaypointsList().stream()
+                    .map(wp -> new TmapWaypoint(String.valueOf(wp.getLng()), String.valueOf(wp.getLat())))
+                    .collect(Collectors.toList());
+            waypointsContainer = new WaypointsContainer(waypoints);
+        }
 
         TmapRoutesInfo routesInfo = new TmapRoutesInfo(departure, destination, waypointsContainer, "arrival", tmapDepartureTime, "00", "car");
         return new TmapRouteRequest(routesInfo);
