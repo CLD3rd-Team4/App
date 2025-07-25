@@ -15,23 +15,18 @@ public class TimeUtil {
     private static final ZoneId SEOUL_ZONE_ID = ZoneId.of("Asia/Seoul");
 
     /**
-     * "오전/오후 hh:mm" 형식의 문자열을 미래의 LocalDateTime 객체로 변환합니다.
-     * 만약 파싱된 시간이 현재 시간보다 과거일 경우, 다음 날로 설정합니다.
+     * "오전/오후 hh:mm" 형식의 문자열을 특정 기준 날짜에 맞는 LocalDateTime 객체로 변환합니다.
      */
-    public static LocalDateTime parseKoreanAmPmToFuture(String timeStr) {
+    public static LocalDateTime parseKoreanAmPmToFuture(String timeStr, LocalDate baseDate) {
         LocalDateTime parsedDateTime;
         try {
             LocalTime localTime = LocalTime.parse(timeStr, KOREAN_AM_PM_FORMATTER);
-            parsedDateTime = LocalDate.now(SEOUL_ZONE_ID).atTime(localTime);
+            parsedDateTime = baseDate.atTime(localTime);
         } catch (Exception e) {
             // "HH:mm" 형식도 지원
-            parsedDateTime = LocalDate.now(SEOUL_ZONE_ID).atTime(LocalTime.parse(timeStr, DateTimeFormatter.ofPattern("HH:mm")));
+            parsedDateTime = baseDate.atTime(LocalTime.parse(timeStr, DateTimeFormatter.ofPattern("HH:mm")));
         }
 
-        // 만약 파싱된 시간이 현재보다 과거이면, 다음 날로 설정
-        if (parsedDateTime.isBefore(now())) {
-            parsedDateTime = parsedDateTime.plusDays(1);
-        }
         return parsedDateTime;
     }
 

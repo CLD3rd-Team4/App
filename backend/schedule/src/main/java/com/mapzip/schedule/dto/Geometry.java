@@ -1,13 +1,16 @@
 package com.mapzip.schedule.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.util.List;
 
 @Getter
 @NoArgsConstructor
 public class Geometry {
+
+    @JsonProperty("type")
     private String type;
-    private List<Object> coordinates;
+
+    @JsonProperty("coordinates")
+    private Object coordinates;
 }

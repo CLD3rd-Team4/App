@@ -13,13 +13,18 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.net.URI;
 import com.fasterxml.jackson.databind.ObjectMapper; // 추가
 
-@Slf4j // 추가
+@Slf4j
 @Component
-@RequiredArgsConstructor
 public class TmapClient {
 
     private final RestTemplate restTemplate;
-    private final ObjectMapper objectMapper = new ObjectMapper(); // 추가
+    private final ObjectMapper objectMapper;
+
+    public TmapClient(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+        this.objectMapper = new ObjectMapper();
+        this.objectMapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    }
 
     @Value("${external.api.tmap.url}")
     private String tmapApiUrl;
@@ -60,15 +65,19 @@ public class TmapClient {
         HttpEntity<TmapRouteRequest> entity = new HttpEntity<>(requestBody, headers);
 
         try {
-            ResponseEntity<TmapRouteResponse> response = restTemplate.postForEntity(uri, entity, TmapRouteResponse.class);
+            ResponseEntity<String> response = restTemplate.postForEntity(uri, entity, String.class);
             if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
-                // 파일에 응답 페이로드 저장
+                // 응답 본문을 파일에 저장
                 try (java.io.FileWriter file = new java.io.FileWriter("tmap_response_payload.json")) {
-                    file.write(objectMapper.writeValueAsString(response.getBody()));
+                    file.write(response.getBody());
                 } catch (java.io.IOException e) {
                     log.error("Failed to write Tmap response payload to file", e);
                 }
-                return response.getBody();
+
+                // 수동으로 JSON을 객체로 변환
+                TmapRouteResponse tmapResponse = objectMapper.readValue(response.getBody(), TmapRouteResponse.class);
+                return tmapResponse;
+
             } else {
                 throw new RuntimeException("Tmap API request failed with status code: " + response.getStatusCode() + " and body: " + response.getBody());
             }

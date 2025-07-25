@@ -59,7 +59,12 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
         try {
             // 1. 사용자의 출발 시간을 미래 시간으로 변환 (과거일 경우 다음 날로)
             // 위치는 사용자의 요청을 그대로 사용합니다.
-            LocalDateTime departureDateTime = TimeUtil.parseKoreanAmPmToFuture(request.getDepartureTime());
+            LocalDateTime departureDateTime = TimeUtil.parseKoreanAmPmToFuture(request.getDepartureTime(), java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul")));
+
+            // 만약 파싱된 출발 시간이 현재 시간보다 과거이면, 다음 날로 설정
+            if (departureDateTime.isBefore(TimeUtil.now())) {
+                departureDateTime = departureDateTime.plusDays(1);
+            }
 
             // 2. 스케줄 엔티티 생성 및 저장 (사용자 요청 원본 그대로 저장)
             Schedule schedule = scheduleMapper.toEntity(request);
@@ -105,8 +110,8 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
             mealTimeSlotRepository.saveAll(mealTimeSlotEntities);
 
             // 6. 계산된 도착 시간을 Schedule에 업데이트
-            String arrivalTimeISO = tmapResponse.getFeatures().get(0).getProperties().getArrivalTime();
-            LocalDateTime arrivalDateTime = LocalDateTime.parse(arrivalTimeISO, TimeUtil.getTmapResponseFormatter());
+            int totalTimeInSeconds = tmapResponse.getFeatures().get(0).getProperties().getTotalTime();
+            LocalDateTime arrivalDateTime = departureDateTime.plusSeconds(totalTimeInSeconds);
             schedule.setCalculatedArrivalTime(TimeUtil.toKoreanAmPm(arrivalDateTime));
             scheduleRepository.save(schedule);
 
