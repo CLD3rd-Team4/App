@@ -138,7 +138,7 @@ public class ScheduleMapper {
 
         WaypointsContainer waypointsContainer = new WaypointsContainer(waypoints);
 
-        TmapRoutesInfo routesInfo = new TmapRoutesInfo(departure, destination, waypointsContainer, "departure", tmapDepartureTime, "00");
+        TmapRoutesInfo routesInfo = new TmapRoutesInfo(departure, destination, waypointsContainer, "arrival", tmapDepartureTime, "00", "car");
         return new TmapRouteRequest(routesInfo);
     }
 }

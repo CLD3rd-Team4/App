@@ -124,6 +124,7 @@ message CreateScheduleRequest {
   string user_id = 1;
   string title = 2;
   string departure_time = 3;
+  string arrival_time = 11; // 추가
   repeated MealTimeSlot meal_slots = 4;
   Location departure = 5;
   repeated Waypoint waypoints = 6;

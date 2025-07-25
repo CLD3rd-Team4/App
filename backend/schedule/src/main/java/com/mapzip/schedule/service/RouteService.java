@@ -33,7 +33,8 @@ public class RouteService {
         List<CalculatedLocation> calculatedLocations = new ArrayList<>();
 
         for (var mealSlot : mealSlots) {
-            LocalDateTime mealDateTime = TimeUtil.parseKoreanAmPmToFuture(mealSlot.getScheduledTime());
+            com.mapzip.schedule.grpc.MealTimeSlot grpcMealSlot = (com.mapzip.schedule.grpc.MealTimeSlot) mealSlot;
+            LocalDateTime mealDateTime = TimeUtil.parseKoreanAmPmToFuture(grpcMealSlot.getScheduledTime());
             // 식사 시간이 출발 시간보다 과거이면 다음날로 처리
             if(mealDateTime.isBefore(departureDateTime)){
                 mealDateTime = mealDateTime.plusDays(1);
@@ -51,7 +52,7 @@ public class RouteService {
                 int targetIndex = (int) ((coordinates.size() - 1) * timeRatio);
                 location = coordinates.get(targetIndex);
             }
-            calculatedLocations.add(new CalculatedLocation(mealSlot.getSlotId(), location.get(1), location.get(0)));
+            calculatedLocations.add(new CalculatedLocation(grpcMealSlot.getSlotId(), location.get(1), location.get(0)));
         }
         return calculatedLocations;
     }
