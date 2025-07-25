@@ -4,17 +4,17 @@
   "departure_time": "오전 09:00",
   "meal_slots": [
     {
-      "meal_type": "MEAL",
+      "meal_type": 0,
       "scheduled_time": "오후 12:30",
       "radius": 1500
     },
     {
-      "meal_type": "SNACK",
+      "meal_type": 1,
       "scheduled_time": "오후 03:30",
       "radius": 1000
     },
     {
-      "meal_type": "MEAL",
+      "meal_type": 0,
       "scheduled_time": "오후 07:00",
       "radius": 2000
     }

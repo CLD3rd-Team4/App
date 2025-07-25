@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -53,6 +55,7 @@ public class Schedule {
      * 출발지 정보 (JSON 형태로 저장)
      * Location 객체를 JSONB 타입으로 변환하여 저장합니다.
      */
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "departure_location", columnDefinition = "jsonb")
     private String departureLocation;
 
@@ -60,6 +63,7 @@ public class Schedule {
      * 목적지 정보 (JSON 형태로 저장)
      * Location 객체를 JSONB 타입으로 변환하여 저장합니다.
      */
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "destination_location", columnDefinition = "jsonb")
     private String destinationLocation;
 
@@ -67,6 +71,7 @@ public class Schedule {
      * 경유지 목록 (JSON 형태로 저장)
      * Waypoint 객체 배열을 JSONB 타입으로 변환하여 저장합니다.
      */
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private String waypoints;
 
@@ -87,6 +92,7 @@ public class Schedule {
      * 동행자 목록 (JSON 형태로 저장)
      * String 배열을 JSONB 타입으로 변환하여 저장합니다.
      */
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private String companions;
 

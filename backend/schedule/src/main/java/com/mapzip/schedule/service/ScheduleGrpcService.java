@@ -2,10 +2,12 @@ package com.mapzip.schedule.service;
 
 import com.mapzip.schedule.entity.MealTimeSlot;
 import com.mapzip.schedule.entity.Schedule;
+import com.mapzip.schedule.entity.SelectedRestaurant;
 import com.mapzip.schedule.grpc.*;
 import com.mapzip.schedule.mapper.ScheduleMapper;
 import com.mapzip.schedule.repository.MealTimeSlotRepository;
 import com.mapzip.schedule.repository.ScheduleRepository;
+import com.mapzip.schedule.repository.SelectedRestaurantRepository;
 import io.grpc.stub.StreamObserver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -27,6 +29,7 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
 
     private final ScheduleRepository scheduleRepository;
     private final MealTimeSlotRepository mealTimeSlotRepository;
+    private final SelectedRestaurantRepository selectedRestaurantRepository;
     private final ScheduleMapper scheduleMapper;
 
     @Override
@@ -115,6 +118,74 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
         } catch (Exception e) {
             responseObserver.onError(io.grpc.Status.INTERNAL
                     .withDescription("스케줄 상세 정보 조회 중 오류가 발생했습니다: " + e.getMessage())
+                    .asRuntimeException());
+        }
+    }
+
+    @Override
+    @Transactional
+    public void selectRestaurant(SelectRestaurantRequest request, StreamObserver<SelectRestaurantResponse> responseObserver) {
+        try {
+            Schedule schedule = scheduleRepository.findById(request.getScheduleId())
+                    .orElseThrow(() -> new IllegalArgumentException("스케줄을 찾을 수 없습니다."));
+
+            if (!schedule.getUserId().equals(request.getUserId())) {
+                responseObserver.onError(io.grpc.Status.PERMISSION_DENIED
+                        .withDescription("해당 스케줄에 접근할 권한이 없습니다.")
+                        .asRuntimeException());
+                return;
+            }
+
+            MealTimeSlot mealTimeSlot = mealTimeSlotRepository.findById(request.getSlotId())
+                    .orElseThrow(() -> new IllegalArgumentException("식사 시간 슬롯을 찾을 수 없습니다."));
+
+            // 맛집 정보는 임시 데이터 사용
+            String restaurantName = "선택된 맛집 (ID: " + request.getRestaurantId() + ")";
+            String detailUrl = "https://placeholder.url/for/" + request.getRestaurantId();
+
+            // Check if SelectedRestaurant already exists for this slotId
+            SelectedRestaurant selectedRestaurant = selectedRestaurantRepository.findById(mealTimeSlot.getId())
+                    .orElseGet(() -> {
+                        SelectedRestaurant newSelectedRestaurant = new SelectedRestaurant();
+                        newSelectedRestaurant.setSlotId(mealTimeSlot.getId()); // Explicitly set ID for new entity
+                        newSelectedRestaurant.setMealTimeSlot(mealTimeSlot);
+                        newSelectedRestaurant.setSchedule(schedule);
+                        return newSelectedRestaurant;
+                    });
+
+            // Update fields (for both new and existing entities)
+            selectedRestaurant.setRestaurantId(request.getRestaurantId());
+            selectedRestaurant.setName(restaurantName);
+            selectedRestaurant.setScheduledTime(mealTimeSlot.getScheduledTime());
+            selectedRestaurant.setDetailUrl(detailUrl);
+
+            selectedRestaurantRepository.save(selectedRestaurant);
+
+            com.mapzip.schedule.grpc.SelectedRestaurant grpcSelectedRestaurant =
+                    com.mapzip.schedule.grpc.SelectedRestaurant.newBuilder()
+                            .setSlotId(selectedRestaurant.getSlotId())
+                            .setRestaurantId(selectedRestaurant.getRestaurantId())
+                            .setName(selectedRestaurant.getName())
+                            .setScheduledTime(selectedRestaurant.getScheduledTime())
+                            .setDetailUrl(selectedRestaurant.getDetailUrl())
+                            .build();
+
+            SelectRestaurantResponse response = SelectRestaurantResponse.newBuilder()
+                    .setSuccess(true)
+                    .setMessage("맛집이 성공적으로 선택되었습니다.")
+                    .setSelectedRestaurant(grpcSelectedRestaurant)
+                    .build();
+
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+
+        } catch (IllegalArgumentException e) {
+            responseObserver.onError(io.grpc.Status.NOT_FOUND
+                    .withDescription(e.getMessage())
+                    .asRuntimeException());
+        } catch (Exception e) {
+            responseObserver.onError(io.grpc.Status.INTERNAL
+                    .withDescription("맛집 선택 중 오류가 발생했습니다: " + e.getMessage())
                     .asRuntimeException());
         }
     }

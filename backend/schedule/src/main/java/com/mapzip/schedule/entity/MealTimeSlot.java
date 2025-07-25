@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -54,6 +56,7 @@ public class MealTimeSlot {
      * 경로상 계산된 예상 식사/간식 위치 (JSON 형태로 저장)
      * MealLocation 객체를 JSONB 타입으로 변환하여 저장합니다.
      */
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "calculated_location", columnDefinition = "jsonb")
     private String calculatedLocation;
 

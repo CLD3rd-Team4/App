@@ -34,6 +34,13 @@ public class SelectedRestaurant {
     private MealTimeSlot mealTimeSlot;
 
     /**
+     * 이 맛집이 속한 스케줄 정보
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "schedule_id", nullable = false)
+    private Schedule schedule;
+
+    /**
      * 선택된 맛집의 ID
      */
     @Column(name = "restaurant_id", nullable = false, length = 100)
