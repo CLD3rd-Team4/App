@@ -15,98 +15,113 @@ import com.mapzip.schedule.util.TimeUtil;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 @Service
 public class RouteService {
+
+    private final ObjectMapper objectMapper;
+
+    public RouteService(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
 
     public List<CalculatedLocation> calculateMealLocations(
             TmapRouteResponse tmapResponse,
             List<com.mapzip.schedule.entity.MealTimeSlot> mealSlots,
             LocalDateTime departureDateTime
     ) {
-        // Point Feature에서 totalTime 및 totalDistance 추출
-        Feature startPointFeature = tmapResponse.getFeatures().stream()
-                .filter(f -> "Point".equalsIgnoreCase(f.getGeometry().getType()) && "S".equals(f.getProperties().getPointType()))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("No start point feature in Tmap response"));
+        List<Feature> features = tmapResponse.getFeatures();
 
-        int totalTimeInSeconds = startPointFeature.getProperties().getTotalTime();
+        // 경로의 모든 Point Feature와 해당 지점까지의 누적 시간을 매핑
+        List<TimePoint> timePoints = new ArrayList<>();
+        long accumulatedTime = 0;
+        Coordinate lastCoordinate = null;
 
-        // LineString Feature에서 coordinates 추출
-        Feature routeFeature = tmapResponse.getFeatures().stream()
-                .filter(f -> "LineString".equalsIgnoreCase(f.getGeometry().getType()))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("No LineString feature in Tmap response"));
-
-        List<Coordinate> coordinates = parseCoordinates(routeFeature.getGeometry().getCoordinates());
-        if (coordinates.size() < 2) {
-            throw new IllegalStateException("Route requires at least two coordinates.");
+        for (Feature feature : features) {
+            if ("Point".equalsIgnoreCase(feature.getGeometry().getType())) {
+                Coordinate currentCoord = parseCoordinates(feature.getGeometry().getCoordinates()).get(0);
+                timePoints.add(new TimePoint(accumulatedTime, currentCoord));
+                lastCoordinate = currentCoord;
+            } else if ("LineString".equalsIgnoreCase(feature.getGeometry().getType())) {
+                // LineString Feature일 때만 time 필드를 사용
+                if (feature.getProperties().getTime() != null) {
+                    accumulatedTime += feature.getProperties().getTime();
+                }
+            }
         }
 
-
-        // 각 좌표 구간별 거리 계산 및 총 거리 합산
-        List<Double> segmentDistances = new ArrayList<>();
-        double totalDistance = 0;
-        for (int i = 0; i < coordinates.size() - 1; i++) {
-            double distance = coordinates.get(i).distanceTo(coordinates.get(i + 1));
-            segmentDistances.add(distance);
-            totalDistance += distance;
+        // 마지막 지점 (도착지) 추가
+        if (lastCoordinate != null && (timePoints.isEmpty() || timePoints.get(timePoints.size() - 1).time < accumulatedTime)) {
+            timePoints.add(new TimePoint(accumulatedTime, lastCoordinate));
         }
 
-        if (totalTimeInSeconds <= 0) {
-            throw new IllegalStateException("Total time from Tmap API is zero or negative, cannot calculate route.");
-        }
-        
-        double averageSpeed = totalDistance / totalTimeInSeconds;
         List<CalculatedLocation> calculatedLocations = new ArrayList<>();
 
         for (var mealSlot : mealSlots) {
             LocalDateTime mealDateTime = TimeUtil.parseKoreanAmPmToFuture(mealSlot.getScheduledTime(), departureDateTime.toLocalDate());
-
-            // 식사 시간이 출발 시간보다 과거이면 다음 날로 처리
             if (mealDateTime.isBefore(departureDateTime)) {
                 mealDateTime = mealDateTime.plusDays(1);
             }
 
             long secondsFromDeparture = ChronoUnit.SECONDS.between(departureDateTime, mealDateTime);
 
-            Coordinate location;
-            if (secondsFromDeparture < 0) {
-                location = coordinates.get(0);
-            } else if (secondsFromDeparture >= totalTimeInSeconds) {
-                location = coordinates.get(coordinates.size() - 1);
-            } else {
-                double targetDistance = averageSpeed * secondsFromDeparture;
-                double accumulatedDistance = 0;
-                location = coordinates.get(coordinates.size() - 1); // 기본값: 목적지
+            // 목표 시간과 가장 가까운 안내점 찾기
+            TimePoint closestPoint = findClosestTimePoint(timePoints, secondsFromDeparture);
+            Coordinate location = closestPoint.getCoordinate();
 
-                for (int i = 0; i < segmentDistances.size(); i++) {
-                    double segmentDistance = segmentDistances.get(i);
-                    if (accumulatedDistance + segmentDistance >= targetDistance) {
-                        double ratio = (targetDistance - accumulatedDistance) / segmentDistance;
-                        location = Coordinate.interpolate(coordinates.get(i), coordinates.get(i + 1), ratio);
-                        break;
-                    }
-                    accumulatedDistance += segmentDistance;
-                }
-            }
             calculatedLocations.add(new CalculatedLocation(mealSlot.getId(), location.getLat(), location.getLon()));
         }
+
         return calculatedLocations;
     }
 
+    private TimePoint findClosestTimePoint(List<TimePoint> timePoints, long targetTime) {
+        if (timePoints.isEmpty()) {
+            throw new IllegalStateException("No time points available to find closest location.");
+        }
+
+        TimePoint closest = timePoints.get(0);
+        long minDiff = Long.MAX_VALUE;
+
+        for (TimePoint point : timePoints) {
+            long diff = Math.abs(point.getTime() - targetTime);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closest = point;
+            }
+        }
+        return closest;
+    }
+
+    // TimePoint 내부 클래스 추가
+    @Getter
+    @AllArgsConstructor
+    private static class TimePoint {
+        private long time; // 초 단위 누적 시간
+        private Coordinate coordinate;
+    }
+
     private List<Coordinate> parseCoordinates(Object rawCoordinates) {
-        if (!(rawCoordinates instanceof List)) {
-            throw new IllegalArgumentException("Coordinates is not a List");
+        if (rawCoordinates == null) {
+            return new ArrayList<>();
         }
         try {
-            return ((List<?>) rawCoordinates).stream()
-                    .map(item -> {
-                        List<Double> point = (List<Double>) item;
-                        return new Coordinate(point.get(1), point.get(0)); // Tmap: lon, lat -> 우리: lat, lon
-                    })
-                    .collect(Collectors.toList());
-        } catch (ClassCastException e) {
-            throw new IllegalArgumentException("Invalid coordinate format in LineString", e);
+            if (rawCoordinates instanceof List && !((List<?>) rawCoordinates).isEmpty() && ((List<?>) rawCoordinates).get(0) instanceof List) {
+                // LineString (중첩 리스트) 형태: [[lon, lat], [lon, lat], ...]
+                List<List<Double>> parsedList = objectMapper.convertValue(rawCoordinates, new com.fasterxml.jackson.core.type.TypeReference<List<List<Double>>>() {});
+                return parsedList.stream()
+                        .map(point -> new Coordinate(point.get(1), point.get(0))) // Tmap: lon, lat -> 우리: lat, lon
+                        .collect(Collectors.toList());
+            } else if (rawCoordinates instanceof List && !((List<?>) rawCoordinates).isEmpty() && ((List<?>) rawCoordinates).get(0) instanceof Double) {
+                // Point (단일 리스트) 형태: [lon, lat]
+                List<Double> point = objectMapper.convertValue(rawCoordinates, new com.fasterxml.jackson.core.type.TypeReference<List<Double>>() {});
+                return List.of(new Coordinate(point.get(1), point.get(0))); // Tmap: lon, lat -> 우리: lat, lon
+            } else {
+                throw new IllegalArgumentException("Unsupported coordinate format: " + rawCoordinates);
+            }
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid coordinate format in LineString: " + rawCoordinates, e);
         }
     }
 

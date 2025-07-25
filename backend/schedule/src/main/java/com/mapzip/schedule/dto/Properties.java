@@ -22,4 +22,7 @@ public class Properties {
 
     @JsonProperty("pointType")
     private String pointType;
+
+    @JsonProperty("time")
+    private Integer time;
 }
