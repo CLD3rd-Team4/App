@@ -1,0 +1,57 @@
+package com.mapzip.schedule.util;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
+
+public class TimeUtil {
+
+    private static final DateTimeFormatter KOREAN_AM_PM_FORMATTER = DateTimeFormatter.ofPattern("a hh:mm", Locale.KOREAN);
+    private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
+    private static final ZoneId SEOUL_ZONE_ID = ZoneId.of("Asia/Seoul");
+
+    /**
+     * "오전/오후 hh:mm" 형식의 문자열을 미래의 LocalDateTime 객체로 변환합니다.
+     * 만약 파싱된 시간이 현재 시간보다 과거일 경우, 다음 날로 설정합니다.
+     */
+    public static LocalDateTime parseKoreanAmPmToFuture(String timeStr) {
+        LocalDateTime parsedDateTime;
+        try {
+            LocalTime localTime = LocalTime.parse(timeStr, KOREAN_AM_PM_FORMATTER);
+            parsedDateTime = LocalDate.now(SEOUL_ZONE_ID).atTime(localTime);
+        } catch (Exception e) {
+            // "HH:mm" 형식도 지원
+            parsedDateTime = LocalDate.now(SEOUL_ZONE_ID).atTime(LocalTime.parse(timeStr, DateTimeFormatter.ofPattern("HH:mm")));
+        }
+
+        // 만약 파싱된 시간이 현재보다 과거이면, 다음 날로 설정
+        if (parsedDateTime.isBefore(now())) {
+            parsedDateTime = parsedDateTime.plusDays(1);
+        }
+        return parsedDateTime;
+    }
+
+    /**
+     * LocalDateTime 객체를 Tmap API가 요구하는 ISO 형식 문자열로 변환합니다.
+     */
+    public static String toTmapApiFormat(LocalDateTime dateTime) {
+        return dateTime.atZone(SEOUL_ZONE_ID).format(ISO_FORMATTER);
+    }
+
+    /**
+     * LocalDateTime 객체를 "오후 HH:mm" 형식의 문자열로 변환합니다.
+     */
+    public static String toKoreanAmPm(LocalDateTime dateTime) {
+        return dateTime.format(KOREAN_AM_PM_FORMATTER);
+    }
+
+    /**
+     * 현재 서울의 시간을 반환합니다.
+     */
+    public static LocalDateTime now() {
+        return LocalDateTime.now(SEOUL_ZONE_ID);
+    }
+}
