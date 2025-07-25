@@ -122,14 +122,14 @@ public class ScheduleMapper {
 
         TmapLocation departure = new TmapLocation(
                 grpcRequest.getDeparture().getName(),
-                String.valueOf(grpcRequest.getDeparture().getLng()),
-                String.valueOf(grpcRequest.getDeparture().getLat())
+                grpcRequest.getDeparture().getLng(),
+                grpcRequest.getDeparture().getLat()
         );
 
         TmapLocation destination = new TmapLocation(
                 grpcRequest.getDestination().getName(),
-                String.valueOf(grpcRequest.getDestination().getLng()),
-                String.valueOf(grpcRequest.getDestination().getLat())
+                grpcRequest.getDestination().getLng(),
+                grpcRequest.getDestination().getLat()
         );
 
         List<TmapWaypoint> waypoints = grpcRequest.getWaypointsList().stream()

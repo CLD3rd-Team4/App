@@ -26,7 +26,8 @@ public class TmapClient {
     public TmapRouteResponse getRoutePrediction(TmapRouteRequest requestBody) {
         URI uri = UriComponentsBuilder
                 .fromHttpUrl(tmapApiUrl)
-                .path("/tmap/routes/prediction/1")
+                .path("/tmap/routes/prediction")
+                .queryParam("version", 1)
                 .encode()
                 .build()
                 .toUri();

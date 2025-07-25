@@ -7,6 +7,6 @@ import lombok.Getter;
 @AllArgsConstructor
 public class TmapLocation {
     private String name;
-    private String lon;
-    private String lat;
+    private double lon;
+    private double lat;
 }
