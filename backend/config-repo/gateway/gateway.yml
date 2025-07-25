@@ -1,31 +1,37 @@
-# Gateway 서비스 설정
+# Gateway 서비스 설정 템플릿
+# Gateway 팀원이 아래 설정들을 참고해서 직접 작성해주세요
 
-server:
-  port: 8080
+# 서버 포트 설정
+# server:
+#   port: 8080
 
-spring:
-  application:
-    name: gateway
-  cloud:
-    gateway:
-      routes:
-        - id: auth-service
-          uri: lb://auth
-          predicates:
-            - Path=/api/auth/**
-        - id: review-service
-          uri: lb://review
-          predicates:
-            - Path=/api/reviews/**
-        - id: recommend-service
-          uri: lb://recommend
-          predicates:
-            - Path=/api/recommend/**
-        - id: schedule-service
-          uri: lb://schedule
-          predicates:
-            - Path=/api/schedule/**
-      discovery:
-        locator:
-          enabled: true
-          lower-case-service-id: true
+# 애플리케이션 기본 설정
+# spring:
+#   application:
+#     name: gateway
+#   cloud:
+#     gateway:
+#       routes:
+#         - id: auth-service
+#           uri: lb://auth
+#           predicates:
+#             - Path=/api/auth/**
+#         - id: review-service
+#           uri: lb://review
+#           predicates:
+#             - Path=/api/reviews/**
+#         - id: recommend-service
+#           uri: lb://recommend
+#           predicates:
+#             - Path=/api/recommend/**
+#         - id: schedule-service
+#           uri: lb://schedule
+#           predicates:
+#             - Path=/api/schedule/**
+#       discovery:
+#         locator:
+#           enabled: true
+#           lower-case-service-id: true
+
+# 추가로 고려해야 할 설정들:
+# - 로드밸런싱 설정

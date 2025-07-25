@@ -8,12 +8,30 @@ spring:
     config:
       server:
         git:
-          uri: https://github.com/CLD3rd-Team4/App
-          default-label: ECS-55-backend/config
-          search-paths: backend/config-repo/{application},backend/config-repo
+          # 로컬 config-repo 디렉토리를 사용 (개발용)
+          uri: file://${user.home}/mapzip/app/backend/config-repo
+          # 실제 운영에서는 Git 저장소 URL 사용
+          # uri: https://github.com/your-username/mapzip-config.git
+          default-label: main
+          clone-on-start: true
+        # 네이티브 프로파일 사용 (로컬 파일 시스템)
+        native:
+          search-locations: file://${user.home}/mapzip/app/backend/config-repo
+  profiles:
+    active: native
 
-# 보안 설정 (선택사항)
-# security:
-#   user:
-#     name: configuser
-#     password: configpassword
+# Actuator 설정 (헬스체크용)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,env,configprops
+  endpoint:
+    health:
+      show-details: always
+
+# 로깅 설정
+logging:
+  level:
+    org.springframework.cloud.config: DEBUG
+    org.springframework.web: DEBUG

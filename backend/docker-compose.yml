@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  config-server:
+    build:
+      context: ./config/config-server
+      dockerfile: Dockerfile
+    ports:
+      - "8888:8888"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    volumes:
+      - ./config-repo:/config-repo:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - mapzip-network
+
+  # 추후 다른 서비스들 추가 예정
+  # gateway:
+  #   build: ./gateway
+  #   ports:
+  #     - "8080:8080"
+  #   depends_on:
+  #     - config-server
+  #   networks:
+  #     - mapzip-network
+
+networks:
+  mapzip-network:
+    driver: bridge
+
+volumes:
+  config-data:

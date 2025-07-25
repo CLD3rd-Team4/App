@@ -1,17 +1,24 @@
-# Schedule 서비스 설정
+# Schedule 서비스 설정 템플릿
+# Schedule 팀원이 아래 설정들을 참고해서 직접 작성해주세요
 
-server:
-  port: 8084
+# 서버 포트 설정
+# server:
+#   port: 8084
 
-spring:
-  application:
-    name: schedule
-  datasource:
-    url: jdbc:mysql://localhost:3306/mapzip_schedule
-    username: root
-    password: password
-    driver-class-name: com.mysql.cj.jdbc.Driver
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
+# 애플리케이션 기본 설정
+# spring:
+#   application:
+#     name: schedule
+#   datasource:
+#     url: jdbc:mysql://localhost:3306/mapzip_schedule
+#     username: root
+#     password: password
+#     driver-class-name: com.mysql.cj.jdbc.Driver
+#   jpa:
+#     hibernate:
+#       ddl-auto: update
+#     show-sql: true
+
+# 추가로 고려해야 할 설정들:
+# - 실제 데이터베이스 연결 정보
+# - 스케줄링 관련 설정
