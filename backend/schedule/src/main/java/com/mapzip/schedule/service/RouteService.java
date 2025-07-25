@@ -23,6 +23,14 @@ public class RouteService {
             List<com.mapzip.schedule.grpc.MealTimeSlot> mealSlots,
             LocalDateTime departureDateTime
     ) {
+        // Point Feature에서 totalTime 추출
+        int totalTimeInSeconds = tmapResponse.getFeatures().stream()
+                .filter(f -> "Point".equalsIgnoreCase(f.getGeometry().getType()) && "S".equals(f.getProperties().getPointType()))
+                .findFirst()
+                .map(f -> f.getProperties().getTotalTime())
+                .orElseThrow(() -> new IllegalArgumentException("No start point feature in Tmap response"));
+
+        // LineString Feature에서 coordinates 추출
         Feature routeFeature = tmapResponse.getFeatures().stream()
                 .filter(f -> "LineString".equalsIgnoreCase(f.getGeometry().getType()))
                 .findFirst()
@@ -41,7 +49,6 @@ public class RouteService {
         } else {
             throw new IllegalArgumentException("Coordinates is not a List");
         }
-        int totalTimeInSeconds = routeFeature.getProperties().getTotalTime();
 
         List<CalculatedLocation> calculatedLocations = new ArrayList<>();
 

@@ -11,6 +11,7 @@ public class TimeUtil {
 
     private static final DateTimeFormatter KOREAN_AM_PM_FORMATTER = DateTimeFormatter.ofPattern("a hh:mm", Locale.KOREAN);
     private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssZ");
+    private static final DateTimeFormatter TMAP_RESPONSE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssZ");
     private static final ZoneId SEOUL_ZONE_ID = ZoneId.of("Asia/Seoul");
 
     /**
@@ -39,6 +40,10 @@ public class TimeUtil {
      */
     public static String toTmapApiFormat(LocalDateTime dateTime) {
         return dateTime.atZone(SEOUL_ZONE_ID).format(ISO_FORMATTER);
+    }
+
+    public static DateTimeFormatter getTmapResponseFormatter() {
+        return TMAP_RESPONSE_FORMATTER;
     }
 
     /**

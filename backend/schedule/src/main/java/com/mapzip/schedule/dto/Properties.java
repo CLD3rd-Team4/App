@@ -10,4 +10,5 @@ public class Properties {
     private Integer totalTime;
     private String departureTime;
     private String arrivalTime;
+    private String pointType; // 추가
 }

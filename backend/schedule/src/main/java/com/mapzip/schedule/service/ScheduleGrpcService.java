@@ -68,7 +68,7 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
             List<MealTimeSlot> mealTimeSlotEntities = new ArrayList<>();
             for (com.mapzip.schedule.grpc.MealTimeSlot slotRequest : request.getMealSlotsList()) {
                 MealTimeSlot mealTimeSlot = new MealTimeSlot();
-                mealTimeSlot.setId(slotRequest.getSlotId());
+                mealTimeSlot.setId(java.util.UUID.randomUUID().toString());
                 mealTimeSlot.setSchedule(schedule);
                 mealTimeSlot.setMealType(slotRequest.getMealType().getNumber());
                 mealTimeSlot.setScheduledTime(slotRequest.getScheduledTime());
@@ -106,7 +106,7 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
 
             // 6. 계산된 도착 시간을 Schedule에 업데이트
             String arrivalTimeISO = tmapResponse.getFeatures().get(0).getProperties().getArrivalTime();
-            LocalDateTime arrivalDateTime = LocalDateTime.parse(arrivalTimeISO, DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+            LocalDateTime arrivalDateTime = LocalDateTime.parse(arrivalTimeISO, TimeUtil.getTmapResponseFormatter());
             schedule.setCalculatedArrivalTime(TimeUtil.toKoreanAmPm(arrivalDateTime));
             scheduleRepository.save(schedule);
 
