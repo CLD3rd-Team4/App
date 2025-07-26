@@ -8,30 +8,30 @@ spring:
     config:
       server:
         git:
-          # 로컬 config-repo 디렉토리를 사용 (개발용)
-          uri: file://${user.home}/mapzip/app/backend/config-repo
-          # 실제 운영에서는 Git 저장소 URL 사용
-          # uri: https://github.com/your-username/mapzip-config.git
+          uri: ${CONFIG_REPO_URI:https://github.com/CLD3rd-Team4/App}
+          search-paths: backend/config-repo
           default-label: main
           clone-on-start: true
-        # 네이티브 프로파일 사용 (로컬 파일 시스템)
-        native:
-          search-locations: file://${user.home}/mapzip/app/backend/config-repo
-  profiles:
-    active: native
+          timeout: 10
+          # Git 인증 (필요시)
+          username: ${GIT_USERNAME:}
+          password: ${GIT_TOKEN:}
 
 # Actuator 설정 (헬스체크용)
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,env,configprops
+        include: health,info,env,configprops,refresh
   endpoint:
     health:
       show-details: always
+    refresh:
+      enabled: true
 
 # 로깅 설정
 logging:
   level:
-    org.springframework.cloud.config: DEBUG
-    org.springframework.web: DEBUG
+    org.springframework.cloud.config: ${LOG_LEVEL:INFO}
+    org.springframework.web: ${LOG_LEVEL:INFO}
+    root: INFO
