@@ -1,0 +1,63 @@
+# Recommend 서비스 설정 (EKS 환경 기본)
+
+server:
+  port: ${SERVER_PORT:8082}
+
+spring:
+  application:
+    name: recommend
+    
+  # Aurora PostgreSQL 연결 (recommend 클러스터) - 환경변수 필수
+  datasource:
+    url: jdbc:postgresql://${AURORA_RECOMMEND_ENDPOINT}:5432/mapzip_recommend
+    username: mapzip-recommend-${TERRAFORM_WORKSPACE:dev}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    
+  # JPA 설정 (운영 환경 기준)
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  # ElastiCache Valkey 연결 (recommend-cache 클러스터) - 환경변수 필수
+  data:
+    valkey:
+      host: ${ELASTICACHE_RECOMMEND_ENDPOINT}
+      port: 6379
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+
+  # MSK Kafka 설정 (main 클러스터) - 환경변수 필수
+  kafka:
+    bootstrap-servers: ${MSK_BOOTSTRAP_SERVERS}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      retries: 3
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      group-id: recommend-service
+      auto-offset-reset: earliest
+
+
+# Kubernetes 서비스 디스커버리 활성화
+spring:
+  cloud:
+    kubernetes:
+      discovery:
+        enabled: true
+
+# Eureka 비활성화
+eureka:
+  client:
+    enabled: false

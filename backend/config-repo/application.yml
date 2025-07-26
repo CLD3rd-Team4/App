@@ -1,0 +1,80 @@
+# 모든 서비스에 공통으로 적용되는 설정 (EKS 환경 우선)
+
+# Kubernetes 네이티브 서비스 디스커버리 (기본 활성화)
+spring:
+  cloud:
+    kubernetes:
+      discovery:
+        enabled: ${KUBERNETES_DISCOVERY_ENABLED:true}
+        all-namespaces: false
+    loadbalancer:
+      ribbon:
+        enabled: false
+
+# Eureka 비활성화 (EKS에서는 사용하지 않음)
+eureka:
+  client:
+    enabled: ${EUREKA_ENABLED:false}
+
+# Actuator 설정
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: ${PROMETHEUS_ENABLED:true}
+
+# 로깅 설정 (운영 환경 기준)
+logging:
+  level:
+    root: ${LOG_LEVEL:INFO}
+    org.springframework.cloud.config: INFO
+    org.springframework.cloud.kubernetes: INFO
+
+# Aurora PostgreSQL 공통 설정 (EKS 환경 기준)
+datasource:
+  hikari:
+    maximum-pool-size: ${DB_POOL_SIZE:10}
+    minimum-idle: ${DB_POOL_MIN_IDLE:5}
+    connection-timeout: ${DB_CONNECTION_TIMEOUT:30000}
+    idle-timeout: ${DB_IDLE_TIMEOUT:600000}
+    max-lifetime: ${DB_MAX_LIFETIME:1800000}
+
+# JPA 공통 설정 (PostgreSQL 기반, 운영 환경)
+jpa:
+  hibernate:
+    ddl-auto: ${JPA_DDL_AUTO:validate}
+  show-sql: ${JPA_SHOW_SQL:false}
+  properties:
+    hibernate:
+      dialect: org.hibernate.dialect.PostgreSQLDialect
+      format_sql: false
+
+# ElastiCache Valkey 공통 설정 (EKS 환경 기준)
+valkey:
+  timeout: ${VALKEY_TIMEOUT:2000}
+  lettuce:
+    pool:
+      max-active: ${VALKEY_POOL_MAX_ACTIVE:8}
+      max-idle: ${VALKEY_POOL_MAX_IDLE:8}
+      min-idle: ${VALKEY_POOL_MIN_IDLE:0}
+
+# MSK Kafka 공통 설정 (EKS 환경 기준)
+kafka:
+  bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+  producer:
+    key-serializer: org.apache.kafka.common.serialization.StringSerializer
+    value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    acks: all
+    retries: 3
+  consumer:
+    key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    group-id: ${spring.application.name}
+    auto-offset-reset: earliest
