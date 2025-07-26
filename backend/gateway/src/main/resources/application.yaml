@@ -16,6 +16,6 @@ server:
 #  application:
 #    name: gateway
 #  config:
-#    import: "configserver:http://localhost:8888"
+#    import: "configserver:http://config.platform.svc.cluster.local:8888"
 #  profiles:
 #    active: dev
