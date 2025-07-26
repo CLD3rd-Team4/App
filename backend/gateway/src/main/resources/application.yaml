@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: gateway
+
+
+jwt:
+  secret:
+  expiration: 86400000
+
+server:
+  port: 8080
+
+# from config server
+
+#spring:
+#  application:
+#    name: gateway
+#  config:
+#    import: "configserver:http://localhost:8888"
+#  profiles:
+#    active: dev
