@@ -20,7 +20,7 @@ public class CustomRouteLocator {
     }
 
     @Bean
-    public RouteLocator customRouteLocator(RouteLocatorBuilder builder) {
+    public RouteLocator gatewayRoutes(RouteLocatorBuilder builder) {
         return builder.routes()
                 // 인증 서비스 라우팅
                 .route("auth-service", r -> r.path("/auth/**")

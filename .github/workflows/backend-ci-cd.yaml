@@ -1,0 +1,139 @@
+name: Backend CI/CD
+
+on:
+  push:
+    branches:
+      - dev
+
+permissions:
+  contents: write
+
+jobs:
+  ci-build-push:
+    runs-on: ubuntu-latest
+
+    outputs:
+      changed_services: ${{ steps.changed-services.outputs.changed_services }}
+      image_tag: ${{ steps.get-commit-hash.outputs.commit_hash }}
+
+    steps:
+      - name: Checkout service repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed services
+        id: changed-services
+        run: |
+          git fetch origin dev
+          CHANGED=$(git diff --name-only origin/dev | grep '^backend/' | cut -d '/' -f2 | sort | uniq)
+          echo "changed_services=$CHANGED" >> $GITHUB_OUTPUT
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Get short git commit hash
+        id: get-commit-hash
+        run: echo "commit_hash=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/mapzip-dev-GitHubActionsOIDCRole
+          role-session-name: GitHub_to_AWS_via_FederatedOIDC
+          aws-region: ap-northeast-2
+
+      - name: Login to Amazon ECR Private
+        id: login-ecr-private
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push images for changed services
+        env:
+          REGISTRY: ${{ steps.login-ecr-private.outputs.registry }}
+          IMAGE_TAG: ${{ steps.get-commit-hash.outputs.commit_hash }}
+        run: |
+          IFS=' ' read -r -a services <<< "${{ steps.changed-services.outputs.changed_services }}"
+
+          for service in "${services[@]}"; do
+            echo "Building service: $service"
+
+            cd "./backend/$service" || { echo "Failed to cd into ./backend/$service"; exit 1; }
+
+            mvn -B package -DskipTests --file pom.xml
+
+            mv ./target/*.jar ./target/app.jar
+
+            ls ./target
+
+            cd - || exit
+
+            docker build -t "$REGISTRY/mapzip-dev-ecr-$service:$IMAGE_TAG" "./backend/$service"
+            docker push "$REGISTRY/mapzip-dev-ecr-$service:$IMAGE_TAG"
+          done
+
+
+
+  cd-update-infra:
+    needs: ci-build-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Infra repo
+        uses: actions/checkout@v4
+        with:
+          repository: CLD3rd-Team4/Infra
+          ref: dev
+          token: ${{ secrets.GITHUB_TOKEN }}
+          path: infra # Infra 리포지토리의 dev 브랜치를 체크아웃하면서 현재 워크스페이스 디렉토리의 infra/ 폴더 안에 내려받겠다.
+
+      - name: Update ArgoCD deployment YAML with new image tags for changed services
+        env:
+          IMAGE_TAG: ${{ needs.ci-build-push.outputs.image_tag }}
+        run: |
+          INFRA_PATH="infra/argocd"
+
+          CHANGED_SERVICES="${{ needs.ci-build-push.outputs.changed_services }}"
+
+          if [ -z "$CHANGED_SERVICES" ]; then
+            echo "No changed services detected. Exiting."
+            exit 0
+          fi
+
+          # Git 사용자 정보 설정
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+
+          cd infra
+
+          # 변경된 서비스별로 YAML 파일 수정 및 커밋
+          for SERVICE_NAME in $CHANGED_SERVICES; do
+            echo "Updating image tag for service: $SERVICE_NAME"
+
+            if [[ "$SERVICE_NAME" == "auth" || "$SERVICE_NAME" == "gateway" || "$SERVICE_NAME" == "config" ]]; then
+              SERVICE_DIR="$INFRA_PATH/platform"
+            else
+              SERVICE_DIR="$INFRA_PATH/service-$SERVICE_NAME"
+            fi
+
+            FILE_NAME="${SERVICE_NAME#service-}.yaml"
+            YAML_FILE="$SERVICE_DIR/$FILE_NAME"
+
+            if [ ! -f "$YAML_FILE" ]; then
+              echo "Warning: YAML file not found: $YAML_FILE"
+              continue
+            fi
+
+            # 이미지 태그 치환 (공백을 제외한 모든 문자에 대응)
+            sed -i -E "s|(image:.*:)[^[:space:]]+|\1$IMAGE_TAG|g" "$YAML_FILE"
+
+            git add "$YAML_FILE"
+            git commit -m "Update $SERVICE_NAME image tag to $IMAGE_TAG [ci skip]" || echo "No changes to commit for $SERVICE_NAME"
+          done
+
+          git push origin dev
+        shell: bash
+
