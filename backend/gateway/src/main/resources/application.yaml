@@ -7,6 +7,22 @@ spring:
     config:
       enabled: false
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    readiness-state:
+      enabled: true
+    liveness-state:
+      enabled: true
+
 jwt:
   secret:
   expiration: 86400000
