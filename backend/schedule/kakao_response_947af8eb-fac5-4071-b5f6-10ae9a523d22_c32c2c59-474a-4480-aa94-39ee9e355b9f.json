@@ -1,0 +1,174 @@
+{
+  "meta" : {
+    "total_count" : 710,
+    "pageable_count" : 45,
+    "is_end" : false,
+    "same_name" : null
+  },
+  "documents" : [ {
+    "id" : "1648858596",
+    "phone" : "",
+    "distance" : "59",
+    "place_name" : "비빔가",
+    "category_name" : "음식점 > 한식",
+    "address_name" : "부산 동구 초량동 1187-1",
+    "road_address_name" : "부산 동구 중앙대로 206",
+    "x" : "129.0426560741946",
+    "y" : "35.11479275345987",
+    "place_url" : "http://place.map.kakao.com/1648858596"
+  }, {
+    "id" : "1639873649",
+    "phone" : "",
+    "distance" : "77",
+    "place_name" : "위니비니 부산역사점",
+    "category_name" : "음식점 > 간식",
+    "address_name" : "부산 동구 초량동 1187-1",
+    "road_address_name" : "부산 동구 중앙대로 206",
+    "x" : "129.04244355575364",
+    "y" : "35.11480264403786",
+    "place_url" : "http://place.map.kakao.com/1639873649"
+  }, {
+    "id" : "1920192626",
+    "phone" : "",
+    "distance" : "82",
+    "place_name" : "북창동순두부 부산역사점",
+    "category_name" : "음식점 > 한식 > 두부전문점 > 북창동순두부",
+    "address_name" : "부산 동구 초량동 1187-1",
+    "road_address_name" : "부산 동구 중앙대로 206",
+    "x" : "129.04289312952454",
+    "y" : "35.115238441336835",
+    "place_url" : "http://place.map.kakao.com/1920192626"
+  }, {
+    "id" : "688554292",
+    "phone" : "070-7092-7209",
+    "distance" : "85",
+    "place_name" : "부산옥",
+    "category_name" : "음식점 > 한식",
+    "address_name" : "부산 동구 초량동 1187-1",
+    "road_address_name" : "부산 동구 중앙대로 206",
+    "x" : "129.04239734390652",
+    "y" : "35.11488452836955",
+    "place_url" : "http://place.map.kakao.com/688554292"
+  }, {
+    "id" : "27266866",
+    "phone" : "051-442-1937",
+    "distance" : "85",
+    "place_name" : "크리스피크림도넛 부산역사점",
+    "category_name" : "음식점 > 간식 > 도넛 > 크리스피크림도넛",
+    "address_name" : "부산 동구 초량동 1187-1",
+    "road_address_name" : "부산 동구 중앙대로 206",
+    "x" : "129.0429215260933",
+    "y" : "35.115277614095874",
+    "place_url" : "http://place.map.kakao.com/27266866"
+  }, {
+    "id" : "1068121745",
+    "phone" : "",
+    "distance" : "88",
+    "place_name" : "육수당 부산역사점",
+    "category_name" : "음식점 > 한식 > 국밥 > 육수당",
+    "address_name" : "부산 동구 초량동 1187-1",
+    "road_address_name" : "부산 동구 중앙대로 206",
+    "x" : "129.04292772727737",
+    "y" : "35.115306347013394",
+    "place_url" : "http://place.map.kakao.com/1068121745"
+  }, {
+    "id" : "1434032761",
+    "phone" : "",
+    "distance" : "92",
+    "place_name" : "멘무샤 부산KTX역점",
+    "category_name" : "음식점 > 일식 > 일본식라면 > 멘무샤",
+    "address_name" : "부산 동구 초량동 1187-1",
+    "road_address_name" : "부산 동구 중앙대로 206",
+    "x" : "129.04286559955995",
+    "y" : "35.11532181320732",
+    "place_url" : "http://place.map.kakao.com/1434032761"
+  }, {
+    "id" : "864354044",
+    "phone" : "",
+    "distance" : "102",
+    "place_name" : "부산별빛샌드 부산역점",
+    "category_name" : "음식점 > 간식 > 제과,베이커리",
+    "address_name" : "부산 동구 초량동 1187-1",
+    "road_address_name" : "부산 동구 중앙대로 206",
+    "x" : "129.04225759482577",
+    "y" : "35.11499772788219",
+    "place_url" : "http://place.map.kakao.com/864354044"
+  }, {
+    "id" : "929513988",
+    "phone" : "070-7092-7209",
+    "distance" : "109",
+    "place_name" : "태성당",
+    "category_name" : "음식점 > 간식 > 제과,베이커리",
+    "address_name" : "부산 동구 초량동 1187-1",
+    "road_address_name" : "부산 동구 중앙대로 206",
+    "x" : "129.04278456035914",
+    "y" : "35.11545835510227",
+    "place_url" : "http://place.map.kakao.com/929513988"
+  }, {
+    "id" : "702293033",
+    "phone" : "",
+    "distance" : "119",
+    "place_name" : "에그박스 부산KTX역사점",
+    "category_name" : "음식점 > 패스트푸드 > 샌드위치 > 에그박스",
+    "address_name" : "부산 동구 초량동 1187-1",
+    "road_address_name" : "부산 동구 중앙대로 206",
+    "x" : "129.04205265972578",
+    "y" : "35.115003885285866",
+    "place_url" : "http://place.map.kakao.com/702293033"
+  }, {
+    "id" : "1654248836",
+    "phone" : "070-7092-7209",
+    "distance" : "141",
+    "place_name" : "국제시장도나스",
+    "category_name" : "음식점 > 간식 > 도넛",
+    "address_name" : "부산 동구 초량동 1187-1",
+    "road_address_name" : "부산 동구 중앙대로 206",
+    "x" : "129.04216534411773",
+    "y" : "35.115476002177694",
+    "place_url" : "http://place.map.kakao.com/1654248836"
+  }, {
+    "id" : "21307127",
+    "phone" : "",
+    "distance" : "147",
+    "place_name" : "간사이우동",
+    "category_name" : "음식점 > 일식 > 돈까스,우동",
+    "address_name" : "부산 동구 초량동 1187-21",
+    "road_address_name" : "부산 동구 중앙대로 206",
+    "x" : "129.04167322192046",
+    "y" : "35.11487330128071",
+    "place_url" : "http://place.map.kakao.com/21307127"
+  }, {
+    "id" : "1652465454",
+    "phone" : "",
+    "distance" : "147",
+    "place_name" : "오대근짬뽕",
+    "category_name" : "음식점 > 중식 > 중국요리",
+    "address_name" : "부산 동구 초량동 1187-21",
+    "road_address_name" : "부산 동구 중앙대로 206",
+    "x" : "129.041675864061",
+    "y" : "35.114891280186",
+    "place_url" : "http://place.map.kakao.com/1652465454"
+  }, {
+    "id" : "158766690",
+    "phone" : "",
+    "distance" : "150",
+    "place_name" : "남천할매떡볶이",
+    "category_name" : "음식점 > 분식 > 떡볶이",
+    "address_name" : "부산 동구 초량동 1187-1",
+    "road_address_name" : "부산 동구 중앙대로 206",
+    "x" : "129.04160017813135",
+    "y" : "35.1147150246586",
+    "place_url" : "http://place.map.kakao.com/158766690"
+  }, {
+    "id" : "547026686",
+    "phone" : "070-7092-7209",
+    "distance" : "160",
+    "place_name" : "부산오뎅몬스터마마",
+    "category_name" : "음식점 > 분식",
+    "address_name" : "부산 동구 초량동 1187-1",
+    "road_address_name" : "부산 동구 중앙대로 206",
+    "x" : "129.04155062999033",
+    "y" : "35.11497089094352",
+    "place_url" : "http://place.map.kakao.com/547026686"
+  } ]
+}

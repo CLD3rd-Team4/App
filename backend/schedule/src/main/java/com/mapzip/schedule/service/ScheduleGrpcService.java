@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mapzip.schedule.client.KakaoClient;
 import com.mapzip.schedule.client.TmapClient;
@@ -44,6 +45,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.devh.boot.grpc.server.service.GrpcService;
 
+import java.io.File;
+import java.io.IOException;
+
 @Slf4j
 @GrpcService
 @RequiredArgsConstructor
@@ -56,7 +60,7 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
     private final TmapClient tmapClient;
     private final KakaoClient kakaoClient;
     private final RouteService routeService;
-    private final Gson gson = new Gson();
+    private final ObjectMapper objectMapper; // Gson 대신 ObjectMapper 사용
 
     @Override
     @Transactional
@@ -80,7 +84,6 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
                 mealTimeSlot.setSchedule(schedule);
                 mealTimeSlot.setMealType(slotRequest.getMealType().getNumber());
                 mealTimeSlot.setScheduledTime(slotRequest.getScheduledTime());
-                // radius가 0이면 기본값 1000m 사용
                 mealTimeSlot.setRadius(slotRequest.getRadius() > 0 ? slotRequest.getRadius() : 1000);
                 mealTimeSlotEntities.add(mealTimeSlot);
             }
@@ -97,12 +100,9 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
                     departureDateTime
             );
 
-            // 5. 계산된 위치 정보를 MealTimeSlot에 업데이트 및 Kakao API 호출
+            // 5. 계산된 위치 정보를 MealTimeSlot에 업데이트 및 Kakao API 호출/파일 저장
             Map<String, MealTimeSlot> slotMap = mealTimeSlotEntities.stream()
                     .collect(Collectors.toMap(MealTimeSlot::getId, Function.identity()));
-
-            // 테스트를 위해 검색 결과를 담을 임시 리스트
-            List<String> testRestaurantResults = new ArrayList<>();
 
             for (RouteService.CalculatedLocation loc : calculatedLocations) {
                 MealTimeSlot slot = slotMap.get(loc.getSlotId());
@@ -111,21 +111,20 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
                     locationJson.put("lat", loc.getLat());
                     locationJson.put("lon", loc.getLon());
                     locationJson.put("scheduled_time", slot.getScheduledTime());
-                    slot.setCalculatedLocation(gson.toJson(locationJson));
+                    slot.setCalculatedLocation(objectMapper.writeValueAsString(locationJson));
 
-                    // Kakao API 호출하여 주변 음식점 검색
                     try {
                         log.info("Searching for restaurants near lat: {}, lon: {} for slot: {}", loc.getLat(), loc.getLon(), slot.getId());
                         KakaoSearchResponse searchResponse = kakaoClient.searchRestaurants(loc.getLat(), loc.getLon(), slot.getRadius());
                         log.info("Found {} restaurants for slot {}", searchResponse.getDocuments().size(), slot.getId());
-                        
-                        // 테스트용: 첫번째 음식점 이름을 결과 리스트에 추가
-                        if (!searchResponse.getDocuments().isEmpty()) {
-                            testRestaurantResults.add(String.format("Slot for %s found: %s", slot.getScheduledTime(), searchResponse.getDocuments().get(0).getPlaceName()));
-                        }
+
+                        // 파일로 저장
+                        String fileName = String.format("kakao_response_%s_%s.json", schedule.getId(), slot.getId());
+                        objectMapper.writerWithDefaultPrettyPrinter().writeValue(new File(fileName), searchResponse);
+                        log.info("Kakao API response saved to {}", fileName);
 
                     } catch (Exception e) {
-                        log.error("Error searching restaurants for slot {}: {}", slot.getId(), e.getMessage(), e);
+                        log.error("Error during Kakao API call or file save for slot {}: {}", slot.getId(), e.getMessage(), e);
                     }
                 }
             }
@@ -137,11 +136,10 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
             schedule.setCalculatedArrivalTime(TimeUtil.toKoreanAmPm(arrivalDateTime));
             scheduleRepository.save(schedule);
 
-            // 7. 최종 응답 생성 (테스트 결과를 message에 포함)
-            String resultMessage = testRestaurantResults.isEmpty() ? "No restaurants found." : String.join(", ", testRestaurantResults);
+            // 7. 최종 응답 생성
             CreateScheduleResponse response = CreateScheduleResponse.newBuilder()
                     .setSuccess(true)
-                    .setMessage(resultMessage)
+                    .setMessage("스케줄이 성공적으로 생성되었으며, 주변 음식점 검색이 시작되었습니다.")
                     .setScheduleId(schedule.getId())
                     .setCalculatedArrivalTime(TimeUtil.toKoreanAmPm(arrivalDateTime))
                     .build();

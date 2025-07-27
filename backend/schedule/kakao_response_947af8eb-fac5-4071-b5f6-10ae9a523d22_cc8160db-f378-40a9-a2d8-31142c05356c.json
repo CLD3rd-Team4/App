@@ -1,0 +1,174 @@
+{
+  "meta" : {
+    "total_count" : 386,
+    "pageable_count" : 45,
+    "is_end" : false,
+    "same_name" : null
+  },
+  "documents" : [ {
+    "id" : "8338173",
+    "phone" : "054-444-9979",
+    "distance" : "144",
+    "place_name" : "미루나무집",
+    "category_name" : "음식점 > 한식 > 육류,고기 > 닭요리",
+    "address_name" : "경북 구미시 봉곡동 46",
+    "road_address_name" : "경북 구미시 야은로 290-14",
+    "x" : "128.313971120974",
+    "y" : "36.1380774131781",
+    "place_url" : "http://place.map.kakao.com/8338173"
+  }, {
+    "id" : "542634475",
+    "phone" : "",
+    "distance" : "192",
+    "place_name" : "고들",
+    "category_name" : "음식점 > 한식",
+    "address_name" : "경북 구미시 선기동 296-8",
+    "road_address_name" : "경북 구미시 송선로 399",
+    "x" : "128.312458594097",
+    "y" : "36.1371784407642",
+    "place_url" : "http://place.map.kakao.com/542634475"
+  }, {
+    "id" : "1645380898",
+    "phone" : "054-443-8833",
+    "distance" : "201",
+    "place_name" : "차이나팬",
+    "category_name" : "음식점 > 중식 > 중국요리",
+    "address_name" : "경북 구미시 봉곡동 36",
+    "road_address_name" : "경북 구미시 야은로 296",
+    "x" : "128.31513765592",
+    "y" : "36.1386125011096",
+    "place_url" : "http://place.map.kakao.com/1645380898"
+  }, {
+    "id" : "1360233143",
+    "phone" : "",
+    "distance" : "201",
+    "place_name" : "금오쭈꾸미",
+    "category_name" : "음식점 > 한식 > 해물,생선",
+    "address_name" : "경북 구미시 봉곡동 36",
+    "road_address_name" : "경북 구미시 야은로 296",
+    "x" : "128.315137655913",
+    "y" : "36.1386125010818",
+    "place_url" : "http://place.map.kakao.com/1360233143"
+  }, {
+    "id" : "1167942930",
+    "phone" : "054-604-9777",
+    "distance" : "201",
+    "place_name" : "두끼떡볶이 구미봉곡점",
+    "category_name" : "음식점 > 분식 > 떡볶이 > 두끼떡볶이",
+    "address_name" : "경북 구미시 봉곡동 36",
+    "road_address_name" : "경북 구미시 야은로 296",
+    "x" : "128.31513987741639",
+    "y" : "36.138612476713",
+    "place_url" : "http://place.map.kakao.com/1167942930"
+  }, {
+    "id" : "1435803901",
+    "phone" : "054-458-6274",
+    "distance" : "201",
+    "place_name" : "고메스퀘어 구미점",
+    "category_name" : "음식점 > 뷔페",
+    "address_name" : "경북 구미시 봉곡동 36",
+    "road_address_name" : "경북 구미시 야은로 296",
+    "x" : "128.31513765592",
+    "y" : "36.1386125011096",
+    "place_url" : "http://place.map.kakao.com/1435803901"
+  }, {
+    "id" : "1044187146",
+    "phone" : "",
+    "distance" : "204",
+    "place_name" : "투인샤브 봉곡점",
+    "category_name" : "음식점 > 샤브샤브",
+    "address_name" : "경북 구미시 봉곡동 36",
+    "road_address_name" : "경북 구미시 야은로 296",
+    "x" : "128.315189051107",
+    "y" : "36.1386299594729",
+    "place_url" : "http://place.map.kakao.com/1044187146"
+  }, {
+    "id" : "1338458157",
+    "phone" : "054-444-1814",
+    "distance" : "211",
+    "place_name" : "펠리치따 구미G7스퀘어점",
+    "category_name" : "음식점 > 간식 > 아이스크림",
+    "address_name" : "경북 구미시 봉곡동 33-3",
+    "road_address_name" : "경북 구미시 야은로 296",
+    "x" : "128.3152123940177",
+    "y" : "36.138697288604085",
+    "place_url" : "http://place.map.kakao.com/1338458157"
+  }, {
+    "id" : "968328679",
+    "phone" : "054-455-2183",
+    "distance" : "253",
+    "place_name" : "피자헛 구미도량점",
+    "category_name" : "음식점 > 양식 > 피자 > 피자헛",
+    "address_name" : "경북 구미시 도량동 316",
+    "road_address_name" : "경북 구미시 야은로 308",
+    "x" : "128.31655188689024",
+    "y" : "36.13847891224425",
+    "place_url" : "http://place.map.kakao.com/968328679"
+  }, {
+    "id" : "961009990",
+    "phone" : "0507-1412-1015",
+    "distance" : "310",
+    "place_name" : "화이트리에 구미도량점",
+    "category_name" : "음식점 > 간식 > 제과,베이커리 > 화이트리에",
+    "address_name" : "경북 구미시 도량동 228-5",
+    "road_address_name" : "경북 구미시 야은로 309",
+    "x" : "128.31680806050213",
+    "y" : "36.13898343732478",
+    "place_url" : "http://place.map.kakao.com/961009990"
+  }, {
+    "id" : "927647342",
+    "phone" : "070-7462-6706",
+    "distance" : "319",
+    "place_name" : "버거킹 구미도량DT점",
+    "category_name" : "음식점 > 패스트푸드 > 버거킹",
+    "address_name" : "경북 구미시 도량동 311-2",
+    "road_address_name" : "경북 구미시 야은로 318",
+    "x" : "128.31775778798308",
+    "y" : "36.138111500782784",
+    "place_url" : "http://place.map.kakao.com/927647342"
+  }, {
+    "id" : "1842142415",
+    "phone" : "054-452-3329",
+    "distance" : "332",
+    "place_name" : "애가남원추어탕순두부 구미점",
+    "category_name" : "음식점 > 한식 > 해물,생선 > 추어",
+    "address_name" : "경북 구미시 봉곡동 49-3",
+    "road_address_name" : "경북 구미시 야은로 270",
+    "x" : "128.312393759032",
+    "y" : "36.1392887208195",
+    "place_url" : "http://place.map.kakao.com/1842142415"
+  }, {
+    "id" : "186106531",
+    "phone" : "070-4633-0079",
+    "distance" : "333",
+    "place_name" : "노브랜드버거 구미도량점",
+    "category_name" : "음식점 > 패스트푸드 > 노브랜드버거",
+    "address_name" : "경북 구미시 봉곡동 13-4",
+    "road_address_name" : "경북 구미시 야은로 273",
+    "x" : "128.31311045554742",
+    "y" : "36.13962960544928",
+    "place_url" : "http://place.map.kakao.com/186106531"
+  }, {
+    "id" : "561736406",
+    "phone" : "054-441-5556",
+    "distance" : "340",
+    "place_name" : "아부찌부대찌개 구미도량점",
+    "category_name" : "음식점 > 한식 > 찌개,전골 > 아부찌부대찌개",
+    "address_name" : "경북 구미시 도량동 226",
+    "road_address_name" : "경북 구미시 도봉로 76-55",
+    "x" : "128.316461411141",
+    "y" : "36.1395135142319",
+    "place_url" : "http://place.map.kakao.com/561736406"
+  }, {
+    "id" : "441664054",
+    "phone" : "010-3935-0556",
+    "distance" : "341",
+    "place_name" : "도깨비도넛츠",
+    "category_name" : "음식점 > 간식 > 도넛",
+    "address_name" : "경북 구미시 도량동 229-3",
+    "road_address_name" : "경북 구미시 도봉로 82",
+    "x" : "128.317454690979",
+    "y" : "36.1388537702251",
+    "place_url" : "http://place.map.kakao.com/441664054"
+  } ]
+}
