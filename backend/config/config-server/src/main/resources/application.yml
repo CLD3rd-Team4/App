@@ -30,7 +30,20 @@ management:
   endpoint:
     health:
       show-details: always
+      probes:
+        enabled: true
     refresh:
+      enabled: true
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+    config:
+      enabled: true
+    diskspace:
+      enabled: true
+    git:
       enabled: true
 
 # 로깅 설정
