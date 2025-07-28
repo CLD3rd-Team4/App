@@ -1,0 +1,41 @@
+server:
+  port: 8080
+
+# gRPC 설정
+grpc:
+  server:
+    port: 50051
+  client:
+    GLOBAL:
+      negotiation-type: plaintext
+
+# AWS 기본 설정 (Config Server에서 오버라이드됨)
+aws:
+  region: ${AWS_REGION:ap-northeast-2}
+  dynamodb:
+    table-name: ${DYNAMODB_TABLE_NAME:reviews}
+  s3:
+    bucket: ${S3_BUCKET_NAME:mapzip-images}
+
+# Google Cloud Vision API (Config Server에서 암호화된 값 제공)
+google:
+  cloud:
+    vision:
+      api-key: ${GOOGLE_CLOUD_VISION_API_KEY:}
+
+# 로깅 설정
+logging:
+  level:
+    com.mapzip.review: DEBUG
+    software.amazon.awssdk: INFO
+    com.google.cloud: INFO
+
+# Health check
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always

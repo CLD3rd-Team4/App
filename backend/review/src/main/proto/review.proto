@@ -1,0 +1,149 @@
+syntax = "proto3";
+
+package com.mapzip.review;
+
+option java_package = "com.mapzip.review.grpc";
+option java_outer_classname = "ReviewProto";
+
+// 리뷰 서비스 정의
+service ReviewService {
+    // 리뷰 작성 (영수증 OCR 검증 포함)
+    rpc CreateReview(CreateReviewRequest) returns (CreateReviewResponse);
+    
+    // 사용자별 리뷰 목록 조회
+    rpc GetUserReviews(GetUserReviewsRequest) returns (GetUserReviewsResponse);
+    
+    // 특정 식당의 리뷰 목록 조회
+    rpc GetRestaurantReviews(GetRestaurantReviewsRequest) returns (GetRestaurantReviewsResponse);
+    
+    // 리뷰 상세 조회
+    rpc GetReview(GetReviewRequest) returns (GetReviewResponse);
+    
+    // 리뷰 수정
+    rpc UpdateReview(UpdateReviewRequest) returns (UpdateReviewResponse);
+    
+    // 리뷰 삭제
+    rpc DeleteReview(DeleteReviewRequest) returns (DeleteReviewResponse);
+    
+    // OCR 검증 (영수증 인식)
+    rpc VerifyReceipt(VerifyReceiptRequest) returns (VerifyReceiptResponse);
+}
+
+// 리뷰 데이터 모델
+message Review {
+    string restaurant_id = 1;  // DynamoDB 파티션 키
+    string review_id = 2;      // DynamoDB 정렬 키
+    string user_id = 3;
+    string restaurant_name = 4;
+    string restaurant_address = 5;
+    int32 rating = 6; // 1-5점
+    string content = 7;
+    repeated string image_urls = 8; // 최대 3개
+    string visit_date = 9; // yyyy-MM-dd format
+    bool is_verified = 10; // OCR 검증 여부
+    string created_at = 11;
+    string updated_at = 12;
+}
+
+// OCR 검증 결과
+message OcrResult {
+    bool is_valid = 1;
+    string restaurant_name = 2;
+    string address = 3;
+    string visit_date = 4;
+    string total_amount = 5;
+    string raw_text = 6;
+    double confidence = 7; // 0.0 - 1.0
+}
+
+// 요청/응답 메시지들
+message CreateReviewRequest {
+    string restaurant_id = 1;
+    string restaurant_name = 2;
+    string restaurant_address = 3;
+    int32 rating = 4;
+    string content = 5;
+    repeated bytes receipt_images = 6; // OCR용 영수증 이미지
+    repeated bytes review_images = 7; // 리뷰 이미지 (최대 3개)
+}
+
+message CreateReviewResponse {
+    Review review = 1;
+    OcrResult ocr_result = 2;
+    string message = 3;
+    bool success = 4;
+}
+
+message GetUserReviewsRequest {
+    string user_id = 1;
+    int32 page = 2;
+    int32 size = 3;
+}
+
+message GetUserReviewsResponse {
+    repeated Review reviews = 1;
+    int32 total_count = 2;
+    int32 current_page = 3;
+    bool has_next = 4;
+}
+
+message GetRestaurantReviewsRequest {
+    string restaurant_id = 1;
+    int32 page = 2;
+    int32 size = 3;
+}
+
+message GetRestaurantReviewsResponse {
+    repeated Review reviews = 1;
+    int32 total_count = 2;
+    int32 current_page = 3;
+    bool has_next = 4;
+    double average_rating = 5;
+}
+
+message GetReviewRequest {
+    string restaurant_id = 1;
+    string review_id = 2;
+}
+
+message GetReviewResponse {
+    Review review = 1;
+    bool success = 2;
+    string message = 3;
+}
+
+message UpdateReviewRequest {
+    string restaurant_id = 1;
+    string review_id = 2;
+    int32 rating = 3;
+    string content = 4;
+    repeated string image_urls = 5;
+}
+
+message UpdateReviewResponse {
+    Review review = 1;
+    bool success = 2;
+    string message = 3;
+}
+
+message DeleteReviewRequest {
+    string restaurant_id = 1;
+    string review_id = 2;
+}
+
+message DeleteReviewResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message VerifyReceiptRequest {
+    bytes receipt_image = 1;
+    string expected_restaurant_name = 2;
+    string expected_address = 3;
+}
+
+message VerifyReceiptResponse {
+    OcrResult ocr_result = 1;
+    bool is_verified = 2;
+    string message = 3;
+}
