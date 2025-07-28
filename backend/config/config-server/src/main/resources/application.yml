@@ -1,6 +1,10 @@
 server:
   port: 8888
 
+# 암호화 설정 (민감한 정보 보호용)
+encrypt:
+  key: ${ENCRYPT_KEY} # Kubernetes Secret으로 관리 필요
+
 spring:
   application:
     name: config-server
