@@ -329,6 +329,7 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
+**/application.properties
 # End of https://www.toptal.com/developers/gitignore/api/java,macos,windows,intellij,react,maven,eclipse,visualstudiocode
 
 **/googleapis/
