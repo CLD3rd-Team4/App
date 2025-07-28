@@ -1,10 +1,15 @@
 package com.mapzip.schedule.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.netty.channel.ChannelOption;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.netty.http.client.HttpClient;
+
+import java.time.Duration;
 
 @Configuration
 public class AppConfig {
@@ -16,8 +21,14 @@ public class AppConfig {
                 .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(10 * 1024 * 1024)) // 10MB
                 .build();
 
+        // 타임아웃 설정을 위한 HttpClient 구성
+        HttpClient httpClient = HttpClient.create()
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 30000) // 연결 타임아웃 30초
+                .responseTimeout(Duration.ofSeconds(30)); // 응답 타임아웃 30초
+
         return WebClient.builder()
-                .exchangeStrategies(exchangeStrategies);
+                .exchangeStrategies(exchangeStrategies)
+                .clientConnector(new ReactorClientHttpConnector(httpClient));
     }
 
     @Bean

@@ -1,5 +1,6 @@
 package com.mapzip.schedule.client;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mapzip.schedule.dto.TmapRouteRequest;
 import com.mapzip.schedule.dto.TmapRouteResponse;
@@ -9,9 +10,6 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
-
-import java.io.FileWriter;
-import java.io.IOException;
 
 @Slf4j
 @Component
@@ -31,14 +29,8 @@ public class TmapClient {
 
     public Mono<TmapRouteResponse> getRoutePrediction(TmapRouteRequest requestBody) {
         try {
-            String jsonPayload = objectMapper.writeValueAsString(requestBody);
-            log.info("TMap API Request Payload: {}", jsonPayload);
-            try (FileWriter file = new FileWriter("tmap_request_payload.json")) {
-                file.write(jsonPayload);
-            } catch (IOException e) {
-                log.error("Failed to write Tmap request payload to file", e);
-            }
-        } catch (Exception e) {
+            log.info("TMap API Request Payload: {}", objectMapper.writeValueAsString(requestBody));
+        } catch (JsonProcessingException e) {
             log.warn("Failed to serialize request body for logging", e);
         }
 
@@ -60,11 +52,6 @@ public class TmapClient {
                 .flatMap(responseBody -> {
                     try {
                         log.info("Tmap API Response: {}", responseBody);
-                        try (FileWriter file = new FileWriter("tmap_response_payload.json")) {
-                            file.write(responseBody);
-                        } catch (IOException e) {
-                            log.error("Failed to write Tmap response payload to file", e);
-                        }
                         TmapRouteResponse tmapResponse = objectMapper.readValue(responseBody, TmapRouteResponse.class);
                         return Mono.just(tmapResponse);
                     } catch (Exception e) {

@@ -32,13 +32,11 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-import java.io.File;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -103,11 +101,7 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
                                 return kakaoClient.searchRestaurants(loc.getLat(), loc.getLon(), slot.getRadius())
                                         .flatMap(kakaoResponse -> {
                                             try {
-                                                // 파일 저장
-                                                String fileName = String.format("kakao_response_%s_%s.json", schedule.getId(), slot.getId());
-                                                objectMapper.writerWithDefaultPrettyPrinter().writeValue(new File(fileName), kakaoResponse);
-                                                log.info("Kakao API response saved to {}", fileName);
-
+                                                log.info("Found {} restaurants for slot {}", kakaoResponse.getDocuments().size(), slot.getId());
                                                 // 위치 정보 업데이트
                                                 Map<String, Object> locationJson = new HashMap<>();
                                                 locationJson.put("lat", loc.getLat());

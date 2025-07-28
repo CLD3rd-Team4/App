@@ -1,6 +1,0 @@
-{
-    "user_id": "여기에_스케줄_생성시_사용한_user_id를_넣으세요",
-    "schedule_id": "여기에_CreateSchedule_응답으로_받은_schedule_id를_넣으세요",
-    "slot_id": "여기에_GetScheduleDetail_응답에서_확인한_meal_slot의_id를_넣으세요",
-    "restaurant_id": "restaurant-abc-123" 
-}

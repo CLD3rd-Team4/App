@@ -60,6 +60,13 @@
 			<version>${protobuf.version}</version>
 		</dependency>
 
+		<!-- Google Common Protos for gRPC HTTP annotations -->
+		<dependency>
+			<groupId>com.google.api.grpc</groupId>
+			<artifactId>proto-google-common-protos</artifactId>
+			<version>2.25.0</version>
+		</dependency>
+
 		<!-- Annotation for generated sources -->
 		<dependency>
 			<groupId>javax.annotation</groupId>
@@ -124,6 +131,32 @@
 				</configuration>
 			</plugin>
 			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-dependency-plugin</artifactId>
+				<version>3.6.0</version>
+				<executions>
+					<execution>
+						<id>unpack-proto-sources</id>
+						<phase>generate-sources</phase>
+						<goals>
+							<goal>unpack</goal>
+						</goals>
+						<configuration>
+							<artifactItems>
+								<artifactItem>
+									<groupId>com.google.api.grpc</groupId>
+									<artifactId>proto-google-common-protos</artifactId>
+									<version>2.25.0</version>
+									<type>jar</type>
+									<overWrite>true</overWrite>
+									<outputDirectory>${project.build.directory}/proto-dependencies</outputDirectory>
+								</artifactItem>
+							</artifactItems>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
 				<groupId>org.xolstice.maven.plugins</groupId>
 				<artifactId>protobuf-maven-plugin</artifactId>
 				<version>0.6.1</version>
@@ -131,7 +164,10 @@
 					<protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
 					<pluginId>grpc-java</pluginId>
 					<pluginArtifact>io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
-					<protoSourceRoot>${project.basedir}/src/main/proto</protoSourceRoot>
+					<protoSourceRoots>
+						<protoSourceRoot>${project.basedir}/src/main/proto</protoSourceRoot>
+						<protoSourceRoot>${project.build.directory}/proto-dependencies</protoSourceRoot>
+					</protoSourceRoots>
 				</configuration>
 				<executions>
 					<execution>
@@ -139,6 +175,12 @@
 							<goal>compile</goal>
 							<goal>compile-custom</goal>
 						</goals>
+						<configuration>
+							<generateDescriptorSet>true</generateDescriptorSet>
+							<includeImportsInDescriptorSet>true</includeImportsInDescriptorSet>
+							<descriptorSetFileName>schedule.pb</descriptorSetFileName>
+							<descriptorSetOutputDirectory>${project.build.directory}/classes</descriptorSetOutputDirectory>
+						</configuration>
 					</execution>
 				</executions>
 			</plugin>
@@ -177,4 +219,43 @@
 		</plugins>
 	</build>
 
+<!-- protoc 실행 파일 경로 프로퍼티 -->
+<profiles>
+    <profile>
+        <id>windows</id>
+        <activation>
+            <os>
+                <family>windows</family>
+            </os>
+        </activation>
+        <properties>
+            <protoc.executable>${settings.localRepository}/com/google/protobuf/protoc/${protobuf.version}/protoc-${protobuf.version}-windows-x86_64.exe</protoc.executable>
+        </properties>
+    </profile>
+    <profile>
+        <id>mac</id>
+        <activation>
+            <os>
+                <family>mac</family>
+            </os>
+        </activation>
+        <properties>
+            <protoc.executable>${settings.localRepository}/com/google/protobuf/protoc/${protobuf.version}/protoc-${protobuf.version}-osx-x86_64.exe</protoc.executable>
+        </properties>
+    </profile>
+    <profile>
+        <id>linux</id>
+        <activation>
+            <os>
+                <family>unix</family>
+                <name>Linux</name>
+            </os>
+        </activation>
+        <properties>
+            <protoc.executable>${settings.localRepository}/com/google/protobuf/protoc/${protobuf.version}/protoc-${protobuf.version}-linux-x86_64.exe</protoc.executable>
+        </properties>
+    </profile>
+</profiles>
+
 </project>
+
