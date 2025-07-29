@@ -33,7 +33,7 @@ management:
         http.server.requests: 100ms,200ms,500ms,1s,2s
     tags:
       application: ${spring.application.name}
-      environment: ${ENVIRONMENT:development}
+      environment: ${ENVIRONMENT:dev}
       region: ${AWS_REGION:ap-northeast-2}
 
 jwt:
