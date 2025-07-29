@@ -126,7 +126,7 @@ jobs:
         with:
           repository: CLD3rd-Team4/Infra
           ref: dev
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.INFRA_PAT }}
           path: infra
 
       - name: Update YAMLs with new image tags
