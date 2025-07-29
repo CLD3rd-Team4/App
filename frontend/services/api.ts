@@ -1,3 +1,5 @@
+import { LocationData } from "@/types"
+
 // API 기본 설정
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.mapzip.com"
 
@@ -195,6 +197,115 @@ export const scheduleApi = {
     // TODO: 실제 API 연동
     return new Promise((resolve) => setTimeout(resolve, 500))
   },
+
+  // 🆕 새로 추가: 위치 정보와 함께 스케줄 생성
+  createScheduleWithRoute: async (scheduleData: {
+    title: string
+    locations: LocationData
+    departureTime: string
+    arrivalTime: string
+    hasMeal: boolean
+    companions: string[]
+    purpose: string
+    tags: string[]
+    mealRadius?: "5km" | "10km" | "20km"
+    targetMealTimes?: Array<{ type: "식사" | "간식", time: string }>
+    userRequirements?: string
+  }) => {
+    try {
+      // TODO: 실제 API 연동 시 이 부분을 실제 fetch로 교체
+      console.log('📍 위치 정보와 함께 스케줄 생성:', scheduleData)
+      
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          const newSchedule = {
+            id: Date.now().toString(),
+            ...scheduleData,
+            // 기존 형식과 호환을 위해 문자열도 함께 저장
+            departure: scheduleData.locations.departure?.name || "",
+            destination: scheduleData.locations.destination?.name || "",
+            waypoints: scheduleData.locations.waypoints.map(w => w?.name).filter(Boolean),
+          }
+          resolve(newSchedule)
+        }, 1000)
+      })
+
+      // 실제 API 연동 시 사용할 코드:
+      /*
+      const response = await fetch(`${API_BASE_URL}/schedule/create-with-route`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // 'Authorization': `Bearer ${getToken()}`
+        },
+        body: JSON.stringify(scheduleData)
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      return await response.json()
+      */
+    } catch (error) {
+      console.error('스케줄 생성 오류:', error)
+      throw error
+    }
+  },
+
+  // 🆕 새로 추가: 경로 및 소요시간 미리 계산
+  calculateRoute: async (locations: LocationData) => {
+    try {
+      // TODO: 실제 API 연동 시 이 부분을 실제 fetch로 교체
+      console.log('🗺️ 경로 계산 요청:', locations)
+      
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          // 더미 응답 데이터
+          resolve({
+            totalDistance: "120.5km",
+            totalDuration: "2시간 30분",
+            routes: [
+              {
+                section: "출발지 → 경유지1",
+                distance: "45.2km",
+                duration: "1시간 10분"
+              },
+              {
+                section: "경유지1 → 도착지",
+                distance: "75.3km",
+                duration: "1시간 20분"
+              }
+            ],
+            estimatedCost: {
+              fuel: "15,000원",
+              toll: "8,500원"
+            }
+          })
+        }, 800)
+      })
+
+      // 실제 API 연동 시 사용할 코드:
+      /*
+      const response = await fetch(`${API_BASE_URL}/route/calculate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ locations })
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      return await response.json()
+      */
+    } catch (error) {
+      console.error('경로 계산 오류:', error)
+      throw error
+    }
+  }
 }
 
 export const recommendationApi = {
@@ -248,4 +359,65 @@ export const reviewApi = {
       }, 1000)
     })
   },
+}
+
+// 🆕 새로 추가: 위치 관련 유틸리티 함수들
+export const locationUtils = {
+  // 직선거리 계산 (km 단위)
+  calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 6371 // 지구 반지름 (km)
+    const dLat = (lat2 - lat1) * Math.PI / 180
+    const dLng = (lng2 - lng1) * Math.PI / 180
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng/2) * Math.sin(dLng/2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+    return R * c
+  },
+
+  // 예상 소요시간 계산 (분 단위)
+  estimateTravelTime(distance: number, transportType: 'car' | 'walk' | 'public' = 'car'): number {
+    const speeds = {
+      car: 40,     // km/h (도시 평균)
+      walk: 4,     // km/h
+      public: 25   // km/h (대중교통 평균)
+    }
+    
+    return Math.round((distance / speeds[transportType]) * 60)
+  },
+
+  // 위치 데이터 검증
+  validateLocationData(locationData: LocationData): boolean {
+    if (!locationData.departure || !locationData.destination) {
+      return false
+    }
+
+    // 위도/경도 범위 검증
+    const isValidCoord = (lat: number, lng: number) => {
+      return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180
+    }
+
+    if (!isValidCoord(locationData.departure.lat, locationData.departure.lng) ||
+        !isValidCoord(locationData.destination.lat, locationData.destination.lng)) {
+      return false
+    }
+
+    // 경유지 검증
+    for (const waypoint of locationData.waypoints) {
+      if (waypoint && !isValidCoord(waypoint.lat, waypoint.lng)) {
+        return false
+      }
+    }
+
+    return true
+  },
+
+  // 위치 데이터를 문자열로 변환 (기존 시스템과의 호환성)
+  locationToString(locationData: LocationData) {
+    return {
+      departure: locationData.departure?.name || "",
+      destination: locationData.destination?.name || "",
+      waypoints: locationData.waypoints.map(w => w?.name).filter(Boolean)
+    }
+  }
 }
