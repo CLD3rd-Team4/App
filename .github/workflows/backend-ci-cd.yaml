@@ -1,0 +1,164 @@
+name: Backend CI/CD
+
+on:
+  push:
+    branches:
+      - dev
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.detect.outputs.services }}
+      commit_hash: ${{ steps.hash.outputs.commit_hash }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed services
+        id: detect
+        run: |
+          git fetch origin dev
+          CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '^backend/' | cut -d '/' -f2 | sort | uniq | jq -R -s -c 'split("\n") | map(select(. != ""))')
+          echo "services=$CHANGED" >> $GITHUB_OUTPUT
+
+      - name: Get short git commit hash
+        id: hash
+        run: echo "commit_hash=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+  build-and-push:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    if: ${{ fromJson(needs.detect-changes.outputs.services) != '[]' }}
+    strategy:
+      matrix:
+        service: ${{ fromJson(needs.detect-changes.outputs.services) }}
+      fail-fast: false
+    env:
+      IMAGE_TAG: ${{ needs.detect-changes.outputs.commit_hash }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/mapzip-dev-GitHubActionsOIDCRole
+          role-session-name: GitHub_to_AWS_via_FederatedOIDC
+          aws-region: ap-northeast-2
+
+      - name: Login to Amazon ECR Private
+        id: login-ecr-private
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        id: build
+        env:
+          REGISTRY: ${{ steps.login-ecr-private.outputs.registry }}
+        run: |
+          SERVICE="${{ matrix.service }}"
+          echo "Building and pushing $SERVICE"
+
+          cd "./backend/$SERVICE" || exit 1
+          mvn -B package -DskipTests --file pom.xml
+          mv ./target/*.jar ./target/app.jar
+          cd - || exit 1
+
+          docker build -t "$REGISTRY/mapzip-dev-ecr-$SERVICE:$IMAGE_TAG" "./backend/$SERVICE"
+          docker push "$REGISTRY/mapzip-dev-ecr-$SERVICE:$IMAGE_TAG"
+
+      - name: Save successful service name
+        if: success()
+        run: |
+          mkdir -p success
+          echo "${{ matrix.service }}" > "success/${{ matrix.service }}.txt"
+
+      - name: Upload success list
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: successful-service-${{ matrix.service }}
+          path: success/${{ matrix.service }}.txt
+
+  update-argocd-yaml:
+    needs:
+      - detect-changes
+      - build-and-push
+    runs-on: ubuntu-latest
+    if: ${{ fromJson(needs.detect-changes.outputs.services) != '[]' }}
+    steps:
+      - name: Download all success artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: successful-service-*
+          path: ./services
+          merge-multiple: true
+
+      - name: Read success list
+        id: get-success
+        run: |
+          SUCCESS_SERVICES=""
+          if [ -d "./services" ]; then
+            for file in ./services/*.txt; do
+              if [ -f "$file" ]; then
+                SERVICE=$(basename "$file" .txt)
+                SUCCESS_SERVICES="$SUCCESS_SERVICES $SERVICE"
+              fi
+            done
+          fi
+          echo "success_services=$(echo $SUCCESS_SERVICES | xargs)" >> $GITHUB_OUTPUT
+
+      - name: Checkout Infra repo
+        uses: actions/checkout@v4
+        with:
+          repository: CLD3rd-Team4/Infra
+          ref: dev
+          token: ${{ secrets.INFRA_PAT }}
+          path: infra
+
+      - name: Update YAMLs with new image tags
+        env:
+          IMAGE_TAG: ${{ needs.detect-changes.outputs.commit_hash }}
+        run: |
+          INFRA_PATH="argocd"
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          cd infra
+
+          for SERVICE_NAME in ${{ steps.get-success.outputs.success_services }}; do
+            echo "Updating image tag for service: $SERVICE_NAME"
+
+            if [[ "$SERVICE_NAME" == "auth" || "$SERVICE_NAME" == "gateway" || "$SERVICE_NAME" == "config" ]]; then
+              SERVICE_DIR="$INFRA_PATH/platform"
+            else
+              SERVICE_DIR="$INFRA_PATH/service-$SERVICE_NAME"
+            fi
+
+            FILE_NAME="${SERVICE_NAME#service-}.yaml"
+            YAML_FILE="$SERVICE_DIR/$FILE_NAME"
+
+            if [ ! -f "$YAML_FILE" ]; then
+              echo "Warning: YAML file not found: $YAML_FILE"
+              continue
+            fi
+
+            sed -i -E "s|(image:.*:)[^[:space:]]+|\1$IMAGE_TAG|g" "$YAML_FILE"
+
+            git add "$YAML_FILE"
+            git commit -m "Update $SERVICE_NAME image tag to $IMAGE_TAG [ci skip]" || echo "No changes to commit for $SERVICE_NAME"
+          done
+
+          git push origin dev
