@@ -61,15 +61,11 @@ public class ReviewRepository {
     }
 
     public List<ReviewEntity> findByUserId(String userId) {
-        // userId로 검색하려면 스캔을 사용해야 함 (GSI가 없으므로)
-        var scanSpec = ScanEnhancedRequest.builder()
-                .filterExpression(Expression.builder()
-                        .expression("user_id = :userId")
-                        .putExpressionValue(":userId", AttributeValue.builder().s(userId).build())
-                        .build())
-                .build();
+        DynamoDbIndex<ReviewEntity> index = reviewTable.index("UserIdIndex");
+        QueryConditional queryConditional = QueryConditional
+                .keyEqualTo(Key.builder().partitionValue(userId).build());
 
-        return reviewTable.scan(scanSpec)
+        return index.query(QueryEnhancedRequest.builder().queryConditional(queryConditional).build())
                 .stream()
                 .flatMap(page -> page.items().stream())
                 .collect(Collectors.toList());

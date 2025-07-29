@@ -45,8 +45,11 @@ public class ReviewService {
                 ocrResult = ocrService.processReceiptImage(
                     receiptImages.get(0), restaurantName, restaurantAddress);
                 isVerified = ocrResult.isValid();
-                
                 logger.info("OCR verification result for user {}: {}", userId, isVerified);
+
+                if (!isVerified) {
+                    return new ReviewCreateResult(null, ocrResult, false, "영수증 검증에 실패하여 리뷰를 생성할 수 없습니다.");
+                }
             }
             
             // 리뷰 이미지 S3 업로드

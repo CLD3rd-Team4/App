@@ -1,5 +1,5 @@
 // API 기본 설정
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.mapzip.com"
+const API_BASE_URL = "https://api.mapzip.shop";
 
 // 테스트용 데이터 - 실제 API 연동 시 제거
 const TEST_DATA = {
@@ -165,10 +165,11 @@ export const authApi = {
 
 export const scheduleApi = {
   getSchedules: async () => {
-    // TODO: 실제 API 연동
-    return new Promise((resolve) => {
-      setTimeout(() => resolve(TEST_DATA.schedules), 500)
-    })
+    const response = await fetch(`${API_BASE_URL}/schedule`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch schedules');
+    }
+    return response.json();
   },
 
   createSchedule: async (scheduleData: any) => {
@@ -220,32 +221,56 @@ export const visitedRestaurantApi = {
 }
 
 export const ocrApi = {
-  processReceipt: async (imageData: string) => {
-    // TODO: 실제 API 연동
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          restaurantName: "맛있는 한식당",
-          visitDate: "2024.07.18",
-          isValid: true,
-          extractedText: "영수증 텍스트 내용...",
-        })
-      }, 2000)
-    })
+  processReceipt: async (imageData: string, expectedRestaurantName: string, expectedAddress: string) => {
+    const formData = new FormData();
+    const blob = await (await fetch(imageData)).blob();
+    formData.append('receiptImage', blob, 'receipt.jpg');
+    formData.append('expectedRestaurantName', expectedRestaurantName);
+    formData.append('expectedAddress', expectedAddress);
+
+    const response = await fetch(`${API_BASE_URL}/api/reviews/verify-receipt`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to process receipt');
+    }
+    return response.json();
   },
-}
+};
 
 export const reviewApi = {
   createReview: async (reviewData: any) => {
-    // TODO: 실제 API 연동
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          id: Date.now().toString(),
-          ...reviewData,
-          createdAt: new Date().toISOString(),
-        })
-      }, 1000)
-    })
+    const formData = new FormData();
+    formData.append('restaurantId', reviewData.restaurantId);
+    formData.append('restaurantName', reviewData.restaurantName);
+    formData.append('restaurantAddress', reviewData.restaurantAddress);
+    formData.append('rating', reviewData.rating.toString());
+    formData.append('content', reviewData.content);
+
+    if (reviewData.receiptImages) {
+      for (const image of reviewData.receiptImages) {
+        const blob = await (await fetch(image)).blob();
+        formData.append('receiptImages', blob, 'receipt.jpg');
+      }
+    }
+
+    if (reviewData.reviewImages) {
+      for (const image of reviewData.reviewImages) {
+        const blob = await (await fetch(image)).blob();
+        formData.append('reviewImages', blob, 'review.jpg');
+      }
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/reviews`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to create review');
+    }
+    return response.json();
   },
-}
+};

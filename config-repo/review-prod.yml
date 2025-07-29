@@ -16,7 +16,7 @@ aws:
 google:
   cloud:
     vision:
-      api-key: ${GOOGLE_CLOUD_VISION_API_KEY_PROD}
+      api-key: '{cipher}암호화된_PROD_API_키'
 
 # Production logging - less verbose
 logging:

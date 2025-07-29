@@ -3,11 +3,11 @@ version: '3.8'
 
 services:
   # Review Service
-  review-service:
+  review.service-review:
     build: 
       context: .
       dockerfile: Dockerfile
-    container_name: review-service
+    container_name: review.service-review
     ports:
       - "8080:8080"    # HTTP port
       - "50051:50051"  # gRPC port

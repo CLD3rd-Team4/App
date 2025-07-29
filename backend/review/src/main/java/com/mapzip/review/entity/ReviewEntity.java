@@ -43,6 +43,7 @@ public class ReviewEntity {
         this.reviewId = reviewId;
     }
 
+    @DynamoDbSecondaryPartitionKey(indexNames = "UserIdIndex")
     @DynamoDbAttribute("user_id")
     public String getUserId() {
         return userId;

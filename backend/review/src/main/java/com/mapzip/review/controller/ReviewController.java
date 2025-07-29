@@ -72,6 +72,7 @@ public class ReviewController {
      */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Map<String, Object>> createReview(
+            @RequestHeader("X-User-Id") String userId,
             @RequestParam("restaurantId") String restaurantId,
             @RequestParam("restaurantName") String restaurantName,
             @RequestParam("restaurantAddress") String restaurantAddress,
@@ -81,9 +82,6 @@ public class ReviewController {
             @RequestParam(value = "reviewImages", required = false) List<MultipartFile> reviewImages) {
         
         try {
-            // 임시로 고정된 userId 사용 (실제로는 Gateway에서 passport 헤더로 전달받아야 함)
-            String userId = "user-1";
-            
             logger.info("Creating review for user: {}, restaurant: {}", userId, restaurantId);
             
             // 영수증 이미지 변환

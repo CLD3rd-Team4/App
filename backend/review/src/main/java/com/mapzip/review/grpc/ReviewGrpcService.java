@@ -4,6 +4,8 @@ import com.google.protobuf.ByteString;
 import com.mapzip.review.dto.OcrResultDto;
 import com.mapzip.review.entity.ReviewEntity;
 import com.mapzip.review.service.ReviewService;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import net.devh.boot.grpc.server.service.GrpcService;
 import org.slf4j.Logger;
@@ -30,8 +32,11 @@ public class ReviewGrpcService extends ReviewServiceGrpc.ReviewServiceImplBase {
         try {
             logger.info("Creating review for restaurant: {}", request.getRestaurantId());
             
-            // passport에서 userId를 추출해야 하지만, 여기서는 임시로 "user-1"을 사용
-            String userId = "user-1"; // 실제로는 Gateway에서 passport 헤더로 전달받아야 함
+            String userId = HeaderInterceptor.USER_ID_CONTEXT_KEY.get();
+            if (userId == null || userId.isEmpty()) {
+                responseObserver.onError(new StatusRuntimeException(Status.UNAUTHENTICATED.withDescription("User ID is missing")));
+                return;
+            }
             
             // 영수증 이미지 변환
             List<byte[]> receiptImages = request.getReceiptImagesList().stream()
@@ -164,7 +169,11 @@ public class ReviewGrpcService extends ReviewServiceGrpc.ReviewServiceImplBase {
     public void updateReview(ReviewProto.UpdateReviewRequest request,
                            StreamObserver<ReviewProto.UpdateReviewResponse> responseObserver) {
         try {
-            String userId = "user-1"; // 실제로는 passport에서 추출
+            String userId = HeaderInterceptor.USER_ID_CONTEXT_KEY.get();
+            if (userId == null || userId.isEmpty()) {
+                responseObserver.onError(new StatusRuntimeException(Status.UNAUTHENTICATED.withDescription("User ID is missing")));
+                return;
+            }
             
             ReviewEntity updatedReview = reviewService.updateReview(
                     request.getRestaurantId(),
@@ -201,7 +210,11 @@ public class ReviewGrpcService extends ReviewServiceGrpc.ReviewServiceImplBase {
     public void deleteReview(ReviewProto.DeleteReviewRequest request,
                            StreamObserver<ReviewProto.DeleteReviewResponse> responseObserver) {
         try {
-            String userId = "user-1"; // 실제로는 passport에서 추출
+            String userId = HeaderInterceptor.USER_ID_CONTEXT_KEY.get();
+            if (userId == null || userId.isEmpty()) {
+                responseObserver.onError(new StatusRuntimeException(Status.UNAUTHENTICATED.withDescription("User ID is missing")));
+                return;
+            }
             
             reviewService.deleteReview(request.getRestaurantId(), request.getReviewId(), userId);
             
@@ -278,5 +291,16 @@ public class ReviewGrpcService extends ReviewServiceGrpc.ReviewServiceImplBase {
                 .setRawText(dto.getRawText() != null ? dto.getRawText() : "")
                 .setConfidence(dto.getConfidence())
                 .build();
+    }
+
+    @Override
+    public void getReviewsForRecommendation(ReviewProto.GetReviewsForRecommendationRequest request,
+                                          StreamObserver<ReviewProto.GetReviewsForRecommendationResponse> responseObserver) {
+        // TODO: 추천 서버를 위한 리뷰 데이터 조회 로직 구현
+        // 예: reviewService.getReviewsByAreaAndCategory(request.getArea(), request.getCategory());
+        
+        ReviewProto.GetReviewsForRecommendationResponse response = ReviewProto.GetReviewsForRecommendationResponse.newBuilder().build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
     }
 }

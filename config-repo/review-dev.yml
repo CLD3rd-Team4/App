@@ -16,7 +16,7 @@ aws:
 google:
   cloud:
     vision:
-      api-key: ${GOOGLE_CLOUD_VISION_API_KEY_DEV}
+      api-key: '{cipher}암호화된_DEV_API_키'
 
 # Development specific logging
 logging:
