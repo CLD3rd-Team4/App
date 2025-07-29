@@ -39,7 +39,7 @@ service ScheduleService {
   // 맛집 선택 반영
   rpc SelectRestaurant(SelectRestaurantRequest) returns (SelectRestaurantResponse) {
     option (google.api.http) = {
-      post: "/schedule/{schedule_id}/restaurant"
+      post: "/schedule/{schedule_id}/restaurant/select"
       body: "*"
     };
   }
