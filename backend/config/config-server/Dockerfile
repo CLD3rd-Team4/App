@@ -18,7 +18,8 @@ COPY src/ src/
 RUN ./gradlew bootJar --no-daemon
 
 # 실행 스테이지
-FROM openjdk:17-jre-slim
+FROM eclipse-temurin:17-jdk
+      
 
 # 애플리케이션 실행을 위한 사용자 생성 (보안)
 RUN addgroup --system spring && adduser --system spring --ingroup spring
