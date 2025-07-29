@@ -1,10 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import type React from "react"
+
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { useRouter, useParams } from "next/navigation"
-import { ArrowLeft, Star, ChevronLeft, ChevronRight, Edit, Save, X } from "lucide-react"
+import { ArrowLeft, Star, ChevronLeft, ChevronRight, Edit, Save, X, Plus } from "lucide-react"
 
 export default function ReviewDetailPage() {
   const router = useRouter()
@@ -14,6 +16,8 @@ export default function ReviewDetailPage() {
   const [isEditing, setIsEditing] = useState(false)
   const [editedRating, setEditedRating] = useState(0)
   const [editedReview, setEditedReview] = useState("")
+  const [editedImages, setEditedImages] = useState<string[]>([])
+  const photoInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     // TODO: 실제 API에서 리뷰 상세 정보 가져오기
@@ -33,6 +37,7 @@ export default function ReviewDetailPage() {
     setReview(mockReview)
     setEditedRating(mockReview.rating)
     setEditedReview(mockReview.review)
+    setEditedImages([...mockReview.images])
   }, [params.id])
 
   const handleEdit = () => {
@@ -46,6 +51,7 @@ export default function ReviewDetailPage() {
         ...review,
         rating: editedRating,
         review: editedReview,
+        images: editedImages,
       }
       setReview(updatedReview)
       setIsEditing(false)
@@ -61,6 +67,7 @@ export default function ReviewDetailPage() {
   const handleCancelEdit = () => {
     setEditedRating(review.rating)
     setEditedReview(review.review)
+    setEditedImages([...review.images])
     setIsEditing(false)
   }
 
@@ -71,15 +78,39 @@ export default function ReviewDetailPage() {
     }
   }
 
+  const handlePhotoAdd = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || [])
+    files.forEach((file) => {
+      if (editedImages.length < 5) {
+        // 최대 5개까지
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          setEditedImages((prev) => [...prev, e.target?.result as string])
+        }
+        reader.readAsDataURL(file)
+      }
+    })
+  }
+
+  const handlePhotoRemove = (index: number) => {
+    setEditedImages((prev) => prev.filter((_, i) => i !== index))
+    // 현재 보고 있던 이미지가 삭제된 경우 인덱스 조정
+    if (currentImageIndex >= editedImages.length - 1) {
+      setCurrentImageIndex(Math.max(0, editedImages.length - 2))
+    }
+  }
+
   const nextImage = () => {
-    if (review?.images) {
-      setCurrentImageIndex((prev) => (prev + 1) % review.images.length)
+    const images = isEditing ? editedImages : review?.images
+    if (images) {
+      setCurrentImageIndex((prev) => (prev + 1) % images.length)
     }
   }
 
   const prevImage = () => {
-    if (review?.images) {
-      setCurrentImageIndex((prev) => (prev - 1 + review.images.length) % review.images.length)
+    const images = isEditing ? editedImages : review?.images
+    if (images) {
+      setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length)
     }
   }
 
@@ -93,6 +124,8 @@ export default function ReviewDetailPage() {
       </div>
     )
   }
+
+  const currentImages = isEditing ? editedImages : review.images
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
@@ -145,17 +178,41 @@ export default function ReviewDetailPage() {
         </div>
 
         {/* 사진 슬라이드 */}
-        {review.images && review.images.length > 0 && (
+        {currentImages && currentImages.length > 0 && (
           <div className="bg-white rounded-lg p-4 shadow-sm">
-            <h3 className="font-medium mb-3">방문 사진</h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-medium">방문 사진</h3>
+              {isEditing && (
+                <Button
+                  onClick={() => photoInputRef.current?.click()}
+                  size="sm"
+                  variant="outline"
+                  className="flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  사진 추가
+                </Button>
+              )}
+            </div>
+
             <div className="relative">
               <img
-                src={review.images[currentImageIndex] || "/placeholder.svg"}
+                src={currentImages[currentImageIndex] || "/placeholder.svg"}
                 alt={`리뷰 사진 ${currentImageIndex + 1}`}
                 className="w-full h-64 object-cover rounded-lg"
               />
 
-              {review.images.length > 1 && (
+              {/* 수정 모드에서 사진 삭제 버튼 */}
+              {isEditing && (
+                <button
+                  onClick={() => handlePhotoRemove(currentImageIndex)}
+                  className="absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center text-sm hover:bg-red-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+
+              {currentImages.length > 1 && (
                 <>
                   <button
                     onClick={prevImage}
@@ -171,7 +228,7 @@ export default function ReviewDetailPage() {
                   </button>
 
                   <div className="flex justify-center mt-3 gap-2">
-                    {review.images.map((_: any, index: number) => (
+                    {currentImages.map((_: any, index: number) => (
                       <button
                         key={index}
                         onClick={() => setCurrentImageIndex(index)}
@@ -237,6 +294,9 @@ export default function ReviewDetailPage() {
           )}
         </div>
       </div>
+
+      {/* 사진 추가용 숨겨진 input */}
+      <input ref={photoInputRef} type="file" accept="image/*" multiple onChange={handlePhotoAdd} className="hidden" />
     </div>
   )
 }
