@@ -93,8 +93,7 @@ export default function VisitedRestaurantsScreen() {
                       />
                       <div className="flex-1 min-w-0">
                         <h3 className="font-medium mb-1">{restaurant.name}</h3>
-                        <p className="text-sm text-gray-600 mb-2">주소 정보</p>
-                        <p className="text-sm text-gray-600 mb-2">방문일: {restaurant.visitDate}</p>
+                        {/* 방문일자와 한줄 제거 */}
                         {restaurant.rating && (
                           <div className="flex items-center mb-2">
                             <Star className="w-4 h-4 text-yellow-400 fill-current" />
@@ -140,9 +139,9 @@ export default function VisitedRestaurantsScreen() {
                         alt={`리뷰 이미지 ${index}`}
                         className="w-full h-16 object-cover rounded mb-2"
                       />
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        {/* 오른쪽 별점 제거, 왼쪽 별점만 유지 */}
                         <span className="text-xs text-gray-600">★★★★</span>
-                        <span className="text-xs text-gray-500">★★★★</span>
                       </div>
                     </div>
                   ))}
