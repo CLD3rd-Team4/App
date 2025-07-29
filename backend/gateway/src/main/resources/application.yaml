@@ -24,7 +24,7 @@ management:
       enabled: true
 
 jwt:
-  secret: tmp
+  secret: 
   expiration: 86400000
 
 server:

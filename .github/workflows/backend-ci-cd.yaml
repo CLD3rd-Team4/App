@@ -133,7 +133,7 @@ jobs:
         env:
           IMAGE_TAG: ${{ needs.detect-changes.outputs.commit_hash }}
         run: |
-          INFRA_PATH="infra/argocd"
+          INFRA_PATH="argocd"
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
           cd infra
