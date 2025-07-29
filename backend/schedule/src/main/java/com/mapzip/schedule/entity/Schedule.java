@@ -109,4 +109,27 @@ public class Schedule {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @OneToMany(mappedBy = "schedule", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private java.util.List<MealTimeSlot> mealTimeSlots = new java.util.ArrayList<>();
+
+    public java.util.List<MealTimeSlot> getMealTimeSlots() {
+        return mealTimeSlots;
+    }
+
+    public void setMealTimeSlots(java.util.List<MealTimeSlot> mealTimeSlots) {
+        this.mealTimeSlots = mealTimeSlots;
+    }
+
+    /**
+     * 연관된 모든 MealTimeSlot을 제거하고 관계를 정리하는 편의 메서드.
+     */
+    public void clearMealTimeSlots() {
+        if (this.mealTimeSlots != null) {
+            for (MealTimeSlot mealTimeSlot : this.mealTimeSlots) {
+                mealTimeSlot.setSchedule(null); // MealTimeSlot에서의 연관 관계 제거
+            }
+            this.mealTimeSlots.clear();
+        }
+    }
 }

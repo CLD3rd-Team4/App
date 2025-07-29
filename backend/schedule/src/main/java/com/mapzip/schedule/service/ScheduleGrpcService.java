@@ -1,22 +1,14 @@
 package com.mapzip.schedule.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.protobuf.GeneratedMessageV3;
 import com.mapzip.schedule.client.KakaoClient;
 import com.mapzip.schedule.client.TmapClient;
 import com.mapzip.schedule.dto.TmapRouteRequest;
+import com.mapzip.schedule.dto.TmapRouteResponse;
 import com.mapzip.schedule.entity.MealTimeSlot;
 import com.mapzip.schedule.entity.Schedule;
-import com.mapzip.schedule.grpc.CreateScheduleRequest;
-import com.mapzip.schedule.grpc.CreateScheduleResponse;
-import com.mapzip.schedule.grpc.GetScheduleDetailRequest;
-import com.mapzip.schedule.grpc.GetScheduleDetailResponse;
-import com.mapzip.schedule.grpc.GetScheduleListRequest;
-import com.mapzip.schedule.grpc.GetScheduleListResponse;
-import com.mapzip.schedule.grpc.RefreshScheduleRequest;
-import com.mapzip.schedule.grpc.RefreshScheduleResponse;
-import com.mapzip.schedule.grpc.ScheduleServiceGrpc;
-import com.mapzip.schedule.grpc.SelectRestaurantRequest;
-import com.mapzip.schedule.grpc.SelectRestaurantResponse;
+import com.mapzip.schedule.grpc.*;
 import com.mapzip.schedule.mapper.ScheduleMapper;
 import com.mapzip.schedule.repository.MealTimeSlotRepository;
 import com.mapzip.schedule.repository.ScheduleRepository;
@@ -30,7 +22,6 @@ import net.devh.boot.grpc.server.service.GrpcService;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -56,98 +47,135 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
     @Override
     @Transactional
     public void createSchedule(CreateScheduleRequest request, StreamObserver<CreateScheduleResponse> responseObserver) {
-        // 1. 초기 데이터 설정 및 저장 (동기)
-        LocalDateTime departureDateTime = TimeUtil.parseKoreanAmPmToFuture(request.getDepartureTime(), java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul")));
+        try {
+            Schedule schedule = scheduleMapper.toEntity(request);
+            executeTmapAndKakaoProcess(schedule, request); // 동기 호출
+
+            CreateScheduleResponse response = CreateScheduleResponse.newBuilder()
+                    .setSuccess(true)
+                    .setMessage("스케줄이 성공적으로 생성되었습니다.")
+                    .setScheduleId(schedule.getId())
+                    .setCalculatedArrivalTime(schedule.getCalculatedArrivalTime())
+                    .build();
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+        } catch (Exception e) {
+            log.error("스케줄 생성 중 오류 발생", e);
+            responseObserver.onError(Status.INTERNAL.withDescription("스케줄 생성 중 오류: " + e.getMessage()).withCause(e).asRuntimeException());
+        }
+    }
+
+    @Override
+    @Transactional
+    public void updateSchedule(UpdateScheduleRequest request, StreamObserver<GetScheduleDetailResponse> responseObserver) {
+        try {
+            Schedule schedule = scheduleRepository.findById(request.getScheduleId())
+                    .orElseThrow(() -> Status.NOT_FOUND.withDescription("수정할 스케줄을 찾을 수 없습니다: " + request.getScheduleId()).asRuntimeException());
+
+            if (!schedule.getUserId().equals(request.getUserId())) {
+                throw Status.PERMISSION_DENIED.withDescription("이 스케줄을 수정할 권한이 없습니다.").asRuntimeException();
+            }
+
+            scheduleMapper.updateEntity(schedule, request);
+
+            if (schedule.getMealTimeSlots() != null && !schedule.getMealTimeSlots().isEmpty()) {
+                // orphanRemoval=true 옵션에 의해 clear()만으로도 DB에서 삭제 쿼리가 나감
+                schedule.clearMealTimeSlots();
+            }
+
+            executeTmapAndKakaoProcess(schedule, request); // 동기 호출
+
+            GetScheduleDetailResponse response = GetScheduleDetailResponse.newBuilder()
+                    .setSchedule(scheduleMapper.toDetail(schedule))
+                    .build();
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+        } catch (Exception e) {
+            log.error("스케줄 수정 중 오류 발생", e);
+            responseObserver.onError(Status.INTERNAL.withDescription("스케줄 수정 중 오류: " + e.getMessage()).withCause(e).asRuntimeException());
+        }
+    }
+
+    private void executeTmapAndKakaoProcess(Schedule schedule, GeneratedMessageV3 request) {
+        List<com.mapzip.schedule.grpc.MealTimeSlot> mealSlotsRequest;
+        String departureTimeRequest;
+
+        if (request instanceof CreateScheduleRequest) {
+            CreateScheduleRequest r = (CreateScheduleRequest) request;
+            mealSlotsRequest = r.getMealSlotsList();
+            departureTimeRequest = r.getDepartureTime();
+        } else if (request instanceof UpdateScheduleRequest) {
+            UpdateScheduleRequest r = (UpdateScheduleRequest) request;
+            mealSlotsRequest = r.getMealSlotsList();
+            departureTimeRequest = r.getDepartureTime();
+        } else {
+            throw new IllegalArgumentException("지원하지 않는 요청 타입입니다.");
+        }
+
+        LocalDateTime departureDateTime = TimeUtil.parseKoreanAmPmToFuture(departureTimeRequest, java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul")));
         if (departureDateTime.isBefore(TimeUtil.now())) {
             departureDateTime = departureDateTime.plusDays(1);
         }
 
-        Schedule schedule = scheduleMapper.toEntity(request);
-        scheduleRepository.save(schedule);
-
         List<MealTimeSlot> mealTimeSlotEntities = new ArrayList<>();
-        for (com.mapzip.schedule.grpc.MealTimeSlot slotRequest : request.getMealSlotsList()) {
+        for (com.mapzip.schedule.grpc.MealTimeSlot slotRequest : mealSlotsRequest) {
             MealTimeSlot mealTimeSlot = new MealTimeSlot();
             mealTimeSlot.setId(java.util.UUID.randomUUID().toString());
-            mealTimeSlot.setSchedule(schedule);
+            mealTimeSlot.setSchedule(schedule); // *** 양방향 관계 설정 ***
             mealTimeSlot.setMealType(slotRequest.getMealType().getNumber());
             mealTimeSlot.setScheduledTime(slotRequest.getScheduledTime());
             mealTimeSlot.setRadius(slotRequest.getRadius() > 0 ? slotRequest.getRadius() : 1000);
             mealTimeSlotEntities.add(mealTimeSlot);
         }
-        mealTimeSlotRepository.saveAll(mealTimeSlotEntities);
-
-        // 2. Tmap API 비동기 호출
+        schedule.getMealTimeSlots().addAll(mealTimeSlotEntities); // 기존 컬렉션에 추가
+        
+        // Tmap API 호출을 동기적으로 실행하고 결과를 기다림
         TmapRouteRequest tmapRequest = scheduleMapper.toTmapRequest(request, departureDateTime);
-        final LocalDateTime finalDepartureDateTime = departureDateTime;
+        TmapRouteResponse tmapResponse = tmapClient.getRoutePrediction(tmapRequest).block();
 
-        tmapClient.getRoutePrediction(tmapRequest)
-                .flatMap(tmapResponse -> {
-                    // 3. 경로 정보 기반 위치 계산 (동기)
-                    List<RouteService.CalculatedLocation> calculatedLocations = routeService.calculateMealLocations(
-                            tmapResponse, mealTimeSlotEntities, finalDepartureDateTime
-                    );
+        if (tmapResponse == null) {
+            throw new RuntimeException("Tmap API로부터 응답을 받지 못했습니다.");
+        }
 
-                    // 4. Kakao API 병렬 호출
-                    return Flux.fromIterable(calculatedLocations)
-                            .parallel()
-                            .runOn(Schedulers.parallel())
-                            .flatMap(loc -> {
-                                MealTimeSlot slot = mealTimeSlotEntities.stream()
-                                        .filter(s -> s.getId().equals(loc.getSlotId()))
-                                        .findFirst().orElse(null);
-                                if (slot == null) return Mono.empty();
+        List<RouteService.CalculatedLocation> calculatedLocations = routeService.calculateMealLocations(
+                tmapResponse, mealTimeSlotEntities, departureDateTime
+        );
 
-                                return kakaoClient.searchRestaurants(loc.getLat(), loc.getLon(), slot.getRadius())
-                                        .flatMap(kakaoResponse -> {
-                                            try {
-                                                log.info("Found {} restaurants for slot {}", kakaoResponse.getDocuments().size(), slot.getId());
-                                                // 위치 정보 업데이트
-                                                Map<String, Object> locationJson = new HashMap<>();
-                                                locationJson.put("lat", loc.getLat());
-                                                locationJson.put("lon", loc.getLon());
-                                                locationJson.put("scheduled_time", slot.getScheduledTime());
-                                                slot.setCalculatedLocation(objectMapper.writeValueAsString(locationJson));
-                                                return Mono.just(slot);
-                                            } catch (Exception e) {
-                                                log.error("Error during Kakao API processing for slot {}: {}", slot.getId(), e.getMessage(), e);
-                                                return Mono.error(e);
-                                            }
-                                        });
-                            })
-                            .sequential()
-                            .collectList()
-                            .flatMap(updatedSlots -> {
-                                // 5. 모든 정보 취합 및 최종 저장
-                                mealTimeSlotRepository.saveAll(updatedSlots);
+        // Kakao API 호출을 동기적으로 실행하고 결과를 기다림
+        List<MealTimeSlot> updatedSlots = Flux.fromIterable(calculatedLocations)
+                .flatMap(loc -> {
+                    MealTimeSlot slot = mealTimeSlotEntities.stream()
+                            .filter(s -> s.getId().equals(loc.getSlotId()))
+                            .findFirst().orElse(null);
+                    if (slot == null) return Mono.empty();
 
-                                int totalTimeInSeconds = tmapResponse.getFeatures().get(0).getProperties().getTotalTime();
-                                LocalDateTime arrivalDateTime = finalDepartureDateTime.plusSeconds(totalTimeInSeconds);
-                                schedule.setCalculatedArrivalTime(TimeUtil.toKoreanAmPm(arrivalDateTime));
-                                scheduleRepository.save(schedule);
-
-                                return Mono.just(CreateScheduleResponse.newBuilder()
-                                        .setSuccess(true)
-                                        .setMessage("스케줄이 성공적으로 생성되었으며, 주변 음식점 검색이 시작되었습니다.")
-                                        .setScheduleId(schedule.getId())
-                                        .setCalculatedArrivalTime(TimeUtil.toKoreanAmPm(arrivalDateTime))
-                                        .build());
+                    return kakaoClient.searchRestaurants(loc.getLat(), loc.getLon(), slot.getRadius())
+                            .map(kakaoResponse -> {
+                                try {
+                                    log.info("Found {} restaurants for slot {}", kakaoResponse.getDocuments().size(), slot.getId());
+                                    Map<String, Object> locationJson = new HashMap<>();
+                                    locationJson.put("lat", loc.getLat());
+                                    locationJson.put("lon", loc.getLon());
+                                    locationJson.put("scheduled_time", slot.getScheduledTime());
+                                    slot.setCalculatedLocation(objectMapper.writeValueAsString(locationJson));
+                                    return slot;
+                                } catch (Exception e) {
+                                    throw new RuntimeException("Kakao API 응답 처리 중 오류 발생", e);
+                                }
                             });
                 })
-                .subscribe(
-                        responseObserver::onNext,
-                        error -> {
-                            log.error("Error creating schedule asynchronously", error);
-                            responseObserver.onError(Status.INTERNAL
-                                    .withDescription("스케줄 생성 중 오류 발생: " + error.getMessage())
-                                    .withCause(error)
-                                    .asRuntimeException());
-                        },
-                        responseObserver::onCompleted
-                );
+                .collectList()
+                .block();
+
+        int totalTimeInSeconds = tmapResponse.getFeatures().get(0).getProperties().getTotalTime();
+        LocalDateTime arrivalDateTime = departureDateTime.plusSeconds(totalTimeInSeconds);
+        schedule.setCalculatedArrivalTime(TimeUtil.toKoreanAmPm(arrivalDateTime));
+
+        // 모든 변경사항을 포함하여 schedule을 최종 저장
+        scheduleRepository.save(schedule);
     }
 
-    // ... (getScheduleList, getScheduleDetail, selectRestaurant, refreshSchedule 등 다른 메서드들은 여기에 유지)
+
     @Override
     @Transactional(readOnly = true)
     public void getScheduleList(GetScheduleListRequest request, StreamObserver<GetScheduleListResponse> responseObserver) {
@@ -209,7 +237,6 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
     @Transactional
     public void selectRestaurant(SelectRestaurantRequest request, StreamObserver<SelectRestaurantResponse> responseObserver) {
         try {
-            // 1. 스케줄과 시간 슬롯의 존재 여부 및 사용자 권한 확인
             Schedule schedule = scheduleRepository.findById(request.getScheduleId())
                     .orElseThrow(() -> Status.NOT_FOUND.withDescription("스케줄을 찾을 수 없습니다: " + request.getScheduleId()).asRuntimeException());
 
@@ -220,26 +247,22 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
             MealTimeSlot mealTimeSlot = mealTimeSlotRepository.findById(request.getSlotId())
                     .orElseThrow(() -> Status.NOT_FOUND.withDescription("시간 슬롯을 찾을 수 없습니다: " + request.getSlotId()).asRuntimeException());
 
-            // 2. 기존에 선택된 맛집이 있는지 확인하고, 없다면 새로 생성
             com.mapzip.schedule.entity.SelectedRestaurant selectedRestaurant = mealTimeSlot.getSelectedRestaurant();
             if (selectedRestaurant == null) {
                 selectedRestaurant = new com.mapzip.schedule.entity.SelectedRestaurant();
-                selectedRestaurant.setMealTimeSlot(mealTimeSlot); // 관계 설정
-                selectedRestaurant.setSchedule(schedule); // 관계 설정
-                mealTimeSlot.setSelectedRestaurant(selectedRestaurant); // 양방향 관계 설정
+                selectedRestaurant.setMealTimeSlot(mealTimeSlot);
+                selectedRestaurant.setSchedule(schedule);
+                mealTimeSlot.setSelectedRestaurant(selectedRestaurant);
             }
 
-            // 3. 맛집 정보 업데이트 (생성 또는 수정)
             selectedRestaurant.setRestaurantId(request.getRestaurantId());
             selectedRestaurant.setName(request.getName());
             selectedRestaurant.setDetailUrl(request.getDetailUrl());
             selectedRestaurant.setScheduledTime(mealTimeSlot.getScheduledTime());
-            selectedRestaurant.setSelectedAt(java.time.LocalDateTime.now()); // 선택 시간을 현재로 갱신
+            selectedRestaurant.setSelectedAt(java.time.LocalDateTime.now());
 
-            // 4. mealTimeSlot을 저장하면 selectedRestaurant도 함께 저장됨 (CascadeType.ALL)
             mealTimeSlotRepository.save(mealTimeSlot);
 
-            // 5. 성공 응답 전송
             SelectRestaurantResponse response = SelectRestaurantResponse.newBuilder()
                     .setSuccess(true)
                     .setMessage("맛집이 성공적으로 선택되었습니다.")
@@ -257,8 +280,38 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
 
     @Override
     public void refreshSchedule(RefreshScheduleRequest request, StreamObserver<RefreshScheduleResponse> responseObserver) {
-        // TODO: Implement refresh logic
         responseObserver.onError(Status.UNIMPLEMENTED.withDescription("Method not implemented").asRuntimeException());
     }
+
+    @Override
+    @Transactional
+    public void deleteSchedule(com.mapzip.schedule.grpc.DeleteScheduleRequest request, StreamObserver<com.mapzip.schedule.grpc.DeleteScheduleResponse> responseObserver) {
+        try {
+            Schedule schedule = scheduleRepository.findById(request.getScheduleId())
+                    .orElseThrow(() -> Status.NOT_FOUND.withDescription("스케줄을 찾을 수 없습니다: " + request.getScheduleId()).asRuntimeException());
+
+            if (!schedule.getUserId().equals(request.getUserId())) {
+                throw Status.PERMISSION_DENIED.withDescription("이 스케줄을 삭제할 권한이 없습니다.").asRuntimeException();
+            }
+
+            scheduleRepository.delete(schedule);
+
+            com.mapzip.schedule.grpc.DeleteScheduleResponse response = com.mapzip.schedule.grpc.DeleteScheduleResponse.newBuilder()
+                    .setSuccess(true)
+                    .setMessage("스케줄이 성공적으로 삭제되었습니다.")
+                    .build();
+
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+
+        } catch (Exception e) {
+            log.error("스케줄 삭제 중 오류 발생", e);
+            responseObserver.onError(Status.INTERNAL
+                    .withDescription("스케줄 삭제 중 오류 발생: " + e.getMessage())
+                    .withCause(e)
+                    .asRuntimeException());
+        }
+    }
 }
+
 

@@ -2,13 +2,12 @@ package com.mapzip.schedule.mapper;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
+import com.google.protobuf.GeneratedMessageV3;
 import com.mapzip.schedule.dto.*;
 import com.mapzip.schedule.entity.MealTimeSlot;
 import com.mapzip.schedule.entity.Schedule;
 import com.mapzip.schedule.entity.SelectedRestaurant;
-import com.mapzip.schedule.grpc.CreateScheduleRequest;
-import com.mapzip.schedule.grpc.GetScheduleDetailResponse;
-import com.mapzip.schedule.grpc.GetScheduleListResponse;
+import com.mapzip.schedule.grpc.*;
 import com.mapzip.schedule.repository.MealTimeSlotRepository;
 import com.mapzip.schedule.repository.SelectedRestaurantRepository;
 import com.mapzip.schedule.util.TimeUtil;
@@ -48,6 +47,19 @@ public class ScheduleMapper {
         return schedule;
     }
 
+    public void updateEntity(Schedule schedule, UpdateScheduleRequest request) {
+        schedule.setTitle(request.getTitle());
+        schedule.setDepartureTime(request.getDepartureTime());
+        schedule.setUserNote(request.getUserNote());
+        schedule.setPurpose(request.getPurpose());
+
+        schedule.setDepartureLocation(gson.toJson(request.getDeparture()));
+        schedule.setDestinationLocation(gson.toJson(request.getDestination()));
+        schedule.setWaypoints(gson.toJson(request.getWaypointsList()));
+        schedule.setCompanions(gson.toJson(request.getCompanionsList()));
+    }
+
+
     public GetScheduleListResponse.ScheduleSummary toSummary(Schedule schedule) {
         com.mapzip.schedule.grpc.Location destination = gson.fromJson(schedule.getDestinationLocation(), com.mapzip.schedule.grpc.Location.class);
         int totalMealSlots = mealTimeSlotRepository.countBySchedule(schedule);
@@ -69,11 +81,12 @@ public class ScheduleMapper {
         List<com.mapzip.schedule.grpc.Waypoint> waypoints = gson.fromJson(schedule.getWaypoints(), WAYPOINT_LIST_TYPE);
         List<String> companions = gson.fromJson(schedule.getCompanions(), STRING_LIST_TYPE);
 
-        List<MealTimeSlot> mealTimeSlotEntities = mealTimeSlotRepository.findBySchedule(schedule);
-        List<com.mapzip.schedule.grpc.MealTimeSlot> mealTimeSlots = mealTimeSlotEntities.stream()
+        // DB를 다시 조회하는 대신, 영속성 컨텍스트에 있는 엔티티의 컬렉션을 직접 사용
+        List<com.mapzip.schedule.grpc.MealTimeSlot> mealTimeSlots = schedule.getMealTimeSlots().stream()
                 .map(this::toGrpcMealTimeSlot)
                 .collect(Collectors.toList());
 
+        // 선택된 맛집 정보는 DB에서 읽어와야 할 수 있으므로, 이 부분은 유지하거나 필요에 따라 수정
         List<SelectedRestaurant> selectedRestaurantEntities = selectedRestaurantRepository.findBySchedule(schedule);
         List<com.mapzip.schedule.grpc.SelectedRestaurant> selectedRestaurants = selectedRestaurantEntities.stream()
                 .map(this::toGrpcSelectedRestaurant)
@@ -117,27 +130,44 @@ public class ScheduleMapper {
                 .build();
     }
 
-    public TmapRouteRequest toTmapRequest(CreateScheduleRequest grpcRequest, LocalDateTime departureDateTime) {
+    public TmapRouteRequest toTmapRequest(GeneratedMessageV3 grpcRequest, LocalDateTime departureDateTime) {
         String tmapDepartureTime = TimeUtil.toTmapApiFormat(departureDateTime);
 
+        Location departureLocation;
+        Location destinationLocation;
+        List<Waypoint> waypointsList;
+
+        if (grpcRequest instanceof CreateScheduleRequest) {
+            CreateScheduleRequest request = (CreateScheduleRequest) grpcRequest;
+            departureLocation = request.getDeparture();
+            destinationLocation = request.getDestination();
+            waypointsList = request.getWaypointsList();
+        } else if (grpcRequest instanceof UpdateScheduleRequest) {
+            UpdateScheduleRequest request = (UpdateScheduleRequest) grpcRequest;
+            departureLocation = request.getDeparture();
+            destinationLocation = request.getDestination();
+            waypointsList = request.getWaypointsList();
+        } else {
+            throw new IllegalArgumentException("Unsupported request type: " + grpcRequest.getClass().getName());
+        }
+
         TmapLocation departure = new TmapLocation(
-                grpcRequest.getDeparture().getName(),
-                String.valueOf(grpcRequest.getDeparture().getLng()),
-                String.valueOf(grpcRequest.getDeparture().getLat())
+                departureLocation.getName(),
+                String.valueOf(departureLocation.getLng()),
+                String.valueOf(departureLocation.getLat())
         );
 
         TmapLocation destination = new TmapLocation(
-                grpcRequest.getDestination().getName(),
-                String.valueOf(grpcRequest.getDestination().getLng()),
-                String.valueOf(grpcRequest.getDestination().getLat())
+                destinationLocation.getName(),
+                String.valueOf(destinationLocation.getLng()),
+                String.valueOf(destinationLocation.getLat())
         );
 
         WaypointsContainer waypointsContainer;
-        if (grpcRequest.getWaypointsList().isEmpty()) {
-            // 빈 경유지 리스트로 초기화
-            waypointsContainer = new WaypointsContainer(Collections.emptyList());
+        if (waypointsList == null || waypointsList.isEmpty()) {
+            waypointsContainer = null; // 경유지가 없으면 null로 설정
         } else {
-            List<TmapWaypoint> waypoints = grpcRequest.getWaypointsList().stream()
+            List<TmapWaypoint> waypoints = waypointsList.stream()
                     .map(wp -> new TmapWaypoint(String.valueOf(wp.getLng()), String.valueOf(wp.getLat())))
                     .collect(Collectors.toList());
             waypointsContainer = new WaypointsContainer(waypoints);
