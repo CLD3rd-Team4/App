@@ -130,7 +130,7 @@ config/
 
 ### Config Repository 구조
 ```
-backend/config-repo/
+config-repo/
 ├── application.yml          # 공통 설정
 ├── auth/
 │   └── auth.yml            # Auth 서비스 설정
