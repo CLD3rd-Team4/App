@@ -1,0 +1,41 @@
+spring:
+  application:
+    name: gateway
+  main:
+    web-application-type: reactive
+  cloud:
+    config:
+      enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    readiness-state:
+      enabled: true
+    liveness-state:
+      enabled: true
+
+jwt:
+  secret:
+  expiration: 86400000
+
+server:
+  port: 8080
+
+# from config server
+
+#spring:
+#  application:
+#    name: gateway
+#  config:
+#    import: "configserver:http://config.platform.svc.cluster.local:8888"
+#  profiles:
+#    active: dev
