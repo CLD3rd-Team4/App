@@ -13,7 +13,7 @@ spring:
       server:
         git:
           uri: ${CONFIG_REPO_URI:https://github.com/CLD3rd-Team4/App}
-          search-paths: backend/config-repo
+          search-paths: config-repo
           default-label: main
           clone-on-start: true
           timeout: 10
