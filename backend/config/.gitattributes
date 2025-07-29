@@ -1,3 +1,20 @@
-/gradlew text eol=lf
+# Maven wrapper scripts should have LF line endings on all platforms
+/mvnw text eol=lf
 *.bat text eol=crlf
+
+# Binary files
 *.jar binary
+*.war binary
+*.ear binary
+
+# Text files should be normalized (Convert crlf => lf)
+*.java text
+*.xml text
+*.properties text
+*.yml text
+*.yaml text
+*.md text
+*.txt text
+
+# Dockerfile
+Dockerfile text
