@@ -1,25 +1,25 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: config-server
+  name: config
   namespace: mapzip
   labels:
-    app: config-server
+    app: config
     version: v1
 spec:
   replicas: 2  # 고가용성을 위해 2개 인스턴스
   selector:
     matchLabels:
-      app: config-server
+      app: config
   template:
     metadata:
       labels:
-        app: config-server
+        app: config
         version: v1
     spec:
       containers:
-      - name: config-server
-        image: ${ECR_REGISTRY}/mapzip/config-server:${IMAGE_TAG}
+      - name: config
+        image: ${ECR_REGISTRY}/mapzip-dev-ecr-config:${IMAGE_TAG}
         ports:
         - containerPort: 8888
           name: http

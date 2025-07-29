@@ -7,7 +7,7 @@ encrypt:
 
 spring:
   application:
-    name: config-server
+    name: config
   cloud:
     config:
       server:
