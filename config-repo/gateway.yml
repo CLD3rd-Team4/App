@@ -37,7 +37,7 @@ management:
       region: ${AWS_REGION:ap-northeast-2}
 
 jwt:
-  secret: '{cipher}9251c6ed75d610f4d3b7f1284097ef4056b8ad795a45940589f2a9b07f410ad856eb11eaf8646ea36c8f5f7b8fae7f59'
+  secret: '{cipher}7b6b9294d39c3d8255fc378565a0565742c5c044cbd4dccb61fcfde909bc4563a7a6af6e424f8d36a9a3c72164ca1ecb13d11fc82f95c8d242a0acab103e1155'
   expiration: 86400000
 
 server:
