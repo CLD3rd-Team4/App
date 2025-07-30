@@ -25,26 +25,7 @@ jobs:
         id: detect
         run: |
           git fetch origin dev
-          
-          # backend/ 폴더에서 변경된 서비스들 찾기
-          BACKEND_SERVICES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '^backend/' | cut -d '/' -f2 | sort | uniq)
-          
-          # config-repo/application.yml 변경 확인
-          APPLICATION_CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '^config-repo/application\.yml$' | wc -l)
-          
-          # config-repo/ 폴더에서 변경된 개별 설정 파일들 찾기
-          CONFIG_SERVICES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '^config-repo/.*\.yml$' | grep -v '^config-repo/application\.yml$' | sed 's|config-repo/||g' | sed 's|\.yml||g' | sort | uniq)
-          
-          # application.yml이 바뀌면 모든 서비스 빌드
-          if [ "$APPLICATION_CHANGED" -gt 0 ]; then
-            ALL_SERVICES="auth gateway schedule recommend review"
-          else
-            # 그렇지 않으면 변경된 서비스들만
-            ALL_SERVICES=$(echo -e "$BACKEND_SERVICES\n$CONFIG_SERVICES" | sort | uniq)
-          fi
-          
-          # JSON 배열로 변환
-          CHANGED=$(echo "$ALL_SERVICES" | tr '\n' ' ' | tr -s ' ' | sed 's/^ *//g' | sed 's/ *$//g' | tr ' ' '\n' | jq -R -s -c 'split("\n") | map(select(. != ""))')
+          CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '^backend/' | cut -d '/' -f2 | sort | uniq | jq -R -s -c 'split("\n") | map(select(. != ""))')
           echo "services=$CHANGED" >> $GITHUB_OUTPUT
 
       - name: Get short git commit hash
