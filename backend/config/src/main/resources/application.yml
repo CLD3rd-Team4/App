@@ -1,0 +1,55 @@
+server:
+  port: 8888
+
+# 암호화 설정 (민감한 정보 보호용)
+encrypt:
+  key: ${ENCRYPT_KEY} # Kubernetes Secret으로 관리 필요
+
+spring:
+  application:
+    name: config
+  cloud:
+    config:
+      server:
+        git:
+          uri: ${CONFIG_REPO_URI:https://github.com/CLD3rd-Team4/App}
+          search-paths: config-repo
+          default-label: dev
+          clone-on-start: true
+          timeout: 10
+          # Git 인증 (필요시)
+          username: ${GIT_USERNAME:}
+          password: ${GIT_TOKEN:}
+
+# Actuator 설정 (헬스체크용)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,env,configprops,refresh
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+    refresh:
+      enabled: true
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+    config:
+      enabled: true
+    diskspace:
+      enabled: true
+    git:
+      enabled: true
+
+# 로깅 설정
+logging:
+  level:
+    org.springframework.cloud.config: ${LOG_LEVEL:INFO}
+    org.springframework.web: ${LOG_LEVEL:INFO}
+    root: INFO 
+
