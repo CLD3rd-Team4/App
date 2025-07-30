@@ -1,0 +1,79 @@
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 8000
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          access_log:
+          - name: envoy.access_loggers.stdout
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+          http_filters:
+          # gRPC-Web 지원 (브라우저용)
+          - name: envoy.filters.http.grpc_web
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_web.v3.GrpcWeb
+          # HTTP JSON to gRPC 변환 지원 (REST API용)
+          - name: envoy.filters.http.grpc_json_transcoder
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
+              proto_descriptor: "/etc/envoy/proto.pb"
+              services: ["schedule.ScheduleService"]
+              print_options:
+                add_whitespace: true
+                always_print_primitive_fields: true
+              # 경로 매핑으로 더 깔끔하게
+              request_validation_options:
+                reject_unknown_method: false
+                reject_unknown_query_parameters: false
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: local_service
+              domains: ["*"]
+              routes:
+              # HTTP JSON API 라우트 (/api/ 프리픽스)
+              - match:
+                  prefix: "/api/"
+                route:
+                  cluster: schedule_service_cluster
+                  timeout: 60s
+              # gRPC-Web 라우트 (특정 Content-Type)
+              - match:
+                  prefix: "/"
+                  headers:
+                  - name: "content-type"
+                    string_match:
+                      prefix: "application/grpc-web"
+                route:
+                  cluster: schedule_service_cluster
+                  timeout: 60s
+  clusters:
+  - name: schedule_service_cluster
+    connect_timeout: 5s
+    type: LOGICAL_DNS
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: schedule_service_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: host.docker.internal
+                port_value: 9090

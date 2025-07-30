@@ -1,0 +1,41 @@
+{
+  "user_id": "test-user-123",
+  "title": "주말 강릉 여행",
+  "departure_time": "오전 09:00",
+  "arrival_time": "오후 06:00",
+  "meal_slots": [
+    {
+      "meal_type": "MEAL",
+      "scheduled_time": "오후 12:30",
+      "radius": 1500
+    },
+    {
+      "meal_type": "SNACK",
+      "scheduled_time": "오후 03:30",
+      "radius": 1000
+    }
+  ],
+  "departure": {
+    "lat": 37.5665,
+    "lng": 126.9780,
+    "name": "서울역",
+    "address": "서울 중구 한강대로 405"
+  },
+  "destination": {
+    "lat": 37.7721,
+    "lng": 128.9321,
+    "name": "강문해변",
+    "address": "강원 강릉시 강문동"
+  },
+  "waypoints": [
+    {
+      "lat": 37.7905,
+      "lng": 128.8781,
+      "name": "오죽헌",
+      "address": "강원 강릉시 율곡로3139번길 24"
+    }
+  ],
+  "user_note": "해변에서 커피 한잔하기",
+  "purpose": "휴식",
+  "companions": ["친구A", "친구B"]
+}
