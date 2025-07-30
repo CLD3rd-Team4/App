@@ -174,16 +174,26 @@ export const scheduleApi = {
   },
 
   createSchedule: async (scheduleData: any) => {
-    // TODO: 실제 API 연동
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const newSchedule = {
-          id: Date.now().toString(),
-          ...scheduleData,
-        }
-        resolve(newSchedule)
-      }, 1000)
-    })
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/schedule`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // 'Authorization': `Bearer ${getToken()}` // 필요시 주석 해제
+        },
+        body: JSON.stringify(scheduleData),
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, body: ${errorBody}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('스케줄 생성 오류:', error);
+      throw error;
+    }
   },
 
   updateSchedule: async (scheduleData: any) => {
@@ -196,6 +206,33 @@ export const scheduleApi = {
   deleteSchedule: async (scheduleId: string) => {
     // TODO: 실제 API 연동
     return new Promise((resolve) => setTimeout(resolve, 500))
+  },
+
+  // 초기 스케줄 생성 (gRPC 호출)
+  createInitialSchedule: async (locations: LocationData) => {
+    try {
+      const response = await fetch('/api/schedule', { // Next.js rewrites를 통해 Envoy로 전달됨
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          departure: locations.departure,
+          destination: locations.destination,
+          waypoints: locations.waypoints,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, body: ${errorBody}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('초기 스케줄 생성 오류:', error);
+      throw error;
+    }
   },
 
   // 🆕 새로 추가: 위치 정보와 함께 스케줄 생성
