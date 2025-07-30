@@ -185,6 +185,20 @@ message CreateScheduleResponse {
   ScheduleError error = 6;
 }
 
+// 3.1.1 초기 스케줄 생성
+message CreateInitialScheduleRequest {
+  string user_id = 1;
+  Location departure = 2;
+  repeated Waypoint waypoints = 3;
+  Location destination = 4;
+}
+
+message CreateInitialScheduleResponse {
+  string schedule_id = 1;
+  bool success = 2;
+  string message = 3;
+}
+
 // 3.2 맛집 추천 결과 조회
 message GetRecommendationResultsRequest {
   string schedule_id = 1;

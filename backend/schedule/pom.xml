@@ -166,34 +166,40 @@
 				</configuration>
 			</plugin>
 
-			<!-- Protobuf Maven Plugin -->
+			<!-- Protobuf Maven Plugin - 수정된 버전 -->
 			<plugin>
-    <groupId>io.github.ascopes</groupId>
-    <artifactId>protobuf-maven-plugin</artifactId>
-    <version>3.6.0</version>
-    <configuration>
-        <protocVersion>${protobuf.version}</protocVersion>
-        <sourceDirectories>
-            <sourceDirectory>src/main/proto</sourceDirectory>
-        </sourceDirectories>
-        <!-- Descriptor 파일 생성 설정 추가 -->
-        <outputDescriptorFile>${project.build.directory}/descriptor.pb</outputDescriptorFile>
-        <binaryMavenPlugins>
-            <binaryMavenPlugin>
-                <groupId>io.grpc</groupId>
-                <artifactId>protoc-gen-grpc-java</artifactId>
-                <version>${grpc.version}</version>
-            </binaryMavenPlugin>
-        </binaryMavenPlugins>
-    </configuration>
-    <executions>
-        <execution>
-            <goals>
-                <goal>generate</goal>
-            </goals>
-        </execution>
-    </executions>
-</plugin>
+				<groupId>io.github.ascopes</groupId>
+				<artifactId>protobuf-maven-plugin</artifactId>
+				<version>3.6.0</version>
+				<configuration>
+					<protocVersion>${protobuf.version}</protocVersion>
+					<sourceDirectories>
+						<sourceDirectory>src/main/proto</sourceDirectory>
+					</sourceDirectories>
+					<!-- import 경로 추가 (google.api.annotations를 위해) -->
+					<importDirectories>
+						<importDirectory>${project.build.directory}/proto-dependencies</importDirectory>
+					</importDirectories>
+					<!-- Descriptor 파일 생성 설정 - 핵심 옵션들 추가 -->
+					<outputDescriptorFile>${project.build.directory}/descriptor.pb</outputDescriptorFile>
+					<includeImports>true</includeImports>
+					<includeSourceInfo>true</includeSourceInfo>
+					<binaryMavenPlugins>
+						<binaryMavenPlugin>
+							<groupId>io.grpc</groupId>
+							<artifactId>protoc-gen-grpc-java</artifactId>
+							<version>${grpc.version}</version>
+						</binaryMavenPlugin>
+					</binaryMavenPlugins>
+				</configuration>
+				<executions>
+					<execution>
+						<goals>
+							<goal>generate</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
 
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>

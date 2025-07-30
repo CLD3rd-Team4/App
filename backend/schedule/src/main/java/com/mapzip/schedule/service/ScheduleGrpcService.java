@@ -55,19 +55,42 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
     public void createSchedule(CreateScheduleRequest request, StreamObserver<CreateScheduleResponse> responseObserver) {
         try {
             Schedule schedule = scheduleMapper.toEntity(request);
-            executeTmapAndKakaoProcess(schedule, request); // 동기 호출
+            scheduleRepository.save(schedule); // DB에 스케줄 저장
+
+            // executeTmapAndKakaoProcess(schedule, request); // Tmap/Kakao 연동 로직은 여기서는 호출 안 함
 
             CreateScheduleResponse response = CreateScheduleResponse.newBuilder()
                     .setSuccess(true)
                     .setMessage("스케줄이 성공적으로 생성되었습니다.")
                     .setScheduleId(schedule.getId())
-                    .setCalculatedArrivalTime(schedule.getCalculatedArrivalTime())
                     .build();
             responseObserver.onNext(response);
             responseObserver.onCompleted();
         } catch (Exception e) {
             log.error("스케줄 생성 중 오류 발생", e);
             responseObserver.onError(Status.INTERNAL.withDescription("스케줄 생성 중 오류: " + e.getMessage()).withCause(e).asRuntimeException());
+        }
+    }
+
+    @Override
+    @Transactional
+    public void createInitialSchedule(CreateInitialScheduleRequest request, StreamObserver<CreateInitialScheduleResponse> responseObserver) {
+        try {
+            Schedule schedule = scheduleMapper.toEntity(request);
+            Schedule savedSchedule = scheduleRepository.save(schedule);
+
+            CreateInitialScheduleResponse response = CreateInitialScheduleResponse.newBuilder()
+                    .setSuccess(true)
+                    .setMessage("초기 스케줄이 성공적으로 생성되었습니다.")
+                    .setScheduleId(savedSchedule.getId())
+                    .build();
+
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+
+        } catch (Exception e) {
+            log.error("초기 스케줄 생성 중 오류 발생", e);
+            responseObserver.onError(Status.INTERNAL.withDescription("초기 스케줄 생성 중 오류: " + e.getMessage()).withCause(e).asRuntimeException());
         }
     }
 

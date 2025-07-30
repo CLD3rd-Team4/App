@@ -16,23 +16,30 @@ static_resources:
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
           http_filters:
-          # gRPC-Web 지원 (브라우저용)
-          - name: envoy.filters.http.grpc_web
+          # CORS filter
+          - name: envoy.filters.http.cors
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_web.v3.GrpcWeb
-          # HTTP JSON to gRPC 변환 지원 (REST API용)
+              "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.Cors
+          # gRPC-JSON transcoder filter
           - name: envoy.filters.http.grpc_json_transcoder
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
               proto_descriptor: "/etc/envoy/proto.pb"
-              services: ["schedule.ScheduleService"]
+              services: 
+                - "schedule.ScheduleService"
               print_options:
                 add_whitespace: true
                 always_print_primitive_fields: true
-              # 경로 매핑으로 더 깔끔하게
-              request_validation_options:
-                reject_unknown_method: false
-                reject_unknown_query_parameters: false
+                always_print_enums_as_ints: false
+                preserve_proto_field_names: false
+              match_incoming_request_route: true
+              ignored_query_parameters:
+                - "_"
+          # gRPC-Web filter
+          - name: envoy.filters.http.grpc_web
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_web.v3.GrpcWeb
+          # Router filter (마지막에 위치해야 함)
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -42,22 +49,19 @@ static_resources:
             - name: local_service
               domains: ["*"]
               routes:
-              # HTTP JSON API 라우트 (/api/ 프리픽스)
+              # HTTP API 라우트 (JSON 트랜스코딩용)
               - match:
-                  prefix: "/api/"
+                  prefix: "/schedule"
                 route:
                   cluster: schedule_service_cluster
                   timeout: 60s
-              # gRPC-Web 라우트 (특정 Content-Type)
+              # gRPC/gRPC-Web 라우트 
               - match:
                   prefix: "/"
-                  headers:
-                  - name: "content-type"
-                    string_match:
-                      prefix: "application/grpc-web"
                 route:
                   cluster: schedule_service_cluster
                   timeout: 60s
+
   clusters:
   - name: schedule_service_cluster
     connect_timeout: 5s

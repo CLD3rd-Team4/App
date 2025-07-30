@@ -175,7 +175,7 @@ export const scheduleApi = {
 
   createSchedule: async (scheduleData: any) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/schedule`, {
+      const response = await fetch('/api/schedule', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -211,7 +211,7 @@ export const scheduleApi = {
   // 초기 스케줄 생성 (gRPC 호출)
   createInitialSchedule: async (locations: LocationData) => {
     try {
-      const response = await fetch('/api/schedule', { // Next.js rewrites를 통해 Envoy로 전달됨
+      const response = await fetch('/api/schedule/initial', { // Next.js rewrites를 통해 Envoy로 전달됨
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

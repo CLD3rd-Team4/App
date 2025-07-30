@@ -47,6 +47,23 @@ public class ScheduleMapper {
         return schedule;
     }
 
+    public Schedule toEntity(CreateInitialScheduleRequest request) {
+        Schedule schedule = new Schedule();
+        schedule.setId(java.util.UUID.randomUUID().toString());
+        schedule.setUserId(request.getUserId());
+
+        // 초기 생성 시점에는 title, departureTime 등이 없으므로 기본값 또는 null로 설정
+        schedule.setTitle("새로운 스케줄"); // 또는 request에 title 필드 추가
+        schedule.setDepartureTime("미정"); // 또는 request에 departureTime 필드 추가
+
+        schedule.setDepartureLocation(gson.toJson(request.getDeparture()));
+        schedule.setDestinationLocation(gson.toJson(request.getDestination()));
+        schedule.setWaypoints(gson.toJson(request.getWaypointsList()));
+
+        // 나머지 필드는 null 또는 기본값으로 유지
+        return schedule;
+    }
+
     public void updateEntity(Schedule schedule, UpdateScheduleRequest request) {
         schedule.setTitle(request.getTitle());
         schedule.setDepartureTime(request.getDepartureTime());

@@ -38,15 +38,10 @@ export default function ScheduleCreateScreen() {
         mealRadius: requiredData.mealRadius,
         hasMeal: requiredData.targetMealTimes.length > 0,
 
-        // 위치 정보
-        departure: locationData.departure?.name || "",
-        destination: locationData.destination?.name || "",
-        waypoints: locationData.waypoints?.map((wp: any) => wp.name) || [],
-        locationData: {
-          departure: locationData.departure,
-          destination: locationData.destination,
-          waypoints: locationData.waypoints,
-        },
+        // 위치 정보 (Location/Waypoint 객체 전체를 전달)
+        departure: locationData.departure,
+        destination: locationData.destination,
+        waypoints: locationData.waypoints || [],
 
         // 선택 정보
         companions: optionalData.companions,
