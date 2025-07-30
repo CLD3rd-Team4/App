@@ -30,12 +30,18 @@ logging:
     software.amazon.awssdk: INFO
     com.google.cloud: INFO
 
-# Health check
+# Health check and metrics
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus,metrics
   endpoint:
     health:
       show-details: always
+    prometheus:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
