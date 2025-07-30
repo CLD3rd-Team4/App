@@ -55,6 +55,14 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
     public void createSchedule(CreateScheduleRequest request, StreamObserver<CreateScheduleResponse> responseObserver) {
         try {
             Schedule schedule = scheduleMapper.toEntity(request);
+
+            // --- 디버깅 로그 추가 시작 ---
+            log.info("Mapped Schedule Entity: ID={}, UserID={}, Title={}, DepartureTime={}",
+                     schedule.getId(), schedule.getUserId(), schedule.getTitle(), schedule.getDepartureTime());
+            log.info("Mapped Schedule Locations: Departure={}, Destination={}, Waypoints={}",
+                     schedule.getDepartureLocation(), schedule.getDestinationLocation(), schedule.getWaypoints());
+            // --- 디버깅 로그 추가 끝 ---
+
             scheduleRepository.save(schedule); // DB에 스케줄 저장
 
             // executeTmapAndKakaoProcess(schedule, request); // Tmap/Kakao 연동 로직은 여기서는 호출 안 함

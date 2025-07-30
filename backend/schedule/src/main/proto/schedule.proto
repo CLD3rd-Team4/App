@@ -13,6 +13,14 @@ option java_outer_classname = "ScheduleProto";
 // ===============================================================
 
 service ScheduleService {
+  // 초기 스케줄 생성 (위치 정보만)
+  rpc CreateInitialSchedule(CreateInitialScheduleRequest) returns (CreateInitialScheduleResponse) {
+    option (google.api.http) = {
+      post: "/schedule/initial"
+      body: "*"
+    };
+  }
+
   // 스케줄 생성
   rpc CreateSchedule(CreateScheduleRequest) returns (CreateScheduleResponse) {
     option (google.api.http) = {
