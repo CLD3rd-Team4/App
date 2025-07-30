@@ -63,7 +63,29 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
                      schedule.getDepartureLocation(), schedule.getDestinationLocation(), schedule.getWaypoints());
             // --- 디버깅 로그 추가 끝 ---
 
-            scheduleRepository.save(schedule); // DB에 스케줄 저장
+            // user_id 기본값 처리
+            if (schedule.getUserId() == null || schedule.getUserId().isEmpty()) {
+                schedule.setUserId("test-user-123"); // TODO: 추후 실제 로그인 유저 ID로 교체 필요
+            }
+
+            // MealTimeSlot 저장 로직 추가
+            List<com.mapzip.schedule.grpc.MealTimeSlot> mealSlotsRequest = request.getMealSlotsList();
+            if (mealSlotsRequest != null && !mealSlotsRequest.isEmpty()) {
+                List<MealTimeSlot> mealTimeSlotEntities = new ArrayList<>();
+                for (com.mapzip.schedule.grpc.MealTimeSlot slotRequest : mealSlotsRequest) {
+                    MealTimeSlot mealTimeSlot = new MealTimeSlot();
+                    mealTimeSlot.setId(java.util.UUID.randomUUID().toString());
+                    mealTimeSlot.setSchedule(schedule);
+                    // meal_type 변환 (Enum -> int)
+                    mealTimeSlot.setMealType(slotRequest.getMealType().getNumber());
+                    mealTimeSlot.setScheduledTime(slotRequest.getScheduledTime());
+                    mealTimeSlot.setRadius(slotRequest.getRadius() > 0 ? slotRequest.getRadius() : 1000); // 기본값 1000m
+                    mealTimeSlotEntities.add(mealTimeSlot);
+                }
+                schedule.getMealTimeSlots().addAll(mealTimeSlotEntities);
+            }
+
+            scheduleRepository.save(schedule); // DB에 스케줄 및 연관된 MealTimeSlot 저장
 
             // executeTmapAndKakaoProcess(schedule, request); // Tmap/Kakao 연동 로직은 여기서는 호출 안 함
 
@@ -80,27 +102,7 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
         }
     }
 
-    @Override
-    @Transactional
-    public void createInitialSchedule(CreateInitialScheduleRequest request, StreamObserver<CreateInitialScheduleResponse> responseObserver) {
-        try {
-            Schedule schedule = scheduleMapper.toEntity(request);
-            Schedule savedSchedule = scheduleRepository.save(schedule);
-
-            CreateInitialScheduleResponse response = CreateInitialScheduleResponse.newBuilder()
-                    .setSuccess(true)
-                    .setMessage("초기 스케줄이 성공적으로 생성되었습니다.")
-                    .setScheduleId(savedSchedule.getId())
-                    .build();
-
-            responseObserver.onNext(response);
-            responseObserver.onCompleted();
-
-        } catch (Exception e) {
-            log.error("초기 스케줄 생성 중 오류 발생", e);
-            responseObserver.onError(Status.INTERNAL.withDescription("초기 스케줄 생성 중 오류: " + e.getMessage()).withCause(e).asRuntimeException());
-        }
-    }
+    
 
     @Override
     @Transactional
