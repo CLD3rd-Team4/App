@@ -25,7 +25,21 @@ jobs:
         id: detect
         run: |
           git fetch origin dev
-          CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '^backend/' | cut -d '/' -f2 | sort | uniq | jq -R -s -c 'split("\n") | map(select(. != ""))')
+          
+          # backend/ 폴더에서 변경된 서비스들 찾기
+          BACKEND_SERVICES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '^backend/' | cut -d '/' -f2 | sort | uniq)
+          
+          # config-repo/ 폴더 변경 확인
+          CONFIG_CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '^config-repo/' | wc -l)
+          
+          # 결과 합치기
+          ALL_SERVICES="$BACKEND_SERVICES"
+          if [ "$CONFIG_CHANGED" -gt 0 ]; then
+            ALL_SERVICES="$ALL_SERVICES config"
+          fi
+          
+          # JSON 배열로 변환
+          CHANGED=$(echo "$ALL_SERVICES" | tr ' ' '\n' | sort | uniq | jq -R -s -c 'split("\n") | map(select(. != ""))')
           echo "services=$CHANGED" >> $GITHUB_OUTPUT
 
       - name: Get short git commit hash
