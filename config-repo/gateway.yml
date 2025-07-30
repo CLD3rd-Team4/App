@@ -36,6 +36,10 @@ management:
       environment: ${ENVIRONMENT:dev}
       region: ${AWS_REGION:ap-northeast-2}
 
+logging:
+  level:
+    mapzip.gateway.filter: DEBUG
+
 jwt:
   secret: '{cipher}7b6b9294d39c3d8255fc378565a0565742c5c044cbd4dccb61fcfde909bc4563a7a6af6e424f8d36a9a3c72164ca1ecb13d11fc82f95c8d242a0acab103e1155'
   expiration: 86400000
