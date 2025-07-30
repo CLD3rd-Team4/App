@@ -16,8 +16,10 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
+@Slf4j
 public class RouteService {
 
     private final ObjectMapper objectMapper;
@@ -31,7 +33,9 @@ public class RouteService {
             List<com.mapzip.schedule.entity.MealTimeSlot> mealSlots,
             LocalDateTime departureDateTime
     ) {
+        log.info("Starting meal location calculation for {} meal slots.", mealSlots.size());
         List<Feature> features = tmapResponse.getFeatures();
+        log.debug("Total features from Tmap: {}", features.size());
 
         // 경로의 모든 Point Feature와 해당 지점까지의 누적 시간을 매핑
         List<TimePoint> timePoints = new ArrayList<>();
@@ -55,29 +59,55 @@ public class RouteService {
         if (lastCoordinate != null && (timePoints.isEmpty() || timePoints.get(timePoints.size() - 1).time < accumulatedTime)) {
             timePoints.add(new TimePoint(accumulatedTime, lastCoordinate));
         }
+        log.info("Created {} time points for route calculation.", timePoints.size());
+        if (log.isDebugEnabled()) {
+            timePoints.forEach(p -> log.debug("TimePoint: {}s, Lat: {}, Lon: {}", p.getTime(), p.getCoordinate().getLat(), p.getCoordinate().getLon()));
+        }
+
 
         List<CalculatedLocation> calculatedLocations = new ArrayList<>();
 
         for (var mealSlot : mealSlots) {
-            LocalDateTime mealDateTime = TimeUtil.parseKoreanAmPmToFuture(mealSlot.getScheduledTime(), departureDateTime.toLocalDate());
-            if (mealDateTime.isBefore(departureDateTime)) {
-                mealDateTime = mealDateTime.plusDays(1);
+            try {
+                log.debug("Processing meal slot: {}", mealSlot.getScheduledTime());
+                LocalDateTime mealDateTime = TimeUtil.parseKoreanAmPmToFuture(mealSlot.getScheduledTime(), departureDateTime.toLocalDate());
+                if (mealDateTime.isBefore(departureDateTime)) {
+                    mealDateTime = mealDateTime.plusDays(1);
+                }
+
+                long secondsFromDeparture = ChronoUnit.SECONDS.between(departureDateTime, mealDateTime);
+                log.info("Slot '{}' is {} seconds from departure.", mealSlot.getScheduledTime(), secondsFromDeparture);
+
+
+                if (secondsFromDeparture < 0) {
+                    log.warn("Meal time is before departure time. Using departure location for slot {}.", mealSlot.getId());
+                    // 출발 시간보다 이전이면 출발지 좌표를 사용 (혹은 다른 정책)
+                    if (!timePoints.isEmpty()) {
+                        Coordinate departureCoord = timePoints.get(0).getCoordinate();
+                        calculatedLocations.add(new CalculatedLocation(mealSlot.getId(), departureCoord.getLat(), departureCoord.getLon()));
+                    }
+                    continue;
+                }
+
+                // 목표 시간과 가장 가까운 안내점 찾기
+                TimePoint closestPoint = findClosestTimePoint(timePoints, secondsFromDeparture);
+                Coordinate location = closestPoint.getCoordinate();
+                log.info("Found closest point for slot '{}' at time {}s -> Lat: {}, Lon: {}", mealSlot.getScheduledTime(), closestPoint.getTime(), location.getLat(), location.getLon());
+
+                calculatedLocations.add(new CalculatedLocation(mealSlot.getId(), location.getLat(), location.getLon()));
+            } catch (Exception e) {
+                log.error("Error calculating location for meal slot: {}", mealSlot.getId(), e);
+                // 한 슬롯의 에러가 전체를 중단시키지 않도록 계속 진행
             }
-
-            long secondsFromDeparture = ChronoUnit.SECONDS.between(departureDateTime, mealDateTime);
-
-            // 목표 시간과 가장 가까운 안내점 찾기
-            TimePoint closestPoint = findClosestTimePoint(timePoints, secondsFromDeparture);
-            Coordinate location = closestPoint.getCoordinate();
-
-            calculatedLocations.add(new CalculatedLocation(mealSlot.getId(), location.getLat(), location.getLon()));
         }
 
+        log.info("Successfully calculated {} locations.", calculatedLocations.size());
         return calculatedLocations;
     }
 
     private TimePoint findClosestTimePoint(List<TimePoint> timePoints, long targetTime) {
         if (timePoints.isEmpty()) {
+            log.error("Cannot find closest time point because the timePoints list is empty.");
             throw new IllegalStateException("No time points available to find closest location.");
         }
 

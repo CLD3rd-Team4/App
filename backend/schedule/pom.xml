@@ -32,6 +32,19 @@
 		<protobuf.version>3.25.3</protobuf.version>
 		<grpc.version>1.62.2</grpc.version>
 	</properties>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>io.grpc</groupId>
+				<artifactId>grpc-bom</artifactId>
+				<version>${grpc.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
 	<dependencies>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -53,6 +66,13 @@
             <version>2.15.0.RELEASE</version>
         </dependency>
 
+        <!-- gRPC Client Starter -->
+        <dependency>
+            <groupId>net.devh</groupId>
+            <artifactId>grpc-client-spring-boot-starter</artifactId>
+            <version>2.15.0.RELEASE</version>
+        </dependency>
+
 		<!-- Protobuf -->
 		<dependency>
 			<groupId>com.google.protobuf</groupId>
@@ -69,12 +89,10 @@
 		<dependency>
 			<groupId>io.grpc</groupId>
 			<artifactId>grpc-stub</artifactId>
-			<version>${grpc.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>io.grpc</groupId>
 			<artifactId>grpc-protobuf</artifactId>
-			<version>${grpc.version}</version>
 		</dependency>
 
 		<!-- Google Common Protos for gRPC HTTP annotations -->

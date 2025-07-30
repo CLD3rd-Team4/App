@@ -30,6 +30,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import com.mapzip.schedule.grpc.KakaoApiServiceGrpc;
+import com.mapzip.schedule.grpc.KakaoSearchRequest;
+import net.devh.boot.grpc.client.inject.GrpcClient;
+
 @Slf4j
 @GrpcService
 @RequiredArgsConstructor
@@ -41,7 +45,10 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
     private final ScheduleMapper scheduleMapper;
     private final TmapClient tmapClient;
     private final RouteService routeService;
-    private final KakaoApiService kakaoApiService; // [수정] KakaoApiService 주입
+    private final ObjectMapper objectMapper; // [수정] ObjectMapper 다시 추가
+
+    @GrpcClient("kakao-api-service")
+    private KakaoApiServiceGrpc.KakaoApiServiceBlockingStub kakaoApiServiceBlockingStub;
 
     @Override
     @Transactional
@@ -78,7 +85,6 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
             scheduleMapper.updateEntity(schedule, request);
 
             if (schedule.getMealTimeSlots() != null && !schedule.getMealTimeSlots().isEmpty()) {
-                // orphanRemoval=true 옵션에 의해 clear()만으로도 DB에서 삭제 쿼리가 나감
                 schedule.clearMealTimeSlots();
             }
 
@@ -96,6 +102,7 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
     }
 
     private void executeTmapAndKakaoProcess(Schedule schedule, GeneratedMessageV3 request) {
+        // ... (이전 코드는 동일) ...
         List<com.mapzip.schedule.grpc.MealTimeSlot> mealSlotsRequest;
         String departureTimeRequest;
 
@@ -120,15 +127,14 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
         for (com.mapzip.schedule.grpc.MealTimeSlot slotRequest : mealSlotsRequest) {
             MealTimeSlot mealTimeSlot = new MealTimeSlot();
             mealTimeSlot.setId(java.util.UUID.randomUUID().toString());
-            mealTimeSlot.setSchedule(schedule); // *** 양방향 관계 설정 ***
+            mealTimeSlot.setSchedule(schedule);
             mealTimeSlot.setMealType(slotRequest.getMealType().getNumber());
             mealTimeSlot.setScheduledTime(slotRequest.getScheduledTime());
             mealTimeSlot.setRadius(slotRequest.getRadius() > 0 ? slotRequest.getRadius() : 1000);
             mealTimeSlotEntities.add(mealTimeSlot);
         }
-        schedule.getMealTimeSlots().addAll(mealTimeSlotEntities); // 기존 컬렉션에 추가
+        schedule.getMealTimeSlots().addAll(mealTimeSlotEntities);
         
-        // Tmap API 호출을 동기적으로 실행하고 결과를 기다림
         TmapRouteRequest tmapRequest = scheduleMapper.toTmapRequest(request, departureDateTime);
         TmapRouteResponse tmapResponse = tmapClient.getRoutePrediction(tmapRequest).block();
 
@@ -140,14 +146,40 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
                 tmapResponse, mealTimeSlotEntities, departureDateTime
         );
 
-        // [수정] KakaoApiService를 통해 식당 정보 처리 및 저장
-        kakaoApiService.processAndSaveRestaurantSuggestions(calculatedLocations, mealTimeSlotEntities);
+        calculatedLocations.forEach(location -> {
+            try {
+                MealTimeSlot slot = mealTimeSlotEntities.stream()
+                        .filter(s -> s.getId().equals(location.getSlotId()))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalStateException("Cannot find meal slot for location: " + location.getSlotId()));
+
+                // [수정] DB 저장을 위해 엔티티에 계산된 좌표 설정
+                Map<String, Object> locationJson = new HashMap<>();
+                locationJson.put("lat", location.getLat());
+                locationJson.put("lon", location.getLon());
+                locationJson.put("scheduled_time", slot.getScheduledTime());
+                slot.setCalculatedLocation(objectMapper.writeValueAsString(locationJson));
+
+                // gRPC 호출
+                KakaoSearchRequest searchRequest = KakaoSearchRequest.newBuilder()
+                        .setSlotId(location.getSlotId())
+                        .setLat(location.getLat())
+                        .setLon(location.getLon())
+                        .setRadius(slot.getRadius())
+                        .build();
+                
+                kakaoApiServiceBlockingStub.searchRestaurants(searchRequest);
+                log.info("gRPC call to KakaoApiService succeeded for slot {}", location.getSlotId());
+
+            } catch (Exception e) {
+                log.error("gRPC call to KakaoApiService failed for slot {}", location.getSlotId(), e);
+            }
+        });
 
         int totalTimeInSeconds = tmapResponse.getFeatures().get(0).getProperties().getTotalTime();
         LocalDateTime arrivalDateTime = departureDateTime.plusSeconds(totalTimeInSeconds);
         schedule.setCalculatedArrivalTime(TimeUtil.toKoreanAmPm(arrivalDateTime));
 
-        // 모든 변경사항을 포함하여 schedule을 최종 저장
         scheduleRepository.save(schedule);
     }
 

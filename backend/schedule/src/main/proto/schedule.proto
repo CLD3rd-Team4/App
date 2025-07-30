@@ -313,3 +313,26 @@ message RestaurantRecommendationResponse {
   string request_id = 1; // 추천 요청 ID (Kafka 처리용 -> gRPC에서는 트랜잭션 ID로 사용 가능)
   bool success = 2;
 }
+
+// ===============================================================
+// 5. 내부 로직용 서비스 (Internal Logic Services)
+// ===============================================================
+
+// Kakao API 호출을 담당하는 내부 서비스
+service KakaoApiService {
+  // Kakao Local API를 이용한 식당 검색 요청
+  rpc SearchRestaurants(KakaoSearchRequest) returns (KakaoSearchResponse);
+}
+
+message KakaoSearchRequest {
+  string slot_id = 1;
+  double lat = 2;
+  double lon = 3;
+  int32 radius = 4;
+  // 요청에 필요한 추가적인 필드가 있다면 여기에 정의
+}
+
+message KakaoSearchResponse {
+  bool success = 1;
+  string message = 2;
+}
