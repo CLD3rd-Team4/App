@@ -1,18 +1,42 @@
-# Gateway 서비스 설정 (EKS 환경)
-
-server:
-  port: ${SERVER_PORT:8080}
-
 spring:
   application:
     name: gateway
-  cloud:
-    kubernetes:
-      discovery:
-        enabled: true        
-        all-namespaces: false
+  main:
+    web-application-type: reactive
 
-# Eureka 비활성화 (EKS에서는 Kubernetes 사용)
-eureka:
-  client:
-    enabled: false
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    readiness-state:
+      enabled: true
+    liveness-state:
+      enabled: true
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http:
+          server:
+            requests: true
+      slo:
+        http.server.requests: 100ms,200ms,500ms,1s,2s
+    tags:
+      application: ${spring.application.name}
+      environment: ${ENVIRONMENT:dev}
+      region: ${AWS_REGION:ap-northeast-2}
+
+jwt:
+  secret: '{cipher}9251c6ed75d610f4d3b7f1284097ef4056b8ad795a45940589f2a9b07f410ad856eb11eaf8646ea36c8f5f7b8fae7f59'
+  expiration: 86400000
+
+server:
+  port: 8080
+
