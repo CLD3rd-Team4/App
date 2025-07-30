@@ -14,7 +14,7 @@ spring:
         git:
           uri: ${CONFIG_REPO_URI:https://github.com/CLD3rd-Team4/App}
           search-paths: config-repo
-          default-label: main
+          default-label: dev
           clone-on-start: true
           timeout: 10
           # Git 인증 (필요시)
