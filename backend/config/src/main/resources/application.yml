@@ -52,3 +52,4 @@ logging:
     org.springframework.cloud.config: ${LOG_LEVEL:INFO}
     org.springframework.web: ${LOG_LEVEL:INFO}
     root: INFO
+
