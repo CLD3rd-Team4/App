@@ -42,6 +42,28 @@ public class KakaoClient {
                                 })
                 )
                 .bodyToMono(KakaoSearchResponse.class)
+                /*
+                // 응답을 String으로 받아서 파일에 저장하는 예시
+                .bodyToMono(String.class)
+                .doOnSuccess(responseBody -> {
+                    try {
+                        java.nio.file.Path path = java.nio.file.Paths.get("kakao_response_" + System.currentTimeMillis() + ".json");
+                        java.nio.file.Files.writeString(path, responseBody);
+                        log.info("Kakao API response saved to file: {}", path);
+                    } catch (java.io.IOException e) {
+                        log.error("Failed to save Kakao API response to file", e);
+                    }
+                })
+                // 실제 반환 타입인 KakaoSearchResponse로 변환
+                .map(responseBody -> {
+                    try {
+                        com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                        return objectMapper.readValue(responseBody, KakaoSearchResponse.class);
+                    } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                        throw new RuntimeException("Failed to parse Kakao API response", e);
+                    }
+                })
+                */
                 .doOnError(error -> log.error("Error calling Kakao API", error));
     }
 }

@@ -293,3 +293,23 @@ message DeleteScheduleResponse {
   string message = 1;
   bool success = 2;
 }
+
+// ===============================================================
+// 4. 외부 서비스 연동용 메시지 (Messages for External Services)
+// ===============================================================
+
+// 4.1 맛집 추천 요청 (to Recommendation Service)
+message RestaurantRecommendationRequest {
+  string schedule_id = 1;
+  string slot_id = 2;
+  MealType meal_type = 3;
+  string scheduled_time = 4;
+  MealLocation meal_location = 5;
+  int32 radius = 6;
+  string user_note = 7;
+}
+
+message RestaurantRecommendationResponse {
+  string request_id = 1; // 추천 요청 ID (Kafka 처리용 -> gRPC에서는 트랜잭션 ID로 사용 가능)
+  bool success = 2;
+}

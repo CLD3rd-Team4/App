@@ -40,9 +40,8 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
     private final SelectedRestaurantRepository selectedRestaurantRepository;
     private final ScheduleMapper scheduleMapper;
     private final TmapClient tmapClient;
-    private final KakaoClient kakaoClient;
     private final RouteService routeService;
-    private final ObjectMapper objectMapper;
+    private final KakaoApiService kakaoApiService; // [수정] KakaoApiService 주입
 
     @Override
     @Transactional
@@ -141,31 +140,8 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
                 tmapResponse, mealTimeSlotEntities, departureDateTime
         );
 
-        // Kakao API 호출을 동기적으로 실행하고 결과를 기다림
-        List<MealTimeSlot> updatedSlots = Flux.fromIterable(calculatedLocations)
-                .flatMap(loc -> {
-                    MealTimeSlot slot = mealTimeSlotEntities.stream()
-                            .filter(s -> s.getId().equals(loc.getSlotId()))
-                            .findFirst().orElse(null);
-                    if (slot == null) return Mono.empty();
-
-                    return kakaoClient.searchRestaurants(loc.getLat(), loc.getLon(), slot.getRadius())
-                            .map(kakaoResponse -> {
-                                try {
-                                    log.info("Found {} restaurants for slot {}", kakaoResponse.getDocuments().size(), slot.getId());
-                                    Map<String, Object> locationJson = new HashMap<>();
-                                    locationJson.put("lat", loc.getLat());
-                                    locationJson.put("lon", loc.getLon());
-                                    locationJson.put("scheduled_time", slot.getScheduledTime());
-                                    slot.setCalculatedLocation(objectMapper.writeValueAsString(locationJson));
-                                    return slot;
-                                } catch (Exception e) {
-                                    throw new RuntimeException("Kakao API 응답 처리 중 오류 발생", e);
-                                }
-                            });
-                })
-                .collectList()
-                .block();
+        // [수정] KakaoApiService를 통해 식당 정보 처리 및 저장
+        kakaoApiService.processAndSaveRestaurantSuggestions(calculatedLocations, mealTimeSlotEntities);
 
         int totalTimeInSeconds = tmapResponse.getFeatures().get(0).getProperties().getTotalTime();
         LocalDateTime arrivalDateTime = departureDateTime.plusSeconds(totalTimeInSeconds);
@@ -174,7 +150,6 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
         // 모든 변경사항을 포함하여 schedule을 최종 저장
         scheduleRepository.save(schedule);
     }
-
 
     @Override
     @Transactional(readOnly = true)
