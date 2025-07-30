@@ -29,17 +29,14 @@ jobs:
           # backend/ 폴더에서 변경된 서비스들 찾기
           BACKEND_SERVICES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '^backend/' | cut -d '/' -f2 | sort | uniq)
           
-          # config-repo/ 폴더 변경 확인
-          CONFIG_CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '^config-repo/' | wc -l)
+          # config-repo/ 폴더에서 변경된 설정 파일들 찾기 (해당 서비스 이름 추출)
+          CONFIG_SERVICES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '^config-repo/.*\.yml$' | sed 's|config-repo/||g' | sed 's|\.yml||g' | grep -v '^application$' | sort | uniq)
           
           # 결과 합치기
-          ALL_SERVICES="$BACKEND_SERVICES"
-          if [ "$CONFIG_CHANGED" -gt 0 ]; then
-            ALL_SERVICES="$ALL_SERVICES config"
-          fi
+          ALL_SERVICES=$(echo -e "$BACKEND_SERVICES\n$CONFIG_SERVICES" | sort | uniq)
           
           # JSON 배열로 변환
-          CHANGED=$(echo "$ALL_SERVICES" | tr ' ' '\n' | sort | uniq | jq -R -s -c 'split("\n") | map(select(. != ""))')
+          CHANGED=$(echo "$ALL_SERVICES" | tr '\n' ' ' | tr -s ' ' | sed 's/^ *//g' | sed 's/ *$//g' | tr ' ' '\n' | jq -R -s -c 'split("\n") | map(select(. != ""))')
           echo "services=$CHANGED" >> $GITHUB_OUTPUT
 
       - name: Get short git commit hash
