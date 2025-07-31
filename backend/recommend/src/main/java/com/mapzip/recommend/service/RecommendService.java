@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.mapzip.recommend.dto.RecommendRequestDto;
+import com.mapzip.recommend.dto.RecommendResultDto;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,7 +28,7 @@ public class RecommendService {
     private final BedrockRuntimeClient bedrockRuntimeClient;
     private final ObjectMapper objectMapper;
 
-    public String recommendProcess(RecommendRequestDto recommendRequestDto) {
+    public RecommendResultDto recommendProcess(RecommendRequestDto recommendRequestDto) {
         try {
             // 프롬프트 생성
             String prompt = buildPrompt(recommendRequestDto);
@@ -48,15 +50,23 @@ public class RecommendService {
                     .accept("application/json")
                     .body(SdkBytes.fromUtf8String(body))
                     .build();
+            
             InvokeModelResponse bedrockResult = bedrockRuntimeClient.invokeModel(request);
             String result = bedrockResult.body().asUtf8String();
+            String kakaoPlaceListJson=recommendRequestDto.getKakaoPlaceListJson();
             String recommendPlaceListJson = buildRecommendPlaceListJson(
-            	    recommendRequestDto.getKakaoPlaceListJson(),
+            		kakaoPlaceListJson,
             	    result
             	);
+            RecommendResultDto recommendResultDto = new RecommendResultDto(
+            	    recommendRequestDto.getUserId(),
+            	    recommendRequestDto.getScheduleId(),
+            	    recommendRequestDto.getRecommendationRequestIds(),
+            	    recommendPlaceListJson
+            	);
 
-            log.info("🎯 Bedrock 응답 수신 완료: {}", recommendPlaceListJson);
-            return result;
+            log.info("🎯 Bedrock 응답 수신 완료 ");
+            return recommendResultDto;
 
         } catch (JsonProcessingException e) {
             throw new RuntimeException("❌ Bedrock 요청 JSON 직렬화 실패", e);
@@ -125,24 +135,13 @@ public class RecommendService {
     private String buildRecommendPlaceListJson(String kakaoPlaceListJson, String aiResponseJson) {
         try {
             // 0. AI 응답에서 JSON 텍스트 추출
-        	// Claude 응답에서 content[0].text 추출
-        	
+
         	JsonNode raw = objectMapper.readTree(aiResponseJson);
         	String rawText = raw
         	    .path("content")
         	    .path(0)
         	    .path("text")
         	    .asText("");
-        	log.info("🧪 Claude content[0].text:\n{}", rawText);
-
-//        	// 코드블럭 제거: ```json ~ ``` 제거
-//        	String cleanJson = rawText
-//        	    .replaceAll("(?s)^```json\\s*", "")  // 시작 부분 제거
-//        	    .replaceAll("(?s)\\s*```$", "")      // 끝 부분 제거
-//        	    .trim();
-
-        	// 로그 확인용
-//        	log.info("🧪 정제된 JSON:\n{}", cleanJson);
 
             // 1. Kakao 장소 리스트 파싱
             JsonNode kakaoRoot = objectMapper.readTree(kakaoPlaceListJson);
