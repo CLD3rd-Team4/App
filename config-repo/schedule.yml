@@ -9,7 +9,7 @@ spring:
     
   # Aurora PostgreSQL 연결 (schedule 클러스터) - 환경변수 필수
   datasource:
-    url: jdbc:postgresql://${AURORA_SCHEDULE_ENDPOINT}:5432/schedule_db
+    url: jdbc:postgresql://mapzip-dev-schedule-db.cluster-c3qme6c6e7fj.ap-northeast-2.rds.amazonaws.com:5432/schedule_db
     username: mapzip
     password: '{cipher}${DB_PASSWORD}'
     driver-class-name: org.postgresql.Driver
@@ -86,10 +86,10 @@ external:
   api:
     tmap:
       url: https://apis.openapi.sk.com
-      key: '{cipher}${TMAP_API_KEY}'
+      key: '{cipher}f78b10e7eb93c8dd7164c79d8b07799aae13b71043f5473206b3e8fc44980e8c68af082ea0ceeda1bc128040a5677f64501ceb845d13c23a761de3101c7b407b'
     kakao:
       url: https://dapi.kakao.com
-      key: '{cipher}${KAKAO_LOCAL_API_KEY}'
+      key: '{cipher}b3c8d5625fc982f63c90101890b2e0dcbe7a48c73f401b57fdc74474569d12a9f5f992bea8d8da16380ec1f3da05ec3174c1b0c2d364f73aa9c71db86ee6b3d8'
 
 # 개발 환경용 인증 설정
 auth:
