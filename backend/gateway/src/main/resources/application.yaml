@@ -1,54 +1,8 @@
+#from config server
 spring:
   application:
     name: gateway
-  main:
-    web-application-type: reactive
-  cloud:
-    config:
-      enabled: false
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics,prometheus
-      base-path: /actuator
-  endpoint:
-    health:
-      show-details: always
-      probes:
-        enabled: true
-  health:
-    readiness-state:
-      enabled: true
-    liveness-state:
-      enabled: true
-  metrics:
-    distribution:
-      percentiles-histogram:
-        http:
-          server:
-            requests: true
-      slo:
-        http.server.requests: 100ms,200ms,500ms,1s,2s
-    tags:
-      application: ${spring.application.name}
-      environment: ${ENVIRONMENT:dev}
-      region: ${AWS_REGION:ap-northeast-2}
-
-jwt:
-  secret: 
-  expiration: 86400000
-
-server:
-  port: 8080
-
-# from config server
-
-#spring:
-#  application:
-#    name: gateway
-#  config:
-#    import: "configserver:http://config.platform.svc.cluster.local:8888"
-#  profiles:
-#    active: dev
+  config:
+    import: "configserver:http://config.service-platform.svc.cluster.local:8888"
+  profiles:
+    active: dev

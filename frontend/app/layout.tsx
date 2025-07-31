@@ -37,6 +37,12 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="map.zip" />
+        
+        {/* 카카오 지도 API 스크립트 */}
+        <script 
+          type="text/javascript" 
+          src="//dapi.kakao.com/v2/maps/sdk.js?appkey=2d47a9ad4bd4ef47092a4e167cb2b737&libraries=services"
+        ></script>
       </head>
       <body className={inter.className}>
         <div className="min-h-screen bg-gray-100">

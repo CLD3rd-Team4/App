@@ -1,0 +1,48 @@
+spring:
+  application:
+    name: gateway
+  main:
+    web-application-type: reactive
+  cloud:
+    config:
+      enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    readiness-state:
+      enabled: true
+    liveness-state:
+      enabled: true
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http:
+          server:
+            requests: true
+      slo:
+        http.server.requests: 100ms,200ms,500ms,1s,2s
+    tags:
+      application: ${spring.application.name}
+      environment: ${ENVIRONMENT:dev}
+      region: ${AWS_REGION:ap-northeast-2}
+
+logging:
+  level:
+    mapzip.gateway.filter: DEBUG
+
+jwt:
+  secret: '{cipher}7b6b9294d39c3d8255fc378565a0565742c5c044cbd4dccb61fcfde909bc4563a7a6af6e424f8d36a9a3c72164ca1ecb13d11fc82f95c8d242a0acab103e1155'
+  expiration: 86400000
+
+server:
+  port: 8080

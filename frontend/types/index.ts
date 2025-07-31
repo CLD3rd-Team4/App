@@ -10,6 +10,20 @@ export interface MealTime {
   time: string
 }
 
+// 새로 추가된 위치 관련 타입들
+export interface LocationInfo {
+  name: string
+  address: string
+  lat: number
+  lng: number
+}
+
+export interface LocationData {
+  departure: LocationInfo | null
+  destination: LocationInfo | null
+  waypoints: LocationInfo[]
+}
+
 export interface Schedule {
   id: string
   title: string
@@ -30,6 +44,8 @@ export interface Schedule {
   mealRadius?: "5km" | "10km" | "20km"
   targetMealTimes?: MealTime[]
   userRequirements?: string
+  // 새로 추가: 위치 정보 (기존 문자열 필드와 함께 사용)
+  locationData?: LocationData
 }
 
 export interface Restaurant {
@@ -66,4 +82,11 @@ export interface Review {
   review: string
   images: string[]
   createdAt: string
+}
+
+// 카카오 지도 API 타입 확장
+declare global {
+  interface Window {
+    kakao: any
+  }
 }
