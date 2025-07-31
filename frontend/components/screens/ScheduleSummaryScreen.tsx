@@ -123,7 +123,7 @@ export default function ScheduleSummaryScreen() {
 
   const handleRecommendationConfirm = () => {
     setShowRecommendationPopup(false)
-    router.push("/recommendations")
+    router.push("/recommendations/")
   }
 
   const formatTime = (time: string) => {
@@ -258,7 +258,7 @@ export default function ScheduleSummaryScreen() {
           <div className="flex items-center justify-between">
             <h1 className="text-lg font-medium">나의 스케줄 요약</h1>
             <Button
-              onClick={() => router.push("/recommendations")}
+              onClick={() => router.push("/recommendations/")}
               variant="outline"
               size="sm"
               className="flex items-center gap-2 border-blue-200 text-blue-600 hover:bg-blue-50"
@@ -276,7 +276,7 @@ export default function ScheduleSummaryScreen() {
                 <div className="text-center py-8">
                   <p className="text-gray-600 mb-4">스케줄 정보가 없습니다.</p>
                   <Button
-                    onClick={() => router.push("/recommendations")}
+                    onClick={() => router.push("/recommendations/")}
                     className="bg-blue-500 hover:bg-blue-600 text-white"
                   >
                     추천 결과 보기
