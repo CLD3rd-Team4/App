@@ -9,7 +9,7 @@ spring:
     url: "{cipher}569c1c314da35d12120495ae86e04d2b7b668f18b0f3747e26687ed19d7c0e9875d5c81e113db1148c64521ab8a22f2980fbb0d71012ec823930dd12b880baf9fc937984ef4382cb3bcf38f734e33e589f01479e303eef6189492fe08cb3068436befc18b5090db00d0d0b62d3f847b6b3ab4dcb237b862399fce68501857c20"
     username: "{cipher}995dfde6ea6ecd8bbd5a0ee2910a702e005be23ab5892cf6d95f4fca0d1b11ab"
     password: "{cipher}9bd7424c08e3de951c830c47941f93c33ae97a808789991e1df5bd5d062d8774"
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
@@ -39,6 +39,17 @@ spring:
       discovery:
         enabled: true
 
+  data:
+    valkey:
+      host: mapzip-dev-auth-cache.2iapp0.ng.0001.apn2.cache.amazonaws.com
+      port: 6379
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+
 management:
   endpoints:
     web:
@@ -58,3 +69,8 @@ management:
 jwt:
   secret: "{cipher}7b6b9294d39c3d8255fc378565a0565742c5c044cbd4dccb61fcfde909bc4563a7a6af6e424f8d36a9a3c72164ca1ecb13d11fc82f95c8d242a0acab103e1155"
   expiration: 86400000
+
+kakao:
+  client-id: "{cipher}8d132c3fac98a2315d14d76fbea04dd7aeec0c246e463a6d5f6dc2d20a915025756ac1de63d1f48475d455ca942ea86d88e3f79dfa59e1a1b932a58e0a0b37f9"
+  client-secret: "{cipher}1ebdf7a9bb81b448c1fdf06177755626639b7aa2def895ff58a7fd312117f60abc632712a90e3b4217b7ded1a6498302338a88d7ae0103a5f8b766d6ebeef349"
+  redirect-uri: "{cipher}158cc70ef30cfc9d2ef1788234c0d24ac6ea62dcdd607e45da9b022f927a970ab60972f82b194fee071809338f201de0c85d5de4858b43bdaddd0e94105a7e01"
