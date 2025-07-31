@@ -27,7 +27,7 @@ aws:
 google:
   cloud:
     vision:
-      api-key: ${GOOGLE_CLOUD_VISION_API_KEY}
+      api-key: '{cipher}${GOOGLE_CLOUD_VISION_API_KEY}'
 
 # Database Connection Pool
 spring:
