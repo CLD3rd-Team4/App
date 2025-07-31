@@ -71,7 +71,11 @@
 			<groupId>software.amazon.awssdk</groupId>
 			<artifactId>bedrockruntime</artifactId>
 		</dependency>
-		
+		<!-- Kafka 의존성 -->
+		<dependency>
+			<groupId>org.springframework.kafka</groupId>
+			<artifactId>spring-kafka</artifactId>
+		</dependency>
 
 
 	</dependencies>
