@@ -3,6 +3,8 @@
   "style": "default",
   "rsc": true,
   "tsx": true,
+
+  
   "tailwind": {
     "config": "tailwind.config.ts",
     "css": "app/globals.css",
