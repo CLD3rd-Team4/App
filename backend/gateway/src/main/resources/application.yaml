@@ -1,5 +1,4 @@
 #from config server
-
 spring:
   application:
     name: gateway
