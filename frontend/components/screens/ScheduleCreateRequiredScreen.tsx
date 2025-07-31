@@ -7,18 +7,17 @@ import { Label } from "@/components/ui/label"
 import { TimePicker } from "@/components/ui/time-picker"
 import { ArrowLeft } from "lucide-react"
 
+// 1. 데이터 구조 변경
 interface MealTime {
   type: "식사" | "간식"
   time: string
+  radius: number // 개별 반경 (단위: 미터)
 }
 
 interface RequiredData {
-  scheduleName: string
+  title: string // 'scheduleName'에서 변경
   departureTime: string
-  arrivalTime: string
-  estimatedArrivalTime: string
-  mealRadius: "5km" | "10km" | "20km"
-  targetMealTimes: MealTime[]
+  mealTimes: MealTime[] // 'targetMealTimes'에서 변경
 }
 
 interface ScheduleCreateRequiredScreenProps {
@@ -32,20 +31,19 @@ export default function ScheduleCreateRequiredScreen({
   onBack,
   initialData,
 }: ScheduleCreateRequiredScreenProps) {
+  // 2. 상태 관리 로직 수정
   const [formData, setFormData] = useState<RequiredData>(
     initialData || {
-      scheduleName: "",
+      title: "",
       departureTime: "12:00",
-      arrivalTime: "",
-      estimatedArrivalTime: "18:30", // 백엔드에서 계산해서 받을 예정
-      mealRadius: "5km",
-      targetMealTimes: [],
+      // mealTimes 배열에 기본 항목 1개 추가
+      mealTimes: [{ type: "식사", time: "12:05", radius: 5000 }],
     },
   )
-  const [selectedAdjustment, setSelectedAdjustment] = useState<string>("")
 
   // 시간을 분으로 변환하는 함수
   const timeToMinutes = (time: string) => {
+    if (!time) return 0;
     const [hour, minute] = time.split(":").map(Number)
     return hour * 60 + minute
   }
@@ -62,73 +60,51 @@ export default function ScheduleCreateRequiredScreen({
     const departureMinutes = timeToMinutes(formData.departureTime)
 
     if (index === 0) {
-      // 첫 번째 식사는 출발시간 + 5분 이후
       return minutesToTime(departureMinutes + 5)
     } else {
-      // 이후 식사는 이전 식사시간 + 5분 이후
-      const previousMealMinutes = timeToMinutes(formData.targetMealTimes[index - 1].time)
+      const previousMealTime = formData.mealTimes[index - 1]?.time;
+      if (!previousMealTime) return minutesToTime(departureMinutes + 5); // 이전 시간 없으면 출발시간 기준
+      const previousMealMinutes = timeToMinutes(previousMealTime)
       return minutesToTime(previousMealMinutes + 5)
     }
   }
 
+
+  const handleMealTimeChange = (index: number, field: keyof MealTime, value: any) => {
+    // 시간 유효성 검사
+    if (field === "time") {
+      const minTime = getMinTimeForMeal(index)
+      if (value < minTime) {
+        alert(`${index === 0 ? "출발시간" : "이전 식사시간"}의 5분 이후로 선택해주세요.`)
+        return
+      }
+    }
+
+    const newMealTimes = [...formData.mealTimes]
+    newMealTimes[index] = { ...newMealTimes[index], [field]: value }
+    setFormData((prev) => ({ ...prev, mealTimes: newMealTimes }))
+  }
+
   const addMealTime = () => {
-    const minTime = getMinTimeForMeal(formData.targetMealTimes.length)
+    const minTime = getMinTimeForMeal(formData.mealTimes.length);
     setFormData((prev) => ({
       ...prev,
-      targetMealTimes: [...prev.targetMealTimes, { type: "식사", time: minTime }],
+      mealTimes: [
+        ...prev.mealTimes,
+        { type: "식사", time: minTime, radius: 5000 },
+      ],
     }))
   }
 
   const removeMealTime = (index: number) => {
     setFormData((prev) => ({
       ...prev,
-      targetMealTimes: prev.targetMealTimes.filter((_, i) => i !== index),
+      mealTimes: prev.mealTimes.filter((_, i) => i !== index),
     }))
-  }
-
-  const updateMealTime = (index: number, field: keyof MealTime, value: string) => {
-    if (field === "time") {
-      const minTime = getMinTimeForMeal(index)
-      const minMinutes = timeToMinutes(minTime)
-      const selectedMinutes = timeToMinutes(value)
-
-      if (selectedMinutes < minMinutes) {
-        alert(`${index === 0 ? "출발시간" : "이전 식사시간"}의 5분 이후로 선택해주세요.`)
-        return
-      }
-    }
-
-    setFormData((prev) => ({
-      ...prev,
-      targetMealTimes: prev.targetMealTimes.map((meal, i) => (i === index ? { ...meal, [field]: value } : meal)),
-    }))
-  }
-
-  const adjustArrivalTime = (adjustment: string) => {
-    setSelectedAdjustment(adjustment)
-    // TODO: 백엔드에서 계산된 예상 도착시간을 기준으로 조정
-    const currentTime = new Date(`2024-01-01 ${formData.estimatedArrivalTime}`)
-    let minutes = 0
-
-    switch (adjustment) {
-      case "+30분":
-        minutes = 30
-        break
-      case "+1시간":
-        minutes = 60
-        break
-      case "+2시간":
-        minutes = 120
-        break
-    }
-
-    currentTime.setMinutes(currentTime.getMinutes() + minutes)
-    const newTime = `${currentTime.getHours().toString().padStart(2, "0")}:${currentTime.getMinutes().toString().padStart(2, "0")}`
-    setFormData((prev) => ({ ...prev, arrivalTime: newTime }))
   }
 
   const handleNext = () => {
-    if (formData.scheduleName && formData.departureTime) {
+    if (formData.title && formData.departureTime) {
       onNext(formData)
     }
   }
@@ -148,13 +124,13 @@ export default function ScheduleCreateRequiredScreen({
 
           {/* 스케줄명 */}
           <div>
-            <Label htmlFor="scheduleName" className="text-base font-medium">
+            <Label htmlFor="title" className="text-base font-medium">
               스케줄명
             </Label>
             <Input
-              id="scheduleName"
-              value={formData.scheduleName}
-              onChange={(e) => setFormData((prev) => ({ ...prev, scheduleName: e.target.value }))}
+              id="title"
+              value={formData.title}
+              onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
               placeholder="스케줄명을 입력하세요"
               className="mt-2"
             />
@@ -167,55 +143,17 @@ export default function ScheduleCreateRequiredScreen({
             label="출발 시간"
           />
 
-          {/* 도착 여유 시간 선택 */}
-          <div className="bg-white rounded-lg border p-4">
-            <div className="flex items-center justify-between mb-3">
-              <span className="font-medium">도착 여유 시간 선택</span>
-            </div>
-
-            <div className="flex gap-2">
-              {["+30분", "+1시간", "+2시간"].map((adjustment) => (
-                <Button
-                  key={adjustment}
-                  onClick={() => adjustArrivalTime(adjustment)}
-                  variant={selectedAdjustment === adjustment ? "default" : "outline"}
-                  size="sm"
-                  className={`flex-1 ${selectedAdjustment === adjustment ? "bg-blue-500 text-white" : ""}`}
-                >
-                  {adjustment}
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          {/* 식사 반경 */}
-          <div>
-            <Label className="text-base font-medium">식사 반경</Label>
-            <div className="flex gap-2 mt-2">
-              {["5km", "10km", "20km"].map((radius) => (
-                <Button
-                  key={radius}
-                  onClick={() => setFormData((prev) => ({ ...prev, mealRadius: radius as any }))}
-                  variant={formData.mealRadius === radius ? "default" : "outline"}
-                  size="sm"
-                  className={formData.mealRadius === radius ? "bg-blue-500 text-white" : ""}
-                >
-                  {radius}
-                </Button>
-              ))}
-            </div>
-          </div>
-
           {/* 목표 식사 시간 */}
           <div>
             <Label className="text-base font-medium">목표 식사 시간</Label>
 
-            {formData.targetMealTimes.map((mealTime, index) => (
-              <div key={index} className="bg-white rounded-lg border p-3 mt-3">
-                <div className="flex items-center gap-2 mb-3">
+            {formData.mealTimes.map((mealTime, index) => (
+              <div key={index} className="bg-white rounded-lg border p-3 mt-3 space-y-4">
+                {/* 식사/간식 타입 및 삭제 버튼 */}
+                <div className="flex items-center gap-2">
                   <div className="flex gap-2">
                     <Button
-                      onClick={() => updateMealTime(index, "type", "식사")}
+                      onClick={() => handleMealTimeChange(index, "type", "식사")}
                       variant={mealTime.type === "식사" ? "default" : "outline"}
                       size="sm"
                       className={mealTime.type === "식사" ? "bg-blue-500 text-white" : ""}
@@ -223,7 +161,7 @@ export default function ScheduleCreateRequiredScreen({
                       식사
                     </Button>
                     <Button
-                      onClick={() => updateMealTime(index, "type", "간식")}
+                      onClick={() => handleMealTimeChange(index, "type", "간식")}
                       variant={mealTime.type === "간식" ? "default" : "outline"}
                       size="sm"
                       className={mealTime.type === "간식" ? "bg-blue-500 text-white" : ""}
@@ -241,11 +179,30 @@ export default function ScheduleCreateRequiredScreen({
                   </Button>
                 </div>
 
+                {/* 시간 선택 */}
                 <TimePicker
                   value={mealTime.time}
-                  onChange={(time) => updateMealTime(index, "time", time)}
+                  onChange={(time) => handleMealTimeChange(index, "time", time)}
                   label={`시간 선택 (${getMinTimeForMeal(index)} 이후)`}
                 />
+
+                {/* 3. UI 로직 연결: 개별 반경 선택 */}
+                <div>
+                  <Label className="text-sm text-gray-500">식사 반경</Label>
+                  <div className="flex gap-2 mt-2">
+                    {[5000, 10000, 20000].map((radius) => (
+                      <Button
+                        key={radius}
+                        onClick={() => handleMealTimeChange(index, "radius", radius)}
+                        variant={mealTime.radius === radius ? "default" : "outline"}
+                        size="sm"
+                        className={mealTime.radius === radius ? "bg-blue-500 text-white" : ""}
+                      >
+                        {radius / 1000}km
+                      </Button>
+                    ))}
+                  </div>
+                </div>
               </div>
             ))}
 
@@ -255,13 +212,13 @@ export default function ScheduleCreateRequiredScreen({
               size="sm"
               className="w-full mt-3 text-blue-600 border-blue-200 bg-transparent"
             >
-              {formData.targetMealTimes.length === 0 ? "추가하기" : "식사 시간 추가"}
+              {formData.mealTimes.length === 0 ? "추가하기" : "식사 시간 추가"}
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Fixed Progress Bar and Next Button - 하단 네비게이션과 같은 높이로 조정 */}
+      {/* 하단 버튼 */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t z-50">
         <div className="max-w-md mx-auto p-4">
           <div className="flex items-center justify-between mb-3">
@@ -272,7 +229,7 @@ export default function ScheduleCreateRequiredScreen({
           </div>
           <Button
             onClick={handleNext}
-            disabled={!formData.scheduleName || !formData.departureTime}
+            disabled={!formData.title || !formData.departureTime}
             className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2"
           >
             다음

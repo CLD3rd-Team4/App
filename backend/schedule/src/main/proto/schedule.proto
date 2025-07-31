@@ -13,6 +13,8 @@ option java_outer_classname = "ScheduleProto";
 // ===============================================================
 
 service ScheduleService {
+  
+
   // 스케줄 생성
   rpc CreateSchedule(CreateScheduleRequest) returns (CreateScheduleResponse) {
     option (google.api.http) = {
@@ -184,6 +186,8 @@ message CreateScheduleResponse {
   string calculated_arrival_time = 5;
   ScheduleError error = 6;
 }
+
+
 
 // 3.2 맛집 추천 결과 조회
 message GetRecommendationResultsRequest {

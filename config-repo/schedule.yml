@@ -9,9 +9,9 @@ spring:
     
   # Aurora PostgreSQL 연결 (schedule 클러스터) - 환경변수 필수
   datasource:
-    url: jdbc:postgresql://${AURORA_SCHEDULE_ENDPOINT}:5432/mapzip_schedule
-    username: mapzip-schedule-${TERRAFORM_WORKSPACE:dev}
-    password: ${DB_PASSWORD}
+    url: jdbc:postgresql://${AURORA_SCHEDULE_ENDPOINT}:5432/schedule_db
+    username: ${DB_USERNAME}
+    password: '{cipher}8e1486a57e6c448a6bf9973cace90c244c4e548d54ba9e655fa183d940c8e8f3'
     driver-class-name: org.postgresql.Driver
     
   # JPA 설정 (운영 환경 기준)

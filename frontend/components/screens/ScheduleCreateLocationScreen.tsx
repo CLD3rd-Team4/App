@@ -10,7 +10,7 @@ import { scheduleApi } from "@/services/api" // scheduleApi 임포트
 import { useToast } from "@/hooks/use-toast" // useToast 임포트
 
 interface ScheduleCreateLocationScreenProps {
-  onNext: (scheduleId: string) => void // scheduleId를 받도록 수정
+  onNext: (data: LocationData) => void // LocationData를 받도록 수정
   initialData?: LocationData
   isEdit?: boolean
 }
@@ -183,21 +183,13 @@ export default function ScheduleCreateLocationScreen({
     if (formData.departure && formData.destination && !isLoading) {
       setIsLoading(true)
       try {
-        const response = await scheduleApi.createInitialSchedule(formData);
-        if (response && response.scheduleId) {
-          toast({
-            title: "스케줄 생성 성공",
-            description: "기본 스케줄이 생성되었습니다. 상세 정보를 입력해주세요.",
-          })
-          onNext(response.scheduleId); // 생성된 ID를 다음 단계로 전달
-        } else {
-          throw new Error("Invalid response from server");
-        }
+        // API 호출 대신, 상위 컴포넌트로 데이터 전달
+        onNext(formData)
       } catch (error) {
-        console.error("스케줄 생성 실패", error);
+        console.error("데이터 전달 실패", error)
         toast({
           title: "오류",
-          description: "스케줄 생성에 실패했습니다. 잠시 후 다시 시도해주세요.",
+          description: "다음 단계로 진행하는 데 실패했습니다. 잠시 후 다시 시도해주세요.",
           variant: "destructive",
         })
       } finally {

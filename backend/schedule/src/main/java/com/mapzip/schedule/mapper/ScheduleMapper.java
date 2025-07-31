@@ -47,6 +47,8 @@ public class ScheduleMapper {
         return schedule;
     }
 
+    
+
     public void updateEntity(Schedule schedule, UpdateScheduleRequest request) {
         schedule.setTitle(request.getTitle());
         schedule.setDepartureTime(request.getDepartureTime());
