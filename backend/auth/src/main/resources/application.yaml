@@ -3,4 +3,4 @@ spring:
     name: auth
 
   config:
-    import: optional:configserver:http://config-server.service-platform.svc.cluster.local:8888
+    import: optional:configserver:http://config.service-platform.svc.cluster.local:8888
