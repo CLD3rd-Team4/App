@@ -11,7 +11,7 @@ spring:
   datasource:
     url: jdbc:postgresql://mapzip-dev-schedule-db.cluster-c3qme6c6e7fj.ap-northeast-2.rds.amazonaws.com:5432/schedule_db
     username: mapzip
-    password: '{cipher}${DB_PASSWORD}'
+    password: '{cipher}8e1486a57e6c448a6bf9973cace90c244c4e548d54ba9e655fa183d940c8e8f3'
     driver-class-name: org.postgresql.Driver
     
   # JPA 설정 (운영 환경 기준)
