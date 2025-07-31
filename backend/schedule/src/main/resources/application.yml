@@ -1,33 +1,5 @@
-server:
-  port: 8084
-
-# gRPC 설정
-grpc:
-  server:
-    port: 9090
-    reflection-service-enabled: true
-  client:
-    kakao-api-service:
-      address: static://localhost:9090
-      negotiation-type: plaintext
-
-# 로깅 설정
-logging:
-  level:
-    com.mapzip.schedule: DEBUG
-
-# Health check and metrics
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,prometheus,metrics
-  endpoint:
-    health:
-      show-details: always
-    prometheus:
-      enabled: true
-  metrics:
-    export:
-      prometheus:
-        enabled: true
+spring:
+  application:
+    name: schedule
+  config:
+    import: optional:configserver:http://config.service-platform.svc.cluster.local:8888
