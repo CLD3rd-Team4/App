@@ -270,7 +270,7 @@ export default function RecommendationScreen() {
     <div className="min-h-screen bg-gray-100 flex flex-col">
       <div className="bg-white p-4 shadow-sm flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center">
-          <Button onClick={() => router.back()} variant="ghost" size="sm" className="mr-3">
+          <Button onClick={() => router.push("/")} variant="ghost" size="sm" className="mr-3">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className="text-lg font-medium">추천 결과</h1>
@@ -361,6 +361,7 @@ export default function RecommendationScreen() {
                                 src={
                                   section.previousSelection.image ||
                                   "/placeholder.svg?height=60&width=60&query=restaurant" ||
+                                  "/placeholder.svg" ||
                                   "/placeholder.svg"
                                 }
                                 alt={section.previousSelection.name}

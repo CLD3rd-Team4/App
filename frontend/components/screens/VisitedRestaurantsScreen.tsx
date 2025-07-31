@@ -51,6 +51,11 @@ export default function VisitedRestaurantsScreen() {
     loadVisitedRestaurants()
   }
 
+  const handleReviewClick = (reviewId: number) => {
+    // 정적 환경에서 안전한 라우팅을 위해 trailing slash 추가
+    router.push(`/review/detail/${reviewId}/`)
+  }
+
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
       <div className="bg-white p-4 shadow-sm">
@@ -131,8 +136,8 @@ export default function VisitedRestaurantsScreen() {
                   {[1, 2, 3, 4].map((index) => (
                     <div
                       key={index}
-                      className="bg-gray-100 rounded-lg p-3 cursor-pointer hover:bg-gray-200"
-                      onClick={() => router.push(`/review/detail/${index + 1}`)}
+                      className="bg-gray-100 rounded-lg p-3 cursor-pointer hover:bg-gray-200 transition-colors"
+                      onClick={() => handleReviewClick(index)}
                     >
                       <img
                         src={`/placeholder.svg?height=80&width=120&query=food${index}`}

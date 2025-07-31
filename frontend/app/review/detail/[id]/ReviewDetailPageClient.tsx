@@ -138,7 +138,7 @@ export default function ReviewDetailPageClient() {
     <div className="min-h-screen bg-gray-100 flex flex-col">
       <div className="bg-white p-4 shadow-sm flex items-center justify-between">
         <div className="flex items-center">
-          <Button onClick={() => router.back()} variant="ghost" size="sm" className="mr-3">
+          <Button onClick={() => router.push("/visited/")} variant="ghost" size="sm" className="mr-3">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className="text-lg font-medium">리뷰 상세</h1>
