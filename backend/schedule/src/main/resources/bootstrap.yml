@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: schedule
+  cloud:
+    config:
+      uri: ${CONFIG_SERVER_URL:http://config:8888}
+      fail-fast: true
+      retry:
+        initial-interval: 3000
+        max-attempts: 5
+        max-interval: 10000
+        multiplier: 1.2
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}

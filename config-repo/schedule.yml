@@ -10,32 +10,69 @@ spring:
   # Aurora PostgreSQL 연결 (schedule 클러스터) - 환경변수 필수
   datasource:
     url: jdbc:postgresql://${AURORA_SCHEDULE_ENDPOINT}:5432/schedule_db
-    username: ${DB_USERNAME}
-    password: '{cipher}8e1486a57e6c448a6bf9973cace90c244c4e548d54ba9e655fa183d940c8e8f3'
+    username: mapzip
+    password:  '{cipher}${DB_PASSWORD}'
     driver-class-name: org.postgresql.Driver
     
   # JPA 설정 (운영 환경 기준)
   jpa:
     hibernate:
-      ddl-auto: validate
-    show-sql: false
+      ddl-auto: update
+    show-sql: true
     properties:
       hibernate:
+        format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+    # Kubernetes 서비스 디스커버리 활성화
+  spring:
+    cloud:
+      kubernetes:
+        discovery:
+          enabled: true
 
 # 스케줄링 관련 설정
 scheduling:
   enabled: ${SCHEDULING_ENABLED:true}
   pool-size: ${SCHEDULING_POOL_SIZE:10}
 
-# Kubernetes 서비스 디스커버리 활성화
-spring:
-  cloud:
-    kubernetes:
-      discovery:
-        enabled: true
+
 
 # Eureka 비활성화
 eureka:
   client:
     enabled: false
+
+# AWS 자격 증명 설정
+cloud:
+  aws:
+    credentials:
+      access-key: ${AWS_ACCESS_KEY_ID}
+      secret-key: ${AWS_SECRET_ACCESS_KEY}
+    region:
+      static: ${AWS_REGION:ap-northeast-2}
+
+# 외부 API 설정
+external:
+  api:
+    tmap:
+      url: https://apis.openapi.sk.com
+      key: '{cipher}${TMAP_API_KEY}'
+    kakao:
+      url: https://dapi.kakao.com
+      key: '{cipher}${KAKAO_LOCAL_API_KEY}'
+
+# gRPC 서버 설정
+grpc:
+  server:
+    port: 9090
+    reflection-service-enabled: true
+  client:
+    kakao-api-service:
+      address: static://localhost:9090
+      negotiation-type: plaintext
+
+# 개발 환경용 인증 설정
+auth:
+  enabled: false
