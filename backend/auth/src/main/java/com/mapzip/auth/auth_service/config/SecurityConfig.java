@@ -13,15 +13,19 @@ import com.nimbusds.jose.proc.SecurityContext;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
-import org.springframework.security.oauth2.core.oidc.OidcScopes;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
+import org.springframework.security.oauth2.server.authorization.token.*;
 import org.springframework.security.web.SecurityFilterChain;
 
 import com.nimbusds.jose.jwk.RSAKey;
+import org.springframework.web.reactive.function.client.WebClient;
+
 import java.util.UUID;
 
 @Configuration
@@ -38,22 +42,20 @@ public class SecurityConfig {
     }
 
     @Bean
-    // 클라이언트 등록 정보 저장소 (client_id, secret, redirect_uri 등 정보 설정)
-    // OAuth2 클라이언트 등록을 메모리상(Inmemory)에 저장하는 역할
-    // DB 기반으로 변경 필요
     public RegisteredClientRepository registeredClientRepository() {
-        RegisteredClient client = RegisteredClient.withId(UUID.randomUUID().toString()) // 클라이언트 내부 식별자
-                .clientId("gateway") // 인증 서버에 인증 요청 보낼 때 사용하는 이름
-                .clientSecret("{noop}secret") // 인증서버에 접근할 수 있는 자격 비빌번호, {noop}은 암호화되지 않았다는 의미
-                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE) // 사용자 로그인을 통해 인가 코드 받고, 그걸로 토큰 요청
-                .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN) // Access Token 만료 시 새로 받을 수 있는 토큰
-                .redirectUri("http://gateway.mapzip.dev/login/oauth2/code/gateway") // 인가 코드 발급 후 인증 서버가 사용자를 리디렉션할 URI
-                .scope(OidcScopes.OPENID) // OAuth2/OIDC 범위 설정
-                .scope("profile") // openid: OIDC 인증(필수), profile: 사용자 이름, 프로필 등 추가 정보 요청 가능
+        RegisteredClient client = RegisteredClient.withId(UUID.randomUUID().toString())
+                .clientId("mapzip-client")
+                .clientSecret("{noop}mapzip-secret") // 테스트용이므로 {noop}
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+                .redirectUri("http://localhost:8080/login/oauth2/code/mapzip-client")
+                .scope("read")
+                .scope("write")
                 .build();
 
-        return new InMemoryRegisteredClientRepository(client); // 서버 재시작하면 사라짐(메모리 저장소), DB로 변경해야함
+        return new InMemoryRegisteredClientRepository(client);
     }
+
 
     @Bean
     // JWT 서명을 위한 RSA 키를 생성하고 JWK 형식으로 제공
@@ -86,5 +88,25 @@ public class SecurityConfig {
     // 비밀번호 인코더 (BCrypt 사용)
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public JwtEncoder jwtEncoder(JWKSource<SecurityContext> jwkSource) {
+        return new NimbusJwtEncoder(jwkSource);
+    }
+
+    @Bean
+    public OAuth2TokenGenerator<?> tokenGenerator(JwtEncoder jwtEncoder) {
+        JwtGenerator jwtGenerator = new JwtGenerator(jwtEncoder);
+        OAuth2AccessTokenGenerator accessTokenGenerator = new OAuth2AccessTokenGenerator();
+        OAuth2RefreshTokenGenerator refreshTokenGenerator = new OAuth2RefreshTokenGenerator();
+
+        return new DelegatingOAuth2TokenGenerator(
+                accessTokenGenerator, refreshTokenGenerator, jwtGenerator);
+    }
+
+    @Bean
+    public WebClient webClient(WebClient.Builder builder) {
+        return builder.build();
     }
 }

@@ -1,25 +1,24 @@
 package com.mapzip.auth.auth_service.entity;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 @Entity
 @Getter
 @Setter
 @NoArgsConstructor
-public class User {
+@AllArgsConstructor
+@Builder
+public class AppUser {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(unique = true, nullable = false)
-    private String username;
+    private Long kakaoId;
 
-    @Column(nullable = false)
-    private String password;
+    @Column(unique = true)
+    private String nickname;
 
-    private String role = "ROLE_USER";
 }
