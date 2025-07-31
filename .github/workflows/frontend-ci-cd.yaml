@@ -39,14 +39,12 @@ jobs:
         env:
           NEXT_PUBLIC_API_BASE_URL: ${{ secrets.NEXT_PUBLIC_API_BASE_URL }}
           
-      - name: Check .next folder exists
-        run: ls -la frontend/.next
         
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: build-files
-          path: frontend/.next/
+          path: frontend/.next
 
   cd:
     needs: ci
