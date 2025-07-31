@@ -11,7 +11,7 @@ spring:
   datasource:
     url: jdbc:postgresql://${AURORA_SCHEDULE_ENDPOINT}:5432/schedule_db
     username: mapzip
-    password:  '{cipher}${DB_PASSWORD}'
+    password: '{cipher}${DB_PASSWORD}'
     driver-class-name: org.postgresql.Driver
     
   # JPA 설정 (운영 환경 기준)
@@ -25,19 +25,47 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
     database-platform: org.hibernate.dialect.PostgreSQLDialect
 
-    # Kubernetes 서비스 디스커버리 활성화
-  spring:
-    cloud:
-      kubernetes:
-        discovery:
-          enabled: true
+  # Kubernetes 서비스 디스커버리 활성화
+  cloud:
+    kubernetes:
+      discovery:
+        enabled: true
+
+# gRPC 서버 설정
+grpc:
+  server:
+    port: 9090
+    reflection-service-enabled: true
+  client:
+    kakao-api-service:
+      address: static://localhost:9090
+      negotiation-type: plaintext
+
+# 로깅 설정
+logging:
+  level:
+    com.mapzip.schedule: DEBUG
+
+# Health check and metrics
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
 
 # 스케줄링 관련 설정
 scheduling:
   enabled: ${SCHEDULING_ENABLED:true}
   pool-size: ${SCHEDULING_POOL_SIZE:10}
-
-
 
 # Eureka 비활성화
 eureka:
@@ -62,16 +90,6 @@ external:
     kakao:
       url: https://dapi.kakao.com
       key: '{cipher}${KAKAO_LOCAL_API_KEY}'
-
-# gRPC 서버 설정
-grpc:
-  server:
-    port: 9090
-    reflection-service-enabled: true
-  client:
-    kakao-api-service:
-      address: static://localhost:9090
-      negotiation-type: plaintext
 
 # 개발 환경용 인증 설정
 auth:
