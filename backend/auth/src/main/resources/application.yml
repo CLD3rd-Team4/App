@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: auth
+
+  config:
+    import: optional:configserver:http://config-server.service-platform.svc.cluster.local:8888
+
+  data:
+    valkey:
+      host: mapzip-dev-auth-cache.2iapp0.ng.0001.apn2.cache.amazonaws.com
+      port: 6379
