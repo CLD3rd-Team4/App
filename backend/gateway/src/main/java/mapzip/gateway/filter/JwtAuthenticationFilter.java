@@ -67,7 +67,7 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
             log.info("JWT Filter - User authenticated: {}", userId);
 
             ServerHttpRequest modifiedRequest = request.mutate()
-                    .header("X-User-Id", userId)
+                    .header("x-user-id", userId) //gRPC 메타데이터 헤더는 모두 소문자
                     .build();
 
             return chain.filter(exchange.mutate().request(modifiedRequest).build());
