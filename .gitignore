@@ -330,3 +330,5 @@ $RECYCLE.BIN/
 *.lnk
 
 # End of https://www.toptal.com/developers/gitignore/api/java,macos,windows,intellij,react,maven,eclipse,visualstudiocode
+
+**/googleapis/
