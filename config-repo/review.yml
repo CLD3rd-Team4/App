@@ -1,11 +1,19 @@
 # Review 서비스 설정 (EKS 환경 기본)
 
 server:
-  port: ${SERVER_PORT:8083}
+  port: ${SERVER_PORT:8080}
 
 spring:
   application:
     name: review
+
+# gRPC 설정
+grpc:
+  server:
+    port: 50051
+  client:
+    GLOBAL:
+      negotiation-type: plaintext
 
 # AWS DynamoDB 설정 (테라폼에서 생성된 reviews 테이블) - 환경변수 필수
 aws:
@@ -18,6 +26,12 @@ aws:
     # 테라폼에서 생성된 S3 이미지 버킷
     bucket-name: mapzip-${TERRAFORM_WORKSPACE:dev}-image
     region: ap-northeast-2
+
+# Google Cloud Vision API (Config Server에서 암호화된 값 제공)
+google:
+  cloud:
+    vision:
+      api-key: ${GOOGLE_CLOUD_VISION_API_KEY:}
 
 # 파일 업로드 설정 (리뷰 이미지)
 spring:
@@ -32,6 +46,29 @@ amazon:
     region: ap-northeast-2
     # EKS에서는 IAM Role for Service Account (IRSA)를 통한 인증
     # access-key, secret-key 불필요
+
+# 로깅 설정
+logging:
+  level:
+    com.mapzip.review: DEBUG
+    software.amazon.awssdk: INFO
+    com.google.cloud: INFO
+
+# Health check and metrics
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
 
 # Kubernetes 서비스 디스커버리 활성화
 spring:
