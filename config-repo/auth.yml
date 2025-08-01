@@ -41,8 +41,6 @@ spring:
               require-authorization-consent: true
 
   cloud:
-    compatibility-verifier:
-      enabled: false
     kubernetes:
       discovery:
         enabled: true
