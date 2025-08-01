@@ -1,0 +1,5 @@
+spring:
+  application:
+    name: review
+  config:
+    import: optional:configserver:http://config.service-platform.svc.cluster.local:8888

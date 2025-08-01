@@ -1,11 +1,29 @@
 # Review 서비스 설정 (EKS 환경 기본)
 
 server:
-  port: ${SERVER_PORT:8083}
+  port: ${SERVER_PORT:8080}
 
 spring:
   application:
     name: review
+  # 파일 업로드 설정 (리뷰 이미지)
+  servlet:
+    multipart:
+      max-file-size: ${MAX_FILE_SIZE:10MB}
+      max-request-size: ${MAX_REQUEST_SIZE:50MB}
+  # Kubernetes 서비스 디스커버리 활성화
+  cloud:
+    kubernetes:
+      discovery:
+        enabled: true
+
+# gRPC 설정
+grpc:
+  server:
+    port: 50051
+  client:
+    GLOBAL:
+      negotiation-type: plaintext
 
 # AWS DynamoDB 설정 (테라폼에서 생성된 reviews 테이블) - 환경변수 필수
 aws:
@@ -19,12 +37,11 @@ aws:
     bucket-name: mapzip-${TERRAFORM_WORKSPACE:dev}-image
     region: ap-northeast-2
 
-# 파일 업로드 설정 (리뷰 이미지)
-spring:
-  servlet:
-    multipart:
-      max-file-size: ${MAX_FILE_SIZE:10MB}
-      max-request-size: ${MAX_REQUEST_SIZE:50MB}
+# Google Cloud Vision API (Config Server 암호화 방식)
+google:
+  cloud:
+    vision:
+      api-key: '{cipher}2a049919aabe8d3e61176c877535db0153d24bd98a3afa80145ac1d4d530326dff5b2c6fae218f616b9761a68aef53dd551d5efeb4c299e6fe5b4d4246f42a02'
 
 # DynamoDB 연결 설정 (EKS에서는 IRSA 사용)
 amazon:
@@ -33,11 +50,27 @@ amazon:
     # EKS에서는 IAM Role for Service Account (IRSA)를 통한 인증
     # access-key, secret-key 불필요
 
-# Kubernetes 서비스 디스커버리 활성화
-spring:
-  cloud:
-    kubernetes:
-      discovery:
+# 로깅 설정
+logging:
+  level:
+    com.mapzip.review: DEBUG
+    software.amazon.awssdk: INFO
+    com.google.cloud: INFO
+
+# Health check and metrics
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
         enabled: true
 
 # Eureka 비활성화
