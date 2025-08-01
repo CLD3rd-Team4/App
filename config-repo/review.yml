@@ -6,6 +6,16 @@ server:
 spring:
   application:
     name: review
+  # 파일 업로드 설정 (리뷰 이미지)
+  servlet:
+    multipart:
+      max-file-size: ${MAX_FILE_SIZE:10MB}
+      max-request-size: ${MAX_REQUEST_SIZE:50MB}
+  # Kubernetes 서비스 디스커버리 활성화
+  cloud:
+    kubernetes:
+      discovery:
+        enabled: true
 
 # gRPC 설정
 grpc:
@@ -32,13 +42,6 @@ google:
   cloud:
     vision:
       api-key: '{cipher}2a049919aabe8d3e61176c877535db0153d24bd98a3afa80145ac1d4d530326dff5b2c6fae218f616b9761a68aef53dd551d5efeb4c299e6fe5b4d4246f42a02'
-
-# 파일 업로드 설정 (리뷰 이미지)
-spring:
-  servlet:
-    multipart:
-      max-file-size: ${MAX_FILE_SIZE:10MB}
-      max-request-size: ${MAX_REQUEST_SIZE:50MB}
 
 # DynamoDB 연결 설정 (EKS에서는 IRSA 사용)
 amazon:
@@ -68,13 +71,6 @@ management:
   metrics:
     export:
       prometheus:
-        enabled: true
-
-# Kubernetes 서비스 디스커버리 활성화
-spring:
-  cloud:
-    kubernetes:
-      discovery:
         enabled: true
 
 # Eureka 비활성화
