@@ -162,6 +162,23 @@ public class ReviewService {
         return ocrService.processReceiptImage(receiptImage, expectedRestaurantName, expectedAddress);
     }
     
+    // 추천 서버용 리뷰 데이터 조회
+    public List<ReviewEntity> getReviewsForRecommendation(String area, String category, int page, int size) {
+        // 지역이나 카테고리 기반으로 리뷰를 조회하는 로직
+        // 현재는 간단한 구현으로 모든 리뷰 중에서 페이징 처리된 결과를 반환
+        // 실제로는 GSI를 추가하거나 별도의 검색 로직이 필요할 수 있음
+        
+        // 임시 구현: 모든 리뷰를 스캔하여 필터링 (성능상 권장하지 않음, 추후 개선 필요)
+        logger.warn("getReviewsForRecommendation - 임시 구현 사용 중. 성능 최적화 필요.");
+        
+        // TODO: 실제 구현 시에는 아래와 같은 방법들을 고려해야 함:
+        // 1. DynamoDB GSI를 추가하여 지역/카테고리별 인덱스 구성
+        // 2. ElasticSearch 연동하여 복잡한 검색 쿼리 지원
+        // 3. 캐싱 레이어 추가하여 자주 요청되는 데이터 성능 개선
+        
+        return List.of(); // 현재는 빈 리스트 반환
+    }
+    
     // 내부 클래스: 리뷰 생성 결과
     public static class ReviewCreateResult {
         private final ReviewEntity review;

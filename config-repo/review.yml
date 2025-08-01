@@ -7,6 +7,33 @@ spring:
   application:
     name: review
     
+  # 파일 업로드 설정 (리뷰 이미지)
+  servlet:
+    multipart:
+      max-file-size: ${MAX_FILE_SIZE:10MB}
+      max-request-size: ${MAX_REQUEST_SIZE:50MB}
+      
+  # Kubernetes 서비스 디스커버리 활성화
+  cloud:
+    kubernetes:
+      discovery:
+        enabled: true
+        
+  jackson:
+    default-property-inclusion: NON_NULL
+
+# gRPC 설정
+grpc:
+  server:
+    port: ${GRPC_SERVER_PORT:50051}
+  client:
+    GLOBAL:
+      negotiation-type: plaintext
+
+# AWS 설정
+aws:
+  region: ${AWS_REGION:ap-northeast-2}
+  
   # DynamoDB 연결 (IRSA 사용으로 자격증명 불필요)
   dynamodb:
     table-name: ${DYNAMODB_TABLE_NAME}
@@ -15,7 +42,7 @@ spring:
     
   # S3 설정 (IRSA 사용으로 자격증명 불필요)
   s3:
-    bucket: ${S3_BUCKET_NAME}
+    bucket-name: mapzip-${TERRAFORM_WORKSPACE:dev}-image
     region: ${AWS_REGION:ap-northeast-2}
     
   # MSK Kafka 설정 (main 클러스터) - 환경변수 필수
@@ -31,36 +58,12 @@ spring:
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       group-id: review-service-${ENVIRONMENT:prod}
       auto-offset-reset: ${KAFKA_CONSUMER_OFFSET_RESET:earliest}
-      
-  # Multipart 설정 (환경별 다른 값)
-  servlet:
-    multipart:
-      max-file-size: ${MULTIPART_MAX_FILE_SIZE:10MB}
-      max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:20MB}
-      
-  jackson:
-    default-property-inclusion: NON_NULL
 
-# gRPC Configuration  
-grpc:
-  server:
-    port: ${GRPC_SERVER_PORT:50051}
-  client:
-    GLOBAL:
-      negotiation-type: plaintext
-
-# Google Cloud Vision API
+# Google Cloud Vision API (Config Server 암호화 방식)
 google:
   cloud:
     vision:
-      api-key: '{cipher}${GOOGLE_CLOUD_VISION_API_KEY}'
-
-# Kubernetes 서비스 디스커버리 활성화
-spring:
-  cloud:
-    kubernetes:
-      discovery:
-        enabled: true
+      api-key: '{cipher}2a049919aabe8d3e61176c877535db0153d24bd98a3afa80145ac1d4d530326dff5b2c6fae218f616b9761a68aef53dd551d5efeb4c299e6fe5b4d4246f42a02'
 
 # Eureka 비활성화
 eureka:
@@ -100,7 +103,7 @@ management:
       prometheus:
         enabled: true
 
-# Logging Configuration (환경별 다른 레벨)
+# 로깅 설정
 logging:
   level:
     com.mapzip.review: ${LOG_LEVEL_REVIEW:INFO}

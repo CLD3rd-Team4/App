@@ -32,10 +32,15 @@ public class OcrService {
                                           String expectedRestaurantName, 
                                           String expectedAddress) {
         try {
-            // Google Cloud Vision API 클라이언트 생성
-            ImageAnnotatorSettings settings = ImageAnnotatorSettings.newBuilder()
-                .setCredentialsProvider(() -> null) // API Key 사용
-                .build();
+            // Google Cloud Vision API 클라이언트 생성 (API Key 기반)
+            ImageAnnotatorSettings.Builder settingsBuilder = ImageAnnotatorSettings.newBuilder();
+            
+            // API Key 설정
+            if (apiKey != null && !apiKey.isEmpty()) {
+                settingsBuilder.setApiKey(apiKey);
+            }
+            
+            ImageAnnotatorSettings settings = settingsBuilder.build();
             
             try (ImageAnnotatorClient vision = ImageAnnotatorClient.create(settings)) {
                 // 이미지 준비

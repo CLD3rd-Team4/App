@@ -15,7 +15,7 @@ public class HeaderInterceptor implements ServerInterceptor {
             Metadata headers,
             ServerCallHandler<ReqT, RespT> next) {
 
-        String userId = headers.get(Metadata.Key.of("X-User-Id", Metadata.ASCII_STRING_MARSHALLER));
+        String userId = headers.get(Metadata.Key.of("x-user-id", Metadata.ASCII_STRING_MARSHALLER));
         logger.info("Extracted User-Id from header: {}", userId);
 
         Context context = Context.current().withValue(USER_ID_CONTEXT_KEY, userId);

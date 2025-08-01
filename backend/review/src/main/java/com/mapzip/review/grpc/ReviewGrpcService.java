@@ -296,11 +296,26 @@ public class ReviewGrpcService extends ReviewServiceGrpc.ReviewServiceImplBase {
     @Override
     public void getReviewsForRecommendation(ReviewProto.GetReviewsForRecommendationRequest request,
                                           StreamObserver<ReviewProto.GetReviewsForRecommendationResponse> responseObserver) {
-        // TODO: 추천 서버를 위한 리뷰 데이터 조회 로직 구현
-        // 예: reviewService.getReviewsByAreaAndCategory(request.getArea(), request.getCategory());
-        
-        ReviewProto.GetReviewsForRecommendationResponse response = ReviewProto.GetReviewsForRecommendationResponse.newBuilder().build();
-        responseObserver.onNext(response);
-        responseObserver.onCompleted();
+        try {
+            logger.info("Getting reviews for recommendation - area: {}, category: {}", 
+                       request.getArea(), request.getCategory());
+            
+            List<ReviewEntity> reviews = reviewService.getReviewsForRecommendation(
+                    request.getArea(), request.getCategory(), request.getPage(), request.getSize());
+            
+            ReviewProto.GetReviewsForRecommendationResponse response = 
+                    ReviewProto.GetReviewsForRecommendationResponse.newBuilder()
+                            .addAllReviews(reviews.stream()
+                                    .map(this::convertToProtoReview)
+                                    .collect(Collectors.toList()))
+                            .build();
+            
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+            
+        } catch (Exception e) {
+            logger.error("Error getting reviews for recommendation", e);
+            responseObserver.onError(e);
+        }
     }
 }
