@@ -27,11 +27,11 @@ aws:
     bucket-name: mapzip-${TERRAFORM_WORKSPACE:dev}-image
     region: ap-northeast-2
 
-# Google Cloud Vision API (Config Server에서 암호화된 값 제공)
+# Google Cloud Vision API (Config Server 암호화 방식)
 google:
   cloud:
     vision:
-      api-key: ${GOOGLE_CLOUD_VISION_API_KEY:}
+      api-key: '{cipher}2a049919aabe8d3e61176c877535db0153d24bd98a3afa80145ac1d4d530326dff5b2c6fae218f616b9761a68aef53dd551d5efeb4c299e6fe5b4d4246f42a02'
 
 # 파일 업로드 설정 (리뷰 이미지)
 spring:
