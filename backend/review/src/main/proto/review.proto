@@ -12,7 +12,7 @@ service ReviewService {
     // 리뷰 작성 (영수증 OCR 검증 포함)
     rpc CreateReview(CreateReviewRequest) returns (CreateReviewResponse) {
         option (google.api.http) = {
-            post: "/api/reviews"
+            post: "/review"
             body: "*"
         };
     }
@@ -35,7 +35,7 @@ service ReviewService {
     // OCR 검증 (영수증 인식)
     rpc VerifyReceipt(VerifyReceiptRequest) returns (VerifyReceiptResponse) {
         option (google.api.http) = {
-            post: "/api/reviews/verify-receipt"
+            post: "/review/verify-receipt"
             body: "*"
         };
     }
