@@ -4,12 +4,13 @@ import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 @DynamoDbBean
 public class ReviewEntity {
 
     private String restaurantId;  
-    private String reviewId;      
+    private String createdAtUserId;  // 복합키: "2024-01-01T12:00:00Z#user123"      
     private String userId;
     private String restaurantName;
     private String restaurantAddress;
@@ -34,13 +35,21 @@ public class ReviewEntity {
     }
 
     @DynamoDbSortKey
-    @DynamoDbAttribute("review_id")
-    public String getReviewId() {
-        return reviewId;
+    @DynamoDbAttribute("created_at_user_id")
+    public String getCreatedAtUserId() {
+        return createdAtUserId;
     }
 
-    public void setReviewId(String reviewId) {
-        this.reviewId = reviewId;
+    public void setCreatedAtUserId(String createdAtUserId) {
+        this.createdAtUserId = createdAtUserId;
+    }
+    
+    // 리뷰 ID는 생성 시간과 사용자 ID에서 추출
+    public String getReviewId() {
+        if (createdAtUserId != null && createdAtUserId.contains("#")) {
+            return createdAtUserId.replace("#", "-");
+        }
+        return null;
     }
 
     @DynamoDbSecondaryPartitionKey(indexNames = "UserIdIndex")
@@ -117,12 +126,18 @@ public class ReviewEntity {
     }
 
     @DynamoDbAttribute("created_at")
+    @DynamoDbSecondarySortKey(indexNames = "UserIdIndex")
     public Instant getCreatedAt() {
         return createdAt;
     }
 
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+    
+    // GSI를 위한 ISO 문자열 형태의 created_at
+    public String getCreatedAtString() {
+        return createdAt != null ? createdAt.toString() : null;
     }
 
     @DynamoDbAttribute("updated_at")
@@ -132,5 +147,36 @@ public class ReviewEntity {
 
     public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
+    }
+    
+    // 엔티티 생성 시 복합키 자동 생성
+    public void generateCompositeKey() {
+        if (this.createdAt == null) {
+            this.createdAt = Instant.now();
+        }
+        if (this.userId != null) {
+            this.createdAtUserId = this.createdAt.toString() + "#" + this.userId;
+        }
+    }
+    
+    // 사용자 ID와 생성 시간에서 복합키 생성
+    public static String createCompositeKey(String userId, Instant createdAt) {
+        return createdAt.toString() + "#" + userId;
+    }
+    
+    // 복합키에서 사용자 ID 추출
+    public static String extractUserIdFromCompositeKey(String compositeKey) {
+        if (compositeKey != null && compositeKey.contains("#")) {
+            return compositeKey.split("#")[1];
+        }
+        return null;
+    }
+    
+    // 복합키에서 생성 시간 추출
+    public static Instant extractCreatedAtFromCompositeKey(String compositeKey) {
+        if (compositeKey != null && compositeKey.contains("#")) {
+            return Instant.parse(compositeKey.split("#")[0]);
+        }
+        return null;
     }
 }
