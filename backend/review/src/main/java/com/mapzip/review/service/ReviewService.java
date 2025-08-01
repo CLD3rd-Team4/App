@@ -6,6 +6,9 @@ import com.mapzip.review.repository.ReviewRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -32,6 +35,11 @@ public class ReviewService {
         this.s3Service = s3Service;
     }
     
+    @Caching(evict = {
+        @CacheEvict(value = "userReviews", allEntries = true),
+        @CacheEvict(value = "restaurantReviews", allEntries = true),
+        @CacheEvict(value = "reviewStats", allEntries = true)
+    })
     public ReviewCreateResult createReview(String userId, String restaurantId, String restaurantName, 
                                          String restaurantAddress, int rating, String content,
                                          List<byte[]> receiptImages, List<byte[]> reviewImages) {
@@ -97,11 +105,15 @@ public class ReviewService {
         }
     }
     
+    @Cacheable(value = "userReviews", key = "#userId + '_' + #page + '_' + #size")
     public List<ReviewEntity> getUserReviews(String userId, int page, int size) {
+        logger.info("Fetching user reviews from database for userId: {}, page: {}, size: {}", userId, page, size);
         return reviewRepository.findByUserId(userId);
     }
     
+    @Cacheable(value = "restaurantReviews", key = "#restaurantId + '_' + #page + '_' + #size")
     public List<ReviewEntity> getRestaurantReviews(String restaurantId, int page, int size) {
+        logger.info("Fetching restaurant reviews from database for restaurantId: {}, page: {}, size: {}", restaurantId, page, size);
         return reviewRepository.findByRestaurantId(restaurantId, page, size);
     }
     
@@ -109,6 +121,11 @@ public class ReviewService {
         return reviewRepository.findByRestaurantIdAndReviewId(restaurantId, reviewId);
     }
     
+    @Caching(evict = {
+        @CacheEvict(value = "userReviews", allEntries = true),
+        @CacheEvict(value = "restaurantReviews", allEntries = true),
+        @CacheEvict(value = "reviewStats", allEntries = true)
+    })
     public ReviewEntity updateReview(String restaurantId, String reviewId, String userId, 
                                    int rating, String content, List<String> imageUrls) {
         Optional<ReviewEntity> existingReview = reviewRepository.findByRestaurantIdAndReviewId(restaurantId, reviewId);
@@ -133,6 +150,11 @@ public class ReviewService {
         return reviewRepository.save(review);
     }
     
+    @Caching(evict = {
+        @CacheEvict(value = "userReviews", allEntries = true),
+        @CacheEvict(value = "restaurantReviews", allEntries = true),
+        @CacheEvict(value = "reviewStats", allEntries = true)
+    })
     public void deleteReview(String restaurantId, String reviewId, String userId) {
         Optional<ReviewEntity> existingReview = reviewRepository.findByRestaurantIdAndReviewId(restaurantId, reviewId);
         
@@ -150,15 +172,21 @@ public class ReviewService {
         reviewRepository.deleteByRestaurantIdAndReviewId(restaurantId, reviewId);
     }
     
+    @Cacheable(value = "reviewStats", key = "'count_' + #restaurantId")
     public long getRestaurantReviewCount(String restaurantId) {
+        logger.info("Fetching review count from database for restaurantId: {}", restaurantId);
         return reviewRepository.countByRestaurantId(restaurantId);
     }
     
+    @Cacheable(value = "reviewStats", key = "'avg_rating_' + #restaurantId")
     public double getRestaurantAverageRating(String restaurantId) {
+        logger.info("Fetching average rating from database for restaurantId: {}", restaurantId);
         return reviewRepository.getAverageRatingByRestaurantId(restaurantId);
     }
     
+    @Cacheable(value = "ocrResults", key = "T(java.util.Arrays).hashCode(#receiptImage) + '_' + #expectedRestaurantName")
     public OcrResultDto verifyReceipt(byte[] receiptImage, String expectedRestaurantName, String expectedAddress) {
+        logger.info("Processing OCR for restaurant: {}", expectedRestaurantName);
         return ocrService.processReceiptImage(receiptImage, expectedRestaurantName, expectedAddress);
     }
     

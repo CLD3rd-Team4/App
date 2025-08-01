@@ -19,6 +19,26 @@ spring:
       discovery:
         enabled: true
         
+  # Redis 캐싱 설정 (ElastiCache 연결)
+  data:
+    redis:
+      host: ${ELASTICACHE_ENDPOINT}
+      port: 6379
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
+          
+  # 캐시 설정
+  cache:
+    type: redis
+    redis:
+      time-to-live: 600000  # 기본 10분 TTL (밀리초)
+      cache-null-values: false
+      
   jackson:
     default-property-inclusion: NON_NULL
 
