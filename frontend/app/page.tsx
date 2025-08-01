@@ -13,21 +13,28 @@ export default function HomePage() {
   const { isAuthenticated, user } = useAuth()
   const { selectedSchedule } = useSchedule()
   const [isLoading, setIsLoading] = useState(true)
+  const [isClient, setIsClient] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
+    setIsClient(true)
+  }, [])
+
+  useEffect(() => {
+    if (!isClient) return
+
     // 로그인 상태 체크
     const isLoggedIn = localStorage.getItem("isLoggedIn")
     if (!isLoggedIn) {
-      router.push("/login")
+      router.push("/login/")
       return
     }
 
     // 앱 초기화
     setIsLoading(false)
-  }, [])
+  }, [isClient, router])
 
-  if (isLoading) {
+  if (!isClient || isLoading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">

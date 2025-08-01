@@ -1,5 +1,3 @@
-import { LocationData } from "@/types"
-
 // API 기본 설정
 const API_BASE_URL = "https://api.mapzip.shop";
 
@@ -175,26 +173,16 @@ export const scheduleApi = {
   },
 
   createSchedule: async (scheduleData: any) => {
-    try {
-      const response = await fetch('/api/schedule', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // 'Authorization': `Bearer ${getToken()}` // 필요시 주석 해제
-        },
-        body: JSON.stringify(scheduleData),
-      });
-
-      if (!response.ok) {
-        const errorBody = await response.text();
-        throw new Error(`HTTP error! status: ${response.status}, body: ${errorBody}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('스케줄 생성 오류:', error);
-      throw error;
-    }
+    // TODO: 실제 API 연동
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const newSchedule = {
+          id: Date.now().toString(),
+          ...scheduleData,
+        }
+        resolve(newSchedule)
+      }, 1000)
+    })
   },
 
   updateSchedule: async (scheduleData: any) => {
@@ -208,142 +196,6 @@ export const scheduleApi = {
     // TODO: 실제 API 연동
     return new Promise((resolve) => setTimeout(resolve, 500))
   },
-
-  // 초기 스케줄 생성 (gRPC 호출)
-  createInitialSchedule: async (locations: LocationData) => {
-    try {
-      const response = await fetch('/api/schedule/initial', { // Next.js rewrites를 통해 Envoy로 전달됨
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          departure: locations.departure,
-          destination: locations.destination,
-          waypoints: locations.waypoints,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorBody = await response.text();
-        throw new Error(`HTTP error! status: ${response.status}, body: ${errorBody}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('초기 스케줄 생성 오류:', error);
-      throw error;
-    }
-  },
-
-  // 🆕 새로 추가: 위치 정보와 함께 스케줄 생성
-  createScheduleWithRoute: async (scheduleData: {
-    title: string
-    locations: LocationData
-    departureTime: string
-    arrivalTime: string
-    hasMeal: boolean
-    companions: string[]
-    purpose: string
-    tags: string[]
-    mealRadius?: "5km" | "10km" | "20km"
-    targetMealTimes?: Array<{ type: "식사" | "간식", time: string }>
-    userRequirements?: string
-  }) => {
-    try {
-      // TODO: 실제 API 연동 시 이 부분을 실제 fetch로 교체
-      console.log('📍 위치 정보와 함께 스케줄 생성:', scheduleData)
-      
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          const newSchedule = {
-            id: Date.now().toString(),
-            ...scheduleData,
-            // 기존 형식과 호환을 위해 문자열도 함께 저장
-            departure: scheduleData.locations.departure?.name || "",
-            destination: scheduleData.locations.destination?.name || "",
-            waypoints: scheduleData.locations.waypoints.map(w => w?.name).filter(Boolean),
-          }
-          resolve(newSchedule)
-        }, 1000)
-      })
-
-      // 실제 API 연동 시 사용할 코드:
-      /*
-      const response = await fetch(`${API_BASE_URL}/schedule/create-with-route`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // 'Authorization': `Bearer ${getToken()}`
-        },
-        body: JSON.stringify(scheduleData)
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      return await response.json()
-      */
-    } catch (error) {
-      console.error('스케줄 생성 오류:', error)
-      throw error
-    }
-  },
-
-  // 🆕 새로 추가: 경로 및 소요시간 미리 계산
-  calculateRoute: async (locations: LocationData) => {
-    try {
-      // TODO: 실제 API 연동 시 이 부분을 실제 fetch로 교체
-      console.log('🗺️ 경로 계산 요청:', locations)
-      
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          // 더미 응답 데이터
-          resolve({
-            totalDistance: "120.5km",
-            totalDuration: "2시간 30분",
-            routes: [
-              {
-                section: "출발지 → 경유지1",
-                distance: "45.2km",
-                duration: "1시간 10분"
-              },
-              {
-                section: "경유지1 → 도착지",
-                distance: "75.3km",
-                duration: "1시간 20분"
-              }
-            ],
-            estimatedCost: {
-              fuel: "15,000원",
-              toll: "8,500원"
-            }
-          })
-        }, 800)
-      })
-
-      // 실제 API 연동 시 사용할 코드:
-      /*
-      const response = await fetch(`${API_BASE_URL}/route/calculate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ locations })
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      return await response.json()
-      */
-    } catch (error) {
-      console.error('경로 계산 오류:', error)
-      throw error
-    }
-  }
 }
 
 export const recommendationApi = {

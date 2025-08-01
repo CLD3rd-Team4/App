@@ -12,8 +12,14 @@ export default function ScheduleListScreen() {
   const router = useRouter()
   const { schedules, selectSchedule, loadSchedules, deleteSchedule } = useSchedule()
   const [isLoading, setIsLoading] = useState(true)
+  const [isClient, setIsClient] = useState(false)
 
   useEffect(() => {
+    setIsClient(true)
+  }, [])
+
+  useEffect(() => {
+    if (!isClient) return
     loadScheduleList()
 
     // 스케줄 변경 감지를 위한 이벤트 리스너 추가
@@ -26,7 +32,7 @@ export default function ScheduleListScreen() {
     return () => {
       window.removeEventListener("storage", handleStorageChange)
     }
-  }, [schedules.length])
+  }, [schedules.length, isClient])
 
   const loadScheduleList = async () => {
     try {
@@ -45,7 +51,7 @@ export default function ScheduleListScreen() {
   }
 
   const handleScheduleEdit = (schedule: Schedule) => {
-    router.push(`/schedule/edit/${schedule.id}`)
+    router.push(`/schedule/edit/${schedule.id}/`)
   }
 
   const handleScheduleDelete = async (scheduleId: string) => {
@@ -54,6 +60,17 @@ export default function ScheduleListScreen() {
     } catch (error) {
       console.error("스케줄 삭제 실패:", error)
     }
+  }
+
+  if (!isClient) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">로딩 중...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -73,7 +90,7 @@ export default function ScheduleListScreen() {
             <div className="text-center py-8">
               <p className="text-gray-600 mb-4">생성된 스케줄이 없습니다.</p>
               <Button
-                onClick={() => router.push("/schedule/create")}
+                onClick={() => router.push("/schedule/create/")}
                 className="bg-blue-500 hover:bg-blue-600 text-white"
               >
                 첫 스케줄 만들기
@@ -119,7 +136,7 @@ export default function ScheduleListScreen() {
       {/* + 버튼을 하단 네비게이션 위에 위치 */}
       <div className="floating-action-button">
         <Button
-          onClick={() => router.push("/schedule/create")}
+          onClick={() => router.push("/schedule/create/")}
           className="w-12 h-12 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center"
         >
           <Plus className="w-5 h-5" />

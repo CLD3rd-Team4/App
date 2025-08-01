@@ -1,13 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: 'http://localhost:8000/:path*', // Envoy 프록시로 요청 전달
-      },
-    ]
-  },
+  output: 'export',
+  trailingSlash: true,
+  skipTrailingSlashRedirect: true,
+  distDir: 'out',
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -15,8 +11,13 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    unoptimized: true,
+    unoptimized: true
   },
+  assetPrefix: process.env.NODE_ENV === 'production' ? '' : '',
+  basePath: '',
+  experimental: {
+    esmExternals: false
+  }
 }
 
 export default nextConfig

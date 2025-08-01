@@ -37,17 +37,6 @@
 
 	<dependencyManagement>
 		<dependencies>
-			<!-- Spring Cloud Config Client -->
-			<dependency>
-			    <groupId>org.springframework.cloud</groupId>
-			    <artifactId>spring-cloud-starter-config</artifactId>
-			</dependency>
-			
-			<!-- Bootstrap 컨텍스트 지원 -->
-			<dependency>
-			    <groupId>org.springframework.cloud</groupId>
-			    <artifactId>spring-cloud-starter-bootstrap</artifactId>
-			</dependency>
 			<dependency>
 				<groupId>io.grpc</groupId>
 				<artifactId>grpc-bom</artifactId>
@@ -75,6 +64,18 @@
 	</dependencyManagement>
 
 	<dependencies>
+		<!-- Spring Cloud Config Client - 실제 의존성 추가 -->
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-config</artifactId>
+		</dependency>
+		
+		<!-- Bootstrap 컨텍스트 지원 - 실제 의존성 추가 -->
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-bootstrap</artifactId>
+		</dependency>
+
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-jpa</artifactId>
@@ -221,7 +222,7 @@
 				</configuration>
 			</plugin>
 
-			<!-- Protobuf Maven Plugin - 수정된 버전 -->
+			<!-- 간소화된 Protobuf Maven Plugin -->
 			<plugin>
 				<groupId>io.github.ascopes</groupId>
 				<artifactId>protobuf-maven-plugin</artifactId>
@@ -231,14 +232,6 @@
 					<sourceDirectories>
 						<sourceDirectory>src/main/proto</sourceDirectory>
 					</sourceDirectories>
-					<!-- import 경로 추가 (google.api.annotations를 위해) -->
-					<importDirectories>
-						<importDirectory>${project.build.directory}/proto-dependencies</importDirectory>
-					</importDirectories>
-					<!-- Descriptor 파일 생성 설정 - 핵심 옵션들 추가 -->
-					<outputDescriptorFile>${project.build.directory}/descriptor.pb</outputDescriptorFile>
-					<includeImports>true</includeImports>
-					<includeSourceInfo>true</includeSourceInfo>
 					<binaryMavenPlugins>
 						<binaryMavenPlugin>
 							<groupId>io.grpc</groupId>

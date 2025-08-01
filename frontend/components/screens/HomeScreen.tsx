@@ -20,7 +20,7 @@ export default function HomeScreen() {
         </div>
 
         <Button
-          onClick={() => router.push("/schedule")}
+          onClick={() => router.push("/schedule/")}
           className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 rounded-lg"
         >
           스케줄 보기

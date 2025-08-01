@@ -44,7 +44,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-files
-          path: frontend/.next/
+          path: frontend/out/
           include-hidden-files: true
 
   cd:
@@ -55,7 +55,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: build-files
-          path: .next/
+          path: out/
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -66,7 +66,7 @@ jobs:
           
       - name: Upload to S3 using AWS CLI
         run: |
-          aws s3 sync ./.next s3://${{ secrets.S3_BUCKET_NAME }} --delete
+          aws s3 sync ./out s3://${{ secrets.S3_BUCKET_NAME }} --delete
           
       - name: Invalidate CloudFront cache
         run: |

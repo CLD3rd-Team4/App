@@ -12,9 +12,9 @@ export default function BottomNavigation({ currentTab }: BottomNavigationProps) 
 
   const tabs = [
     { id: "home", label: "Home", icon: Home, path: "/" },
-    { id: "schedule", label: "스케줄", icon: Calendar, path: "/schedule" },
-    { id: "search", label: "추천결과", icon: Search, path: "/recommendations" },
-    { id: "visited", label: "방문식당", icon: MapPin, path: "/visited" },
+    { id: "schedule", label: "스케줄", icon: Calendar, path: "/schedule/" },
+    { id: "search", label: "추천결과", icon: Search, path: "/recommendations/" },
+    { id: "visited", label: "방문식당", icon: MapPin, path: "/visited/" },
   ]
 
   return (
