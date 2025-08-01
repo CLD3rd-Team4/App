@@ -155,7 +155,7 @@ jobs:
               continue
             fi
 
-            sed -i -E "s|(image:.*:)[^[:space:]]+|\1$IMAGE_TAG|g" "$YAML_FILE"
+            sed -i -E "/containers:/,/(^[[:space:]]*[^-[:space:]]|^$)/ s|(image:[[:space:]]*[^[:space:]]+:)[^[:space:]]+|\1$IMAGE_TAG|" "$YAML_FILE"
 
             git add "$YAML_FILE"
             git commit -m "Update $SERVICE_NAME image tag to $IMAGE_TAG [ci skip]" || echo "No changes to commit for $SERVICE_NAME"
