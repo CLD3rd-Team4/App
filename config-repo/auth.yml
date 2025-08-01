@@ -9,12 +9,15 @@ spring:
     url: "{cipher}569c1c314da35d12120495ae86e04d2b7b668f18b0f3747e26687ed19d7c0e9875d5c81e113db1148c64521ab8a22f2980fbb0d71012ec823930dd12b880baf9fc937984ef4382cb3bcf38f734e33e589f01479e303eef6189492fe08cb3068436befc18b5090db00d0d0b62d3f847b6b3ab4dcb237b862399fce68501857c20"
     username: "{cipher}995dfde6ea6ecd8bbd5a0ee2910a702e005be23ab5892cf6d95f4fca0d1b11ab"
     password: "{cipher}9bd7424c08e3de951c830c47941f93c33ae97a808789991e1df5bd5d062d8774"
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
 
   security:
     oauth2:
