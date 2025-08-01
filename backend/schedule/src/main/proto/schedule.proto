@@ -62,6 +62,9 @@ service ScheduleService {
       delete: "/schedule/{schedule_id}"
     };
   }
+
+  // 스케줄 처리 시작 (선택 또는 업데이트 버튼)
+  rpc ProcessSchedule(ProcessScheduleRequest) returns (ProcessScheduleResponse);
 }
 
 // 2. 공통 메시지 타입 (Common Message Types)
@@ -144,7 +147,6 @@ message ScheduleError {
 
 enum ErrorType {
   TMAP_API_FAILED = 0;
-  KAKAO_API_FAILED = 1;
   INVALID_ROUTE = 2;        // 비현실적인 경로
   NO_RESTAURANTS_FOUND = 3;
   RECOMMENDATION_SERVICE_UNAVAILABLE = 4;
@@ -257,6 +259,26 @@ message RefreshScheduleResponse {
   string next_refresh_available_time = 5;
 }
 
+// 3.6.1 스케줄 처리 시작
+message ProcessScheduleRequest {
+  string schedule_id = 1;
+  string user_id = 2;
+  ProcessType type = 3;
+  double current_lat = 4;        // 업데이트 시 현재 GPS 위도
+  double current_lng = 5;        // 업데이트 시 현재 GPS 경도
+  string current_time = 6;       // 업데이트 시 현재 시간 (ISO 8601 형식)
+}
+
+message ProcessScheduleResponse {
+  string message = 1;
+  bool success = 2;
+}
+
+enum ProcessType {
+  SELECT = 0;     // 스케줄 선택 시 (기존 스케줄 정보 사용)
+  UPDATE = 1;     // 업데이트 버튼 시 (현재 위치 기준)
+}
+
 // 3.7 스케줄 수정
 message UpdateScheduleRequest {
   string schedule_id = 1;
@@ -302,23 +324,4 @@ message RestaurantRecommendationResponse {
   bool success = 2;
 }
 
-// 5. 내부 로직용 서비스 (Internal Logic Services)
 
-// Kakao API 호출을 담당하는 내부 서비스
-service KakaoApiService {
-  // Kakao Local API를 이용한 식당 검색 요청
-  rpc SearchRestaurants(KakaoSearchRequest) returns (KakaoSearchResponse);
-}
-
-message KakaoSearchRequest {
-  string slot_id = 1;
-  double lat = 2;
-  double lon = 3;
-  int32 radius = 4;
-  // 요청에 필요한 추가적인 필드가 있다면 여기에 정의
-}
-
-message KakaoSearchResponse {
-  bool success = 1;
-  string message = 2;
-}
