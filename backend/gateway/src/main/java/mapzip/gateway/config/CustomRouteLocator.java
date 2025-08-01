@@ -53,6 +53,7 @@ public class CustomRouteLocator {
                 // 데모 서비스 라우팅
                 .route("demo-service", r -> r.path("/demo/**")
                         .filters(f -> f
+                                .stripPrefix(1)
                                 .filter(xssProtectionFilter.apply(new XssProtectionFilter.Config()))
                                 .filter(jwtAuthenticationFilter.apply(new JwtAuthenticationFilter.Config())))
                         .uri("http://demo.demo:9090"))
