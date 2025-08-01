@@ -228,7 +228,7 @@ export const ocrApi = {
     formData.append('expectedRestaurantName', expectedRestaurantName);
     formData.append('expectedAddress', expectedAddress);
 
-    const response = await fetch(`${API_BASE_URL}/api/reviews/verify-receipt`, {
+    const response = await fetch(`${API_BASE_URL}/review/verify-receipt`, {
       method: 'POST',
       body: formData,
     });
@@ -263,7 +263,7 @@ export const reviewApi = {
       }
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/reviews`, {
+    const response = await fetch(`${API_BASE_URL}/review`, {
       method: 'POST',
       body: formData,
     });
@@ -273,10 +273,7 @@ export const reviewApi = {
     }
     return response.json();
   },
-<<<<<<< HEAD
 };
-=======
-}
 
 // 🆕 새로 추가: 위치 관련 유틸리티 함수들
 export const locationUtils = {
@@ -338,4 +335,3 @@ export const locationUtils = {
     }
   }
 }
->>>>>>> 03cbeb6797f43796c03b8e654d8f9e3941f7a5ca

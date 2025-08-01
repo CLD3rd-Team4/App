@@ -36,12 +36,19 @@ public class CustomRouteLocator {
                                 .filter(jwtAuthenticationFilter.apply(new JwtAuthenticationFilter.Config())))
                         .uri("http://recommend.service-recommend:50051"))
 
-                // 리뷰 서비스 라우팅
-                .route("review-service", r -> r.path("/review/**")
+                // 리뷰 서비스 라우팅 (이미지 포함 - HTTP)
+                .route("review-http", r -> r.path("/review", "/review/verify-receipt")
                         .filters(f -> f
                                 .filter(xssProtectionFilter.apply(new XssProtectionFilter.Config()))
                                 .filter(jwtAuthenticationFilter.apply(new JwtAuthenticationFilter.Config())))
                         .uri("http://review.service-review:8080"))
+
+                // 리뷰 서비스 라우팅 (이미지 없음 - gRPC)  
+                .route("review-grpc", r -> r.path("/review/**")
+                        .filters(f -> f
+                                .filter(xssProtectionFilter.apply(new XssProtectionFilter.Config()))
+                                .filter(jwtAuthenticationFilter.apply(new JwtAuthenticationFilter.Config())))
+                        .uri("http://review.service-review:50051"))
 
                 // 스케줄 서비스 라우팅
                 .route("schedule-service", r -> r.path("/schedule/**")
