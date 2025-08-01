@@ -27,6 +27,9 @@ spring:
             registration:
               client-id: "mapzip-client"
               client-secret: "{cipher}e12398d0e53e0cfc0b02b86dfc9eb5c2c118b8ebb82196be473afcf3645128d860659d41fcef7c7e67eb34658d12bd3e"
+              client-authentication-methods:
+                - client_secret_basic
+                - client_secret_post
               authorization-grant-types:
                 - authorization_code
                 - refresh_token
