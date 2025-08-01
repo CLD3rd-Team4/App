@@ -52,10 +52,13 @@ export interface VisitedRestaurant {
 }
 
 export interface OCRResult {
-  restaurantName: string
-  visitDate: string
-  isValid: boolean
-  extractedText: string
+  isValid: boolean          // 검증 통과 여부
+  restaurantName: string    // 추출된 식당명
+  address: string           // 추출된 주소
+  visitDate: string         // 방문 날짜 (yyyy-MM-dd)
+  totalAmount: string       // 총 결제 금액
+  rawText: string           // OCR 원본 텍스트 (extractedText → rawText 변경)
+  confidence: number        // 신뢰도 (0.0 - 1.0)
 }
 
 export interface Review {

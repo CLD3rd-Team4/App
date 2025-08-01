@@ -44,6 +44,7 @@ aws:
   s3:
     bucket-name: mapzip-${TERRAFORM_WORKSPACE:dev}-image
     region: ${AWS_REGION:ap-northeast-2}
+    presign-duration: ${S3_PRESIGN_DURATION:PT1H}  # Pre-signed URL 유효시간 (1시간)
     
   # MSK Kafka 설정 (main 클러스터) - 환경변수 필수
   kafka:
@@ -63,7 +64,10 @@ aws:
 google:
   cloud:
     vision:
+      # 서비스 계정 키 JSON 전체를 암호화하여 저장
       api-key: '{cipher}2a049919aabe8d3e61176c877535db0153d24bd98a3afa80145ac1d4d530326dff5b2c6fae218f616b9761a68aef53dd551d5efeb4c299e6fe5b4d4246f42a02'
+      # 이거아니면 또는 Kubernetes Secret을 통한 파일 경로 방식도 가능
+      # credentials-path: ${GOOGLE_APPLICATION_CREDENTIALS:/var/secrets/google/service-account-key.json}
 
 # Eureka 비활성화
 eureka:

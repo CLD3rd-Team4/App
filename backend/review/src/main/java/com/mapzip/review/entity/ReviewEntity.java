@@ -8,8 +8,8 @@ import java.util.List;
 @DynamoDbBean
 public class ReviewEntity {
 
-    private String restaurantId;  // 파티션 키
-    private String reviewId;      // 정렬 키
+    private String restaurantId;  
+    private String reviewId;      
     private String userId;
     private String restaurantName;
     private String restaurantAddress;

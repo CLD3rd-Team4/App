@@ -1,5 +1,7 @@
 package com.mapzip.review.service;
 
+import com.google.auth.oauth2.GoogleCredentials;
+import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.google.cloud.vision.v1.*;
 import com.google.protobuf.ByteString;
 import com.mapzip.review.dto.OcrResultDto;
@@ -8,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,7 +23,7 @@ public class OcrService {
     private static final Logger logger = LoggerFactory.getLogger(OcrService.class);
     
     @Value("${google.cloud.vision.api-key}")
-    private String apiKey;
+    private String serviceAccountKey;
     
     private static final Pattern DATE_PATTERN = 
         Pattern.compile("(\\d{4}[-/.]\\d{1,2}[-/.]\\d{1,2}|\\d{1,2}[-/.]\\d{1,2}[-/.]\\d{4})");
@@ -32,15 +35,27 @@ public class OcrService {
                                           String expectedRestaurantName, 
                                           String expectedAddress) {
         try {
-            // Google Cloud Vision API 클라이언트 생성 (API Key 기반)
-            ImageAnnotatorSettings.Builder settingsBuilder = ImageAnnotatorSettings.newBuilder();
+            // Google Cloud Vision API 클라이언트 생성 (Service Account 기반)
+            GoogleCredentials credentials;
             
-            // API Key 설정
-            if (apiKey != null && !apiKey.isEmpty()) {
-                settingsBuilder.setApiKey(apiKey);
+            if (serviceAccountKey != null && !serviceAccountKey.isEmpty()) {
+                // Config Server에서 받은 서비스 계정 키 JSON 문자열을 사용
+                try {
+                    credentials = ServiceAccountCredentials.fromStream(
+                        new ByteArrayInputStream(serviceAccountKey.getBytes())
+                    );
+                } catch (Exception e) {
+                    logger.warn("서비스 계정 키 파싱 실패, 기본 자격증명 사용: {}", e.getMessage());
+                    credentials = GoogleCredentials.getApplicationDefault();
+                }
+            } else {
+                // 환경변수 또는 기본 자격증명 사용
+                credentials = GoogleCredentials.getApplicationDefault();
             }
             
-            ImageAnnotatorSettings settings = settingsBuilder.build();
+            ImageAnnotatorSettings settings = ImageAnnotatorSettings.newBuilder()
+                    .setCredentialsProvider(() -> credentials)
+                    .build();
             
             try (ImageAnnotatorClient vision = ImageAnnotatorClient.create(settings)) {
                 // 이미지 준비

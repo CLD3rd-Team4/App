@@ -41,7 +41,7 @@ public class CustomRouteLocator {
                         .filters(f -> f
                                 .filter(xssProtectionFilter.apply(new XssProtectionFilter.Config()))
                                 .filter(jwtAuthenticationFilter.apply(new JwtAuthenticationFilter.Config())))
-                        .uri("http://review.service-review:50051"))
+                        .uri("http://review.service-review:8080"))
 
                 // 스케줄 서비스 라우팅
                 .route("schedule-service", r -> r.path("/schedule/**")
