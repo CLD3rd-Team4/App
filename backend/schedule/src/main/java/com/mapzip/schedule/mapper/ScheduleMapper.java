@@ -83,12 +83,10 @@ public class ScheduleMapper {
         List<com.mapzip.schedule.grpc.Waypoint> waypoints = gson.fromJson(schedule.getWaypoints(), WAYPOINT_LIST_TYPE);
         List<String> companions = gson.fromJson(schedule.getCompanions(), STRING_LIST_TYPE);
 
-        // DB를 다시 조회하는 대신, 영속성 컨텍스트에 있는 엔티티의 컬렉션을 직접 사용
         List<com.mapzip.schedule.grpc.MealTimeSlot> mealTimeSlots = schedule.getMealTimeSlots().stream()
                 .map(this::toGrpcMealTimeSlot)
                 .collect(Collectors.toList());
 
-        // 선택된 맛집 정보는 DB에서 읽어와야 할 수 있으므로, 이 부분은 유지하거나 필요에 따라 수정
         List<SelectedRestaurant> selectedRestaurantEntities = selectedRestaurantRepository.findBySchedule(schedule);
         List<com.mapzip.schedule.grpc.SelectedRestaurant> selectedRestaurants = selectedRestaurantEntities.stream()
                 .map(this::toGrpcSelectedRestaurant)
@@ -167,7 +165,7 @@ public class ScheduleMapper {
 
         WaypointsContainer waypointsContainer;
         if (waypointsList == null || waypointsList.isEmpty()) {
-            waypointsContainer = null; // 경유지가 없으면 null로 설정
+            waypointsContainer = null; 
         } else {
             List<TmapWaypoint> waypoints = waypointsList.stream()
                     .map(wp -> new TmapWaypoint(String.valueOf(wp.getLng()), String.valueOf(wp.getLat())))

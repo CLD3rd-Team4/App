@@ -67,3 +67,16 @@ export interface Review {
   images: string[]
   createdAt: string
 }
+
+export interface LocationInfo {
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+}
+
+export interface LocationData {
+  departure: LocationInfo | null;
+  destination: LocationInfo | null;
+  waypoints: (LocationInfo | null)[];
+}

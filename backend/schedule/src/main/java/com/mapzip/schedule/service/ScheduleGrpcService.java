@@ -6,21 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mapzip.schedule.dto.MealSlotData;
 import com.mapzip.schedule.entity.MealTimeSlot;
 import com.mapzip.schedule.entity.Schedule;
-import com.mapzip.schedule.grpc.CreateScheduleRequest;
-import com.mapzip.schedule.grpc.CreateScheduleResponse;
-import com.mapzip.schedule.grpc.GetScheduleDetailResponse;
-import com.mapzip.schedule.grpc.GetScheduleDetailRequest; // 추가
-import com.mapzip.schedule.grpc.GetScheduleListRequest;
-import com.mapzip.schedule.grpc.GetScheduleListResponse;
-import com.mapzip.schedule.grpc.ProcessScheduleRequest;
-import com.mapzip.schedule.grpc.ProcessScheduleResponse;
-import com.mapzip.schedule.grpc.ProcessType;
-import com.mapzip.schedule.grpc.RefreshScheduleRequest;
-import com.mapzip.schedule.grpc.RefreshScheduleResponse;
-import com.mapzip.schedule.grpc.ScheduleServiceGrpc;
-import com.mapzip.schedule.grpc.SelectRestaurantRequest;
-import com.mapzip.schedule.grpc.SelectRestaurantResponse;
-import com.mapzip.schedule.grpc.UpdateScheduleRequest;
+import com.mapzip.schedule.grpc.*;
 import com.mapzip.schedule.mapper.ScheduleMapper;
 import com.mapzip.schedule.repository.MealTimeSlotRepository;
 import com.mapzip.schedule.repository.ScheduleRepository;
@@ -98,29 +84,28 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
                     .orElseThrow(() -> Status.NOT_FOUND.withDescription("스케줄을 찾을 수 없습니다: " + request.getScheduleId()).asRuntimeException());
 
             Map<String, Object> jobData = new HashMap<>();
-            jobData.put("schedule_id", schedule.getId());
-            jobData.put("user_id", schedule.getUserId());
+            jobData.put("scheduleId", schedule.getId());
+            log.info("Redis 큐에 저장될 scheduleId: {}", schedule.getId());
+            jobData.put("userId", schedule.getUserId());
             jobData.put("type", request.getType().toString());
-            jobData.put("departure_time", schedule.getDepartureTime());
+            jobData.put("departureTime", schedule.getDepartureTime());
 
-            // JSON 문자열을 객체로 변환
             TypeReference<Map<String, Object>> mapTypeRef = new TypeReference<>() {};
             TypeReference<List<Map<String, Object>>> listMapTypeRef = new TypeReference<>() {};
             jobData.put("departure", objectMapper.readValue(schedule.getDepartureLocation(), mapTypeRef));
             jobData.put("destination", objectMapper.readValue(schedule.getDestinationLocation(), mapTypeRef));
             jobData.put("waypoints", objectMapper.readValue(schedule.getWaypoints(), listMapTypeRef));
 
-            // 엔티티 리스트를 DTO 리스트로 변환
             List<MealSlotData> mealSlotDataList = schedule.getMealTimeSlots().stream()
                     .map(slot -> new MealSlotData(slot.getId(), slot.getMealType(), slot.getScheduledTime(), slot.getRadius()))
                     .collect(Collectors.toList());
-            jobData.put("meal_slots", mealSlotDataList);
-            jobData.put("created_at", LocalDateTime.now().toString());
+            jobData.put("mealSlots", mealSlotDataList);
+            jobData.put("createdAt", LocalDateTime.now().toString());
 
             if (request.getType() == ProcessType.UPDATE) {
-                jobData.put("current_lat", request.getCurrentLat());
-                jobData.put("current_lng", request.getCurrentLng());
-                jobData.put("current_time", request.getCurrentTime());
+                jobData.put("currentLat", request.getCurrentLat());
+                jobData.put("currentLng", request.getCurrentLng());
+                jobData.put("currentTime", request.getCurrentTime());
             }
 
             String jobJson = objectMapper.writeValueAsString(jobData);

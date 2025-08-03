@@ -44,9 +44,11 @@ public class TmapCalculationProcessor {
         String jobJson = redisTemplate.opsForList().rightPop("tmap:calculations");
 
         if (jobJson != null) {
+            log.info("Redis 큐에서 가져온 jobJson: {}", jobJson);
             try {
                 Map<String, Object> jobData = objectMapper.readValue(jobJson, new TypeReference<>() {});
-                String scheduleId = (String) jobData.get("schedule_id");
+                String scheduleId = (String) jobData.get("scheduleId");
+                log.info("파싱된 scheduleId: {}", scheduleId);
                 Schedule schedule = scheduleRepository.findById(scheduleId)
                         .orElseThrow(() -> new IllegalArgumentException("스케줄을 찾을 수 없습니다: " + scheduleId));
 
@@ -57,7 +59,7 @@ public class TmapCalculationProcessor {
                     throw new RuntimeException("Tmap API로부터 응답을 받지 못했습니다.");
                 }
 
-                LocalDateTime departureDateTime = TimeUtil.parseKoreanAmPmToFuture((String)jobData.get("departure_time"), LocalDate.now());
+                LocalDateTime departureDateTime = TimeUtil.parseKoreanAmPmToFuture((String)jobData.get("departureTime"), LocalDate.now());
                 List<RouteService.CalculatedLocation> calculatedLocations = routeService.calculateMealLocations(
                         tmapResponse, schedule.getMealTimeSlots(), departureDateTime
                 );
@@ -80,15 +82,15 @@ public class TmapCalculationProcessor {
         if ("UPDATE".equals(jobData.get("type"))) {
             log.info("UPDATE 타입 요청: 현재 위치를 기준으로 경로를 계산합니다.");
             departureLocation = Location.newBuilder()
-                    .setLat(((Number) jobData.get("current_lat")).doubleValue())
-                    .setLng(((Number) jobData.get("current_lng")).doubleValue())
+                    .setLat(((Number) jobData.get("currentLat")).doubleValue())
+                    .setLng(((Number) jobData.get("currentLng")).doubleValue())
                     .setName("현재 위치")
                     .build();
-            departureDateTime = LocalDateTime.parse((String) jobData.get("current_time"));
+            departureDateTime = LocalDateTime.parse((String) jobData.get("currentTime"));
         } else {
             // 'SELECT' 타입인 경우, 기존 스케줄의 출발 정보를 사용
             departureLocation = convertToObject(jobData.get("departure"), Location.class);
-            departureDateTime = TimeUtil.parseKoreanAmPmToFuture((String) jobData.get("departure_time"), LocalDate.now());
+            departureDateTime = TimeUtil.parseKoreanAmPmToFuture((String) jobData.get("departureTime"), LocalDate.now());
         }
 
         Location destinationLocation = convertToObject(jobData.get("destination"), Location.class);

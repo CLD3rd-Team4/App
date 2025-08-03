@@ -165,35 +165,64 @@ export const authApi = {
 
 export const scheduleApi = {
   getSchedules: async () => {
-    // TODO: 실제 API 연동
-    return new Promise((resolve) => {
-      setTimeout(() => resolve(TEST_DATA.schedules), 500)
-    })
+    const response = await fetch(`${API_BASE_URL}/schedule`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch schedules');
+    }
+    const data = await response.json();
+    return data.schedules || [];
   },
 
   createSchedule: async (scheduleData: any) => {
-    // TODO: 실제 API 연동
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const newSchedule = {
-          id: Date.now().toString(),
-          ...scheduleData,
-        }
-        resolve(newSchedule)
-      }, 1000)
-    })
+    const response = await fetch(`${API_BASE_URL}/schedule`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(scheduleData),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to create schedule');
+    }
+    return response.json();
   },
 
   updateSchedule: async (scheduleData: any) => {
-    // TODO: 실제 API 연동
-    return new Promise((resolve) => {
-      setTimeout(() => resolve(scheduleData), 1000)
-    })
+    const response = await fetch(`${API_BASE_URL}/schedule/${scheduleData.id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(scheduleData),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to update schedule');
+    }
+    return response.json();
   },
 
   deleteSchedule: async (scheduleId: string) => {
-    // TODO: 실제 API 연동
-    return new Promise((resolve) => setTimeout(resolve, 500))
+    const response = await fetch(`${API_BASE_URL}/schedule/${scheduleId}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      throw new Error('Failed to delete schedule');
+    }
+    return response.json();
+  },
+
+  processSchedule: async (scheduleId: string, data: any) => {
+    const response = await fetch(`${API_BASE_URL}/schedule/${scheduleId}/process`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to process schedule');
+    }
+    return response.json();
   },
 }
 

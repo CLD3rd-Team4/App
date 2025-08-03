@@ -45,10 +45,21 @@ export default function ScheduleListScreen() {
     }
   }
 
-  const handleScheduleSelect = (schedule: Schedule) => {
-    selectSchedule(schedule)
-    router.push("/")
-  }
+  const [isProcessing, setIsProcessing] = useState<string | null>(null);
+
+  const handleScheduleSelect = async (schedule: Schedule) => {
+    setIsProcessing(schedule.id);
+    try {
+      await scheduleApi.processSchedule(schedule.id, { type: 'SELECT' });
+      selectSchedule(schedule);
+      router.push('/');
+    } catch (error) { 
+      console.error("스케줄 처리 실패:", error);
+      alert('스케줄 처리에 실패했습니다.');
+    } finally {
+      setIsProcessing(null);
+    }
+  };
 
   const handleScheduleEdit = (schedule: Schedule) => {
     router.push(`/schedule/edit/${schedule.id}/`)
@@ -122,8 +133,9 @@ export default function ScheduleListScreen() {
                       onClick={() => handleScheduleSelect(schedule)}
                       size="sm"
                       className="flex-1 bg-blue-500 hover:bg-blue-600 text-white"
+                      disabled={isProcessing === schedule.id}
                     >
-                      선택
+                      {isProcessing === schedule.id ? '처리 중...' : '선택'}
                     </Button>
                   </div>
                 </div>

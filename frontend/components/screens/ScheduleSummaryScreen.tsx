@@ -1,27 +1,10 @@
-"use client"
-
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import { useSchedule } from "@/hooks/useSchedule"
 import BottomNavigation from "@/components/common/BottomNavigation"
 import { RefreshCw, Star } from "lucide-react"
-
-// 목데이터 - 백엔드 연동 전 테스트용
-const MOCK_SCHEDULE = {
-  id: "mock-1",
-  title: "테스트 스케줄",
-  departure: "서울역",
-  destination: "부산역",
-  waypoints: ["대전역"],
-  departureTime: "09:00",
-  arrivalTime: "20:00",
-  targetMealTimes: [
-    { type: "식사" as const, time: "12:00" },
-    { type: "식사" as const, time: "18:00" },
-    { type: "간식" as const, time: "15:00" },
-  ],
-}
+import { scheduleApi } from "@/services/api"
 
 // 팝업 컴포넌트
 function LoadingPopup() {
@@ -61,31 +44,21 @@ export default function ScheduleSummaryScreen() {
   const router = useRouter()
   const { selectedSchedule } = useSchedule()
   const [isLoading, setIsLoading] = useState(true)
+  const [isUpdating, setIsUpdating] = useState(false)
   const [showRecommendationPopup, setShowRecommendationPopup] = useState(false)
 
-  // 목데이터 사용 - 백엔드 연동 시 주석 처리하고 아래 주석 해제
-  const currentSchedule = MOCK_SCHEDULE
-
-  // 백엔드 연동 시 주석 해제
-  // const currentSchedule = selectedSchedule
-  // if (!selectedSchedule) {
-  //   return null
-  // }
+  const currentSchedule = selectedSchedule
 
   useEffect(() => {
-    // 스케줄 요약 로딩 시뮬레이션
+    if (!currentSchedule) {
+      // 스케줄 정보가 없으면 목록 페이지로 리디렉션
+      router.replace("/schedule");
+      return;
+    }
+
     const loadScheduleSummary = async () => {
       setIsLoading(true)
-
-      // TODO: 백엔드 연동 - 스케줄 요약 API 호출
-      // try {
-      //   const summaryData = await scheduleApi.getSummary(selectedSchedule.id)
-      //   // 요약 데이터 처리
-      // } catch (error) {
-      //   console.error("스케줄 요약 로드 실패:", error)
-      // }
-
-      // 목데이터 - 2초 로딩 시뮬레이션
+      // 2초 후 로딩 완료 (시뮬레이션)
       await new Promise((resolve) => setTimeout(resolve, 2000))
       setIsLoading(false)
 
@@ -94,32 +67,45 @@ export default function ScheduleSummaryScreen() {
     }
 
     loadScheduleSummary()
-  }, [])
+  }, [currentSchedule, router])
 
   const startRecommendationPolling = () => {
-    // TODO: 백엔드 연동 - 추천 결과 폴링
-    // const pollRecommendations = async () => {
-    //   try {
-    //     const response = await recommendationApi.checkStatus(selectedSchedule.id)
-    //     if (response.status === 'ready') {
-    //       setShowRecommendationPopup(true)
-    //       return
-    //     }
-    //     // 5초마다 폴링
-    //     setTimeout(pollRecommendations, 5000)
-    //   } catch (error) {
-    //     console.error("추천 상태 확인 실패:", error)
-    //     // 에러 발생 시 재시도
-    //     setTimeout(pollRecommendations, 10000)
-    //   }
-    // }
-    // pollRecommendations()
-
-    // 목데이터 - 3초 후 추천 결과 준비 완료 팝업
+    // 3초 후 추천 결과 준비 완료 팝업 (시뮬레이션)
     setTimeout(() => {
       setShowRecommendationPopup(true)
     }, 3000)
   }
+
+  const handleUpdate = () => {
+    if (!currentSchedule) return;
+
+    setIsUpdating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        try {
+          await scheduleApi.processSchedule(currentSchedule.id, {
+            type: 'UPDATE',
+            current_lat: latitude,
+            current_lng: longitude,
+            current_time: new Date().toISOString(),
+          });
+          // 성공 시, 스케줄 요약 다시 로드 또는 상태 업데이트
+          alert('스케줄이 업데이트되었습니다.');
+        } catch (error) {
+          console.error("스케줄 업데이트 실패:", error);
+          alert('스케줄 업데이트에 실패했습니다.');
+        } finally {
+          setIsUpdating(false);
+        }
+      },
+      (error) => {
+        console.error("GPS 위치 정보 가져오기 실패:", error);
+        alert('GPS 위치 정보를 가져올 수 없습니다.');
+        setIsUpdating(false);
+      }
+    );
+  };
 
   const handleRecommendationConfirm = () => {
     setShowRecommendationPopup(false)
@@ -135,11 +121,11 @@ export default function ScheduleSummaryScreen() {
     return `${period} ${displayHour}:${minute}`
   }
 
-  // 시간순으로 정렬된 일정 생성
   const createTimelineItems = () => {
+    if (!currentSchedule) return [];
+
     const items = []
 
-    // 출발지
     if (currentSchedule.departureTime && currentSchedule.departure) {
       items.push({
         type: "departure",
@@ -150,12 +136,11 @@ export default function ScheduleSummaryScreen() {
       })
     }
 
-    // 경유지들
-    currentSchedule.waypoints?.forEach((waypoint, index) => {
+    currentSchedule.waypoints?.forEach((waypoint) => {
       if (waypoint) {
         items.push({
           type: "waypoint",
-          time: "11:30", // TODO: 실제 시간 계산
+          time: "", // 실제 시간 계산 필요
           title: waypoint,
           icon: "경유",
           color: "blue",
@@ -163,48 +148,20 @@ export default function ScheduleSummaryScreen() {
       }
     })
 
-    // 목데이터 - 로컬스토리지에서 선택된 식당들 가져오기
-    try {
-      const savedSchedule = localStorage.getItem("selectedSchedule")
-      if (savedSchedule) {
-        const parsedSchedule = JSON.parse(savedSchedule)
-        if (parsedSchedule.selectedRestaurants) {
-          parsedSchedule.selectedRestaurants.forEach((item: any) => {
-            // 섹션 ID를 기반으로 시간 찾기
-            const sectionType = item.sectionId.includes("meal") ? "식사" : "간식"
-            const sectionIndex = Number.parseInt(item.sectionId.split("-")[1])
+    currentSchedule.selectedRestaurants?.forEach((item) => {
+        const mealTime = currentSchedule.targetMealTimes?.find(mt => mt.type === (item.sectionId.includes('meal') ? '식사' : '간식'));
+        items.push({
+            type: "restaurant",
+            time: mealTime?.time || "",
+            title: item.restaurant.name || "선택된 식당",
+            description: item.restaurant.description || "",
+            rating: item.restaurant.rating || 0,
+            icon: item.sectionId.includes("meal") ? "식사" : "간식",
+            color: "orange",
+            restaurant: item.restaurant,
+        });
+    });
 
-            let targetTime = "12:00" // 기본값
-            let currentIndex = 1
-
-            for (const mealTime of currentSchedule.targetMealTimes || []) {
-              if (mealTime.type === sectionType) {
-                if (currentIndex === sectionIndex) {
-                  targetTime = mealTime.time
-                  break
-                }
-                currentIndex++
-              }
-            }
-
-            items.push({
-              type: "restaurant",
-              time: targetTime,
-              title: item.restaurant.name || "선택된 식당",
-              description: item.restaurant.description || "",
-              rating: item.restaurant.rating || 0,
-              icon: item.sectionId.includes("meal") ? "식사" : "간식",
-              color: "orange",
-              restaurant: item.restaurant,
-            })
-          })
-        }
-      }
-    } catch (error) {
-      console.error("로컬스토리지 파싱 에러:", error)
-    }
-
-    // 도착지
     if (currentSchedule.arrivalTime && currentSchedule.destination) {
       items.push({
         type: "destination",
@@ -215,9 +172,8 @@ export default function ScheduleSummaryScreen() {
       })
     }
 
-    // 시간순으로 정렬 (time이 undefined인 경우 처리)
     return items
-      .filter((item) => item.time) // time이 있는 항목만 필터링
+      .filter((item) => item.time)
       .sort((a, b) => {
         if (!a.time || !b.time) return 0
         return a.time.localeCompare(b.time)
@@ -226,29 +182,8 @@ export default function ScheduleSummaryScreen() {
 
   const timelineItems = createTimelineItems()
 
-  // 로딩 중일 때
   if (isLoading) {
-    return (
-      <>
-        <div className="min-h-screen bg-gray-100 flex flex-col">
-          <div className="bg-white p-4 shadow-sm">
-            <h1 className="text-lg font-medium">나의 스케줄 요약</h1>
-          </div>
-          <div className="flex-1 content-with-bottom-nav">
-            <div className="p-4">
-              <div className="bg-white rounded-lg p-4 shadow-sm">
-                <div className="text-center py-8">
-                  <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                  <p className="text-gray-600">스케줄을 불러오는 중...</p>
-                </div>
-              </div>
-            </div>
-          </div>
-          <BottomNavigation currentTab="home" />
-        </div>
-        <LoadingPopup />
-      </>
-    )
+    return <LoadingPopup />;
   }
 
   return (
@@ -258,13 +193,14 @@ export default function ScheduleSummaryScreen() {
           <div className="flex items-center justify-between">
             <h1 className="text-lg font-medium">나의 스케줄 요약</h1>
             <Button
-              onClick={() => router.push("/recommendations/")}
+              onClick={handleUpdate}
               variant="outline"
               size="sm"
               className="flex items-center gap-2 border-blue-200 text-blue-600 hover:bg-blue-50"
+              disabled={isUpdating}
             >
-              <RefreshCw className="w-4 h-4" />
-              추천 업데이트
+              <RefreshCw className={`w-4 h-4 ${isUpdating ? 'animate-spin' : ''}`} />
+              {isUpdating ? '업데이트 중...' : '추천 업데이트'}
             </Button>
           </div>
         </div>
@@ -336,7 +272,6 @@ export default function ScheduleSummaryScreen() {
         <BottomNavigation currentTab="home" />
       </div>
 
-      {/* 추천 결과 준비 완료 팝업 */}
       {showRecommendationPopup && <RecommendationReadyPopup onConfirm={handleRecommendationConfirm} />}
     </>
   )
