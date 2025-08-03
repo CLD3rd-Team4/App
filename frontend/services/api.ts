@@ -164,8 +164,8 @@ export const authApi = {
 }
 
 export const scheduleApi = {
-  getSchedules: async () => {
-    const response = await fetch(`${API_BASE_URL}/schedule`);
+  getSchedules: async (userId: string) => {
+    const response = await fetch(`${API_BASE_URL}/schedule?userId=${userId}`);
     if (!response.ok) {
       throw new Error('Failed to fetch schedules');
     }
@@ -201,9 +201,12 @@ export const scheduleApi = {
     return response.json();
   },
 
-  deleteSchedule: async (scheduleId: string) => {
+  deleteSchedule: async (scheduleId: string, userId: string) => { // userId 추가
     const response = await fetch(`${API_BASE_URL}/schedule/${scheduleId}`, {
       method: 'DELETE',
+      headers: {
+        'X-User-ID': userId, // 헤더에 userId 추가
+      },
     });
     if (!response.ok) {
       throw new Error('Failed to delete schedule');

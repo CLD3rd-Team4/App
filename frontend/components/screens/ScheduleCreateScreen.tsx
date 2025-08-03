@@ -29,20 +29,24 @@ export default function ScheduleCreateScreen() {
   const handleOptionalComplete = async (optionalData: any) => {
     try {
       const scheduleData = {
+        userId: "test-user-123",
         title: requiredData.scheduleName,
-        departure: locationData.departure,
-        destination: locationData.destination,
-        waypoints: locationData.waypoints,
         departureTime: requiredData.departureTime,
-        arrivalTime: requiredData.arrivalTime,
-        hasMeal: requiredData.targetMealTimes.length > 0,
-        companions: optionalData.companions,
+        arrivalTime: "", // 항상 빈 문자열로 전송
+                mealSlots: requiredData.targetMealTimes.map((mt: any) => ({
+          mealType: mt.type === '식사' ? 'MEAL' : 'SNACK',
+          scheduledTime: mt.time,
+          radius: (parseInt(mt.radius, 10) || 1) * 1000, // 각 식사 시간의 반경 사용
+        })),
+        departure: locationData.departure,
+        waypoints: locationData.waypoints,
+        destination: locationData.destination,
+        userNote: optionalData.userRequirements,
         purpose: optionalData.travelPurpose,
-        tags: [],
-        userRequirements: optionalData.userRequirements,
-        mealRadius: requiredData.mealRadius,
-        targetMealTimes: requiredData.targetMealTimes,
+        companions: optionalData.companions,
       }
+
+      console.log("Creating schedule with data:", JSON.stringify(scheduleData, null, 2));
 
       await createSchedule(scheduleData)
       router.push("/schedule")

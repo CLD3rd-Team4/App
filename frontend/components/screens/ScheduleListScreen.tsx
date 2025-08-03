@@ -19,25 +19,15 @@ export default function ScheduleListScreen() {
   }, [])
 
   useEffect(() => {
-    if (!isClient) return
-    loadScheduleList()
-
-    // 스케줄 변경 감지를 위한 이벤트 리스너 추가
-    const handleStorageChange = () => {
+    if (isClient) {
       loadScheduleList()
     }
-
-    window.addEventListener("storage", handleStorageChange)
-
-    return () => {
-      window.removeEventListener("storage", handleStorageChange)
-    }
-  }, [schedules.length, isClient])
+  }, [isClient])
 
   const loadScheduleList = async () => {
     try {
       setIsLoading(true)
-      await loadSchedules()
+      await loadSchedules("test-user-123")
     } catch (error) {
       console.error("스케줄 목록 로드 실패:", error)
     } finally {

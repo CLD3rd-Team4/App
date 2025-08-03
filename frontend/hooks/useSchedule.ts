@@ -37,10 +37,10 @@ export function useSchedule() {
     setSchedules(scheduleList)
   }
 
-  const loadSchedules = async () => {
+  const loadSchedules = async (userId: string) => {
     try {
       // TODO: REST API 연동 - 스케줄 목록 가져오기
-      const data = await scheduleApi.getSchedules()
+      const data = await scheduleApi.getSchedules(userId)
       saveSchedulesToStorage(data)
     } catch (error) {
       console.error("스케줄 목록 로드 실패:", error)
