@@ -6,8 +6,8 @@ import "./globals.css"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "map.zip - 스마트한 여행 스케줄 관리",
-  description: "스마트한 여행 스케줄 관리 앱",
+  title: "map.zip - 스케줄 기반 맛집 추천 서비스",
+  description: "스케줄 기반 맛집 추천 서비스",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
