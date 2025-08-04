@@ -26,13 +26,17 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,env,configprops,refresh
+        include: health,info,env,configprops,refresh,encrypt,decrypt
   endpoint:
     health:
       show-details: always
       probes:
         enabled: true
     refresh:
+      enabled: true
+    encrypt:
+      enabled: true
+    decrypt:
       enabled: true
   health:
     livenessstate:
