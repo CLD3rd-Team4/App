@@ -8,7 +8,6 @@ export function useSchedule() {
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isProcessing, setIsProcessing] = useState(false); // 처리 중 상태 추가
 
   const initFromLocalStorage = useCallback(() => {
     setIsLoading(true);
@@ -21,16 +20,11 @@ export function useSchedule() {
       if (savedSchedules) {
         setSchedules(JSON.parse(savedSchedules));
       }
-       const processingState = localStorage.getItem("isProcessing");
-      if (processingState) {
-        setIsProcessing(JSON.parse(processingState));
-      }
     } catch (error) {
       console.error("로컬 스토리지 파싱/접근 실패:", error);
       // 문제가 있는 데이터는 지웁니다.
       localStorage.removeItem("selectedSchedule");
       localStorage.removeItem("schedules");
-      localStorage.removeItem("isProcessing");
     } finally {
       setIsLoading(false);
     }
@@ -98,8 +92,6 @@ export function useSchedule() {
       if (selectedSchedule?.id === scheduleId) {
         setSelectedSchedule(null)
         localStorage.removeItem("selectedSchedule")
-        setIsProcessing(false);
-        localStorage.removeItem("isProcessing");
       }
     } catch (error) {
       console.error("스케줄 삭제 실패:", error)
@@ -125,11 +117,6 @@ export function useSchedule() {
     }
   }
   
-  const setProcessingStatus = (status: boolean) => {
-    setIsProcessing(status);
-    localStorage.setItem("isProcessing", JSON.stringify(status));
-  }
-
   const updateSelectedRestaurant = (restaurant: Restaurant) => {
     if (selectedSchedule) {
       const updatedSchedule = {
@@ -145,13 +132,11 @@ export function useSchedule() {
     schedules,
     selectedSchedule,
     isLoading,
-    isProcessing, // isProcessing 반환
     loadSchedules,
     createSchedule,
     updateSchedule,
     deleteSchedule,
     selectSchedule,
-    setProcessingStatus, // 처리 상태 설정 함수 반환
     updateSelectedRestaurant,
   }
 }

@@ -11,14 +11,13 @@ import type { Schedule } from "@/types"
 
 export default function ScheduleListScreen() {
   const router = useRouter()
-  const { schedules, selectSchedule, loadSchedules, deleteSchedule, setProcessingStatus } = useSchedule()
+  const { schedules, selectSchedule, loadSchedules, deleteSchedule } = useSchedule()
   const [isLoading, setIsLoading] = useState(true)
   const [isClient, setIsClient] = useState(false)
+  const [isProcessing, setIsProcessing] = useState<string | null>(null);
 
   useEffect(() => {
     setIsClient(true)
-    // 페이지에 들어올 때 처리 상태를 초기화합니다.
-    setProcessingStatus(false);
   }, [])
 
   useEffect(() => {
@@ -38,30 +37,35 @@ export default function ScheduleListScreen() {
     }
   }
 
-  const [isProcessing, setIsProcessing] = useState<string | null>(null);
-
   const handleScheduleSelect = async (schedule: Schedule) => {
     if (!schedule || !schedule.id) {
       console.error("Invalid schedule or schedule ID");
       alert("유효하지 않은 스케줄입니다.");
       return;
     }
+    
     setIsProcessing(schedule.id);
+
     try {
-      // 1. 백엔드에 스케줄 처리를 요청합니다.
-      await scheduleApi.processSchedule(schedule.id, { type: 'SELECT' });
-      
-      // 2. 전역 상태를 '처리 중'으로 변경하고, 선택된 스케줄의 '초안'을 저장합니다.
-      selectSchedule(schedule);
-      setProcessingStatus(true);
+      const response = await scheduleApi.processSchedule(schedule.id, { type: 'SELECT' });
 
-      // 3. 홈 화면으로 이동합니다. (라우팅)
-      // 실제 폴링 및 상태 업데이트는 홈 화면(ScheduleSummaryScreen)에서 처리됩니다.
-      router.push('/');
+      if (response && response.schedule) {
+        // 백엔드에서 받은 상세 스케줄 정보에 프론트엔드에서 사용하는 id를 추가합니다.
+        const updatedSchedule = {
+          ...response.schedule,
+          id: schedule.id, 
+        };
+        
+        selectSchedule(updatedSchedule as Schedule);
+        router.push('/');
+      } else {
+        throw new Error("서버에서 스케줄 정보를 받아오지 못했습니다.");
+      }
 
-    } catch (error) { 
+    } catch (error) {
       console.error("스케줄 처리 실패:", error);
       alert('스케줄 처리에 실패했습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
       setIsProcessing(null);
     }
   };
@@ -82,7 +86,6 @@ export default function ScheduleListScreen() {
       return;
     }
     try {
-      // TODO: 실제 사용자 ID로 교체해야 합니다.
       await deleteSchedule(scheduleId, "test-user-123")
     } catch (error) {
       console.error("스케줄 삭제 실패:", error)
@@ -131,7 +134,7 @@ export default function ScheduleListScreen() {
                   <div className="flex gap-2">
                     <Button
                       onClick={(e) => {
-                        e.stopPropagation(); // 이벤트 버블링 방지
+                        e.stopPropagation();
                         if (!schedule.id) {
                           console.error("Delete Error: Invalid schedule ID", schedule);
                           alert("유효하지 않은 스케줄 ID입니다.");
@@ -147,7 +150,7 @@ export default function ScheduleListScreen() {
                     </Button>
                     <Button
                       onClick={(e) => {
-                        e.stopPropagation(); // 이벤트 버블링 방지
+                        e.stopPropagation();
                         if (!schedule.id) {
                           console.error("Edit Error: Invalid schedule ID", schedule);
                           alert("유효하지 않은 스케줄 ID입니다.");
@@ -162,9 +165,9 @@ export default function ScheduleListScreen() {
                       수정
                     </Button>
                     <Button
-                      onClick={(e) => {
-                        e.stopPropagation(); // 이벤트 버블링 방지
-                        handleScheduleSelect(schedule)
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        await handleScheduleSelect(schedule)
                       }}
                       size="sm"
                       className="flex-1 bg-blue-500 hover:bg-blue-600 text-white"
@@ -180,7 +183,6 @@ export default function ScheduleListScreen() {
         </div>
       </div>
 
-      {/* + 버튼을 하단 네비게이션 위에 위치 */}
       <div className="floating-action-button">
         <Button
           onClick={() => router.push("/schedule/create/")}

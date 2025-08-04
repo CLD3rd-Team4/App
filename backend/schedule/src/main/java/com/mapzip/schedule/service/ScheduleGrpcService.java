@@ -1,6 +1,5 @@
 package com.mapzip.schedule.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mapzip.schedule.dto.MealSlotData;
@@ -22,7 +21,6 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.devh.boot.grpc.server.service.GrpcService;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
@@ -35,7 +33,7 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
     private final SelectedRestaurantRepository selectedRestaurantRepository;
     private final ScheduleMapper scheduleMapper;
     private final ObjectMapper objectMapper;
-    private final RedisTemplate<String, String> redisTemplate;
+    private final TmapCalculationProcessor tmapCalculationProcessor;
 
     @Override
     @Transactional
@@ -77,15 +75,16 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public void processSchedule(ProcessScheduleRequest request, StreamObserver<ProcessScheduleResponse> responseObserver) {
         try {
             Schedule schedule = scheduleRepository.findById(request.getScheduleId())
                     .orElseThrow(() -> Status.NOT_FOUND.withDescription("스케줄을 찾을 수 없습니다: " + request.getScheduleId()).asRuntimeException());
 
+            schedule.setCalculatedArrivalTime(null);
+
             Map<String, Object> jobData = new HashMap<>();
             jobData.put("scheduleId", schedule.getId());
-            log.info("Redis 큐에 저장될 scheduleId: {}", schedule.getId());
             jobData.put("userId", schedule.getUserId());
             jobData.put("type", request.getType().toString());
             jobData.put("departureTime", schedule.getDepartureTime());
@@ -108,13 +107,14 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
                 jobData.put("currentTime", request.getCurrentTime());
             }
 
-            String jobJson = objectMapper.writeValueAsString(jobData);
-            redisTemplate.opsForList().leftPush("tmap:calculations", jobJson);
+            Schedule updatedSchedule = tmapCalculationProcessor.calculateAndSave(jobData);
+
+            GetScheduleDetailResponse.ScheduleDetail scheduleDetail = scheduleMapper.toDetail(updatedSchedule);
 
             ProcessScheduleResponse response = ProcessScheduleResponse.newBuilder()
-                    .setSuccess(true)
-                    .setMessage("스케줄 처리 요청이 접수되었습니다.")
+                    .setSchedule(scheduleDetail)
                     .build();
+
             responseObserver.onNext(response);
             responseObserver.onCompleted();
         } catch (Exception e) {

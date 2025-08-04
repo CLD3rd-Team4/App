@@ -1,25 +1,12 @@
-import { useState, useEffect } from "react"
+"use client"
+
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import { useSchedule } from "@/hooks/useSchedule"
 import BottomNavigation from "@/components/common/BottomNavigation"
 import { RefreshCw, Star } from "lucide-react"
 import { scheduleApi } from "@/services/api"
-
-// 팝업 컴포넌트
-function LoadingPopup() {
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-sm mx-4">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <h3 className="text-lg font-medium mb-2">스케줄 요약 중...</h3>
-          <p className="text-gray-600">잠시만 기다려주세요.</p>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 function RecommendationReadyPopup({ onConfirm }: { onConfirm: () => void }) {
   return (
@@ -42,51 +29,23 @@ function RecommendationReadyPopup({ onConfirm }: { onConfirm: () => void }) {
 
 export default function ScheduleSummaryScreen() {
   const router = useRouter()
-  const { selectedSchedule, selectSchedule, isProcessing, setProcessingStatus } = useSchedule()
+  const { selectedSchedule } = useSchedule()
   const [isUpdating, setIsUpdating] = useState(false)
   const [showRecommendationPopup, setShowRecommendationPopup] = useState(false)
 
-  useEffect(() => {
-    // isProcessing 상태일 때 폴링을 시작합니다.
-    if (isProcessing && selectedSchedule?.id) {
-      const pollSchedule = async (retries = 10, delay = 2000) => {
-        for (let i = 0; i < retries; i++) {
-          try {
-            const data = await scheduleApi.getScheduleDetail(selectedSchedule.id!, "test-user-123");
-            // 계산된 도착 시간이 있는지 확인
-            if (data.schedule && data.schedule.calculatedArrivalTime) {
-              selectSchedule(data.schedule); // 최신 정보로 상태 업데이트
-              setProcessingStatus(false); // 처리 완료 상태로 변경
-              return; // 폴링 중단
-            }
-          } catch (error) {
-            console.error("폴링 중 에러 발생:", error);
-          }
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-        // 타임아웃 처리
-        alert("스케줄 처리 시간을 초과했습니다. 다시 시도해주세요.");
-        setProcessingStatus(false);
-        router.push("/schedule"); // 실패 시 목록으로 이동
-      };
-
-      pollSchedule();
-    }
-  }, [isProcessing, selectedSchedule?.id, selectSchedule, setProcessingStatus, router]);
-
   const handleUpdate = () => {
-    if (!selectedSchedule) return;
+    if (!selectedSchedule || !selectedSchedule.id) return;
 
     setIsUpdating(true);
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
         try {
-          await scheduleApi.processSchedule(selectedSchedule.id, {
+          await scheduleApi.processSchedule(selectedSchedule.id!, {
             type: 'UPDATE',
-            current_lat: latitude,
-            current_lng: longitude,
-            current_time: new Date().toISOString(),
+            currentLat: latitude,
+            currentLng: longitude,
+            currentTime: new Date().toISOString(),
           });
           alert('스케줄이 업데이트되었습니다.');
         } catch (error) {
@@ -111,23 +70,13 @@ export default function ScheduleSummaryScreen() {
 
   const formatTime = (time: string) => {
     if (!time || typeof time !== 'string') return "시간 미정";
-
-    // "오전/오후 HH:mm" 형식의 입력을 먼저 처리
     const match = time.match(/(오전|오후)\s*(\d{1,2}):(\d{2})/);
-    if (match) {
-      // 이미 원하는 형식이므로 그대로 반환
-      return time;
-    }
-
-    // "HH:mm" 또는 "HH:mm:ss" 형식 처리
+    if (match) return time;
     const parts = time.split(":");
     if (parts.length < 2) return "시간 미정";
-
     const h = parseInt(parts[0], 10);
     const m = parts[1];
-
     if (isNaN(h)) return "시간 미정";
-
     const period = h >= 12 ? "오후" : "오전";
     const displayHour = h === 0 ? 12 : h > 12 ? h - 12 : h;
     return `${period} ${displayHour}:${m}`;
@@ -152,7 +101,7 @@ export default function ScheduleSummaryScreen() {
       if (waypoint) {
         items.push({
           type: "waypoint",
-          time: "", // 실제 시간 계산 필요
+          time: waypoint.arrivalTime || "", // 수정된 부분
           title: waypoint.name,
           icon: "경유",
           color: "blue",
@@ -187,15 +136,21 @@ export default function ScheduleSummaryScreen() {
     return items
       .sort((a, b) => {
         if (!a.time || !b.time) return 0
-        return a.time.localeCompare(b.time)
+        // 시간 문자열을 비교 가능한 형태로 변환 (예: "오후 1:30" -> 1330)
+        const toComparable = (timeStr: string) => {
+            const match = timeStr.match(/(오전|오후)\s*(\d{1,2}):(\d{2})/);
+            if (!match) return 0;
+            let [ , period, hourStr, minuteStr ] = match;
+            let hour = parseInt(hourStr, 10);
+            if (period === '오후' && hour !== 12) hour += 12;
+            if (period === '오전' && hour === 12) hour = 0;
+            return hour * 100 + parseInt(minuteStr, 10);
+        };
+        return toComparable(a.time) - toComparable(b.time);
       })
   }
 
   const timelineItems = createTimelineItems()
-
-  if (isProcessing) {
-    return <LoadingPopup />;
-  }
 
   return (
     <>
@@ -223,10 +178,10 @@ export default function ScheduleSummaryScreen() {
                 <div className="text-center py-8">
                   <p className="text-gray-600 mb-4">스케줄 정보가 없습니다.</p>
                   <Button
-                    onClick={() => router.push("/recommendations/")}
+                    onClick={() => router.push("/schedule/")}
                     className="bg-blue-500 hover:bg-blue-600 text-white"
                   >
-                    추천 결과 보기
+                    스케줄 선택하기
                   </Button>
                 </div>
               ) : (

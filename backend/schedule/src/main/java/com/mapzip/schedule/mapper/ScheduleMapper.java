@@ -1,23 +1,22 @@
 package com.mapzip.schedule.mapper;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import com.google.protobuf.GeneratedMessageV3;
-import com.mapzip.schedule.dto.*;
 import com.mapzip.schedule.entity.MealTimeSlot;
 import com.mapzip.schedule.entity.Schedule;
 import com.mapzip.schedule.entity.SelectedRestaurant;
 import com.mapzip.schedule.grpc.*;
 import com.mapzip.schedule.repository.MealTimeSlotRepository;
 import com.mapzip.schedule.repository.SelectedRestaurantRepository;
-import com.mapzip.schedule.util.TimeUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Type;
-import java.time.LocalDateTime;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
@@ -27,10 +26,11 @@ public class ScheduleMapper {
     private final MealTimeSlotRepository mealTimeSlotRepository;
     private final SelectedRestaurantRepository selectedRestaurantRepository;
     private final Gson gson = new Gson();
-    private static final Type WAYPOINT_LIST_TYPE = new TypeToken<List<com.mapzip.schedule.grpc.Waypoint>>() {}.getType();
+    private final ObjectMapper objectMapper; // objectMapper는 그대로 두되, 필요한 곳에만 사용
+    private static final Type WAYPOINT_LIST_TYPE = new TypeToken<List<Map<String, Object>>>() {}.getType();
     private static final Type STRING_LIST_TYPE = new TypeToken<List<String>>() {}.getType();
 
-    public Schedule toEntity(CreateScheduleRequest request) {
+    public Schedule toEntity(CreateScheduleRequest request) throws JsonProcessingException {
         Schedule schedule = new Schedule();
         schedule.setId(java.util.UUID.randomUUID().toString());
         schedule.setUserId(request.getUserId());
@@ -39,6 +39,7 @@ public class ScheduleMapper {
         schedule.setUserNote(request.getUserNote());
         schedule.setPurpose(request.getPurpose());
 
+        // Protobuf 객체는 gson으로 직렬화
         schedule.setDepartureLocation(gson.toJson(request.getDeparture()));
         schedule.setDestinationLocation(gson.toJson(request.getDestination()));
         schedule.setWaypoints(gson.toJson(request.getWaypointsList()));
@@ -47,22 +48,21 @@ public class ScheduleMapper {
         return schedule;
     }
 
-    
-
-    public void updateEntity(Schedule schedule, UpdateScheduleRequest request) {
+    public void updateEntity(Schedule schedule, UpdateScheduleRequest request) throws JsonProcessingException {
         schedule.setTitle(request.getTitle());
         schedule.setDepartureTime(request.getDepartureTime());
         schedule.setUserNote(request.getUserNote());
         schedule.setPurpose(request.getPurpose());
 
+        // Protobuf 객체는 gson으로 직렬화
         schedule.setDepartureLocation(gson.toJson(request.getDeparture()));
         schedule.setDestinationLocation(gson.toJson(request.getDestination()));
         schedule.setWaypoints(gson.toJson(request.getWaypointsList()));
         schedule.setCompanions(gson.toJson(request.getCompanionsList()));
     }
 
-
     public GetScheduleListResponse.ScheduleSummary toSummary(Schedule schedule) {
+        // JSON 파싱은 gson 사용
         com.mapzip.schedule.grpc.Location destination = gson.fromJson(schedule.getDestinationLocation(), com.mapzip.schedule.grpc.Location.class);
         int totalMealSlots = mealTimeSlotRepository.countBySchedule(schedule);
         int selectedRestaurantsCount = selectedRestaurantRepository.countBySchedule(schedule);
@@ -78,9 +78,24 @@ public class ScheduleMapper {
     }
 
     public GetScheduleDetailResponse.ScheduleDetail toDetail(Schedule schedule) {
+        // JSON 파싱은 gson 사용
         com.mapzip.schedule.grpc.Location departure = gson.fromJson(schedule.getDepartureLocation(), com.mapzip.schedule.grpc.Location.class);
         com.mapzip.schedule.grpc.Location destination = gson.fromJson(schedule.getDestinationLocation(), com.mapzip.schedule.grpc.Location.class);
-        List<com.mapzip.schedule.grpc.Waypoint> waypoints = gson.fromJson(schedule.getWaypoints(), WAYPOINT_LIST_TYPE);
+        
+        List<Map<String, Object>> waypointMaps = gson.fromJson(schedule.getWaypoints(), WAYPOINT_LIST_TYPE);
+        List<com.mapzip.schedule.grpc.Waypoint> waypoints = new ArrayList<>();
+        if (waypointMaps != null) {
+            for (Map<String, Object> map : waypointMaps) {
+                Waypoint.Builder waypointBuilder = Waypoint.newBuilder();
+                // gson이 double로 파싱하므로 Double로 캐스팅
+                if (map.get("lat") != null) waypointBuilder.setLat((Double) map.get("lat"));
+                if (map.get("lng") != null) waypointBuilder.setLng((Double) map.get("lng"));
+                if (map.get("name") != null) waypointBuilder.setName((String) map.get("name"));
+                if (map.get("arrivalTime") != null) waypointBuilder.setArrivalTime((String) map.get("arrivalTime"));
+                waypoints.add(waypointBuilder.build());
+            }
+        }
+
         List<String> companions = gson.fromJson(schedule.getCompanions(), STRING_LIST_TYPE);
 
         List<com.mapzip.schedule.grpc.MealTimeSlot> mealTimeSlots = schedule.getMealTimeSlots().stream()
@@ -98,7 +113,7 @@ public class ScheduleMapper {
                 .setCalculatedArrivalTime(schedule.getCalculatedArrivalTime() != null ? schedule.getCalculatedArrivalTime() : "")
                 .setDeparture(departure)
                 .setDestination(destination)
-                .addAllWaypoints(waypoints != null ? waypoints : Collections.emptyList())
+                .addAllWaypoints(waypoints)
                 .addAllMealSlots(mealTimeSlots)
                 .addAllSelectedRestaurants(selectedRestaurants)
                 .setUserNote(schedule.getUserNote() != null ? schedule.getUserNote() : "")
@@ -129,53 +144,4 @@ public class ScheduleMapper {
                 .setDetailUrl(entity.getDetailUrl() != null ? entity.getDetailUrl() : "")
                 .build();
     }
-
-    public TmapRouteRequest toTmapRequest(GeneratedMessageV3 grpcRequest, LocalDateTime departureDateTime) {
-        String tmapDepartureTime = TimeUtil.toTmapApiFormat(departureDateTime);
-
-        Location departureLocation;
-        Location destinationLocation;
-        List<Waypoint> waypointsList;
-
-        if (grpcRequest instanceof CreateScheduleRequest) {
-            CreateScheduleRequest request = (CreateScheduleRequest) grpcRequest;
-            departureLocation = request.getDeparture();
-            destinationLocation = request.getDestination();
-            waypointsList = request.getWaypointsList();
-        } else if (grpcRequest instanceof UpdateScheduleRequest) {
-            UpdateScheduleRequest request = (UpdateScheduleRequest) grpcRequest;
-            departureLocation = request.getDeparture();
-            destinationLocation = request.getDestination();
-            waypointsList = request.getWaypointsList();
-        } else {
-            throw new IllegalArgumentException("Unsupported request type: " + grpcRequest.getClass().getName());
-        }
-
-        TmapLocation departure = new TmapLocation(
-                departureLocation.getName(),
-                String.valueOf(departureLocation.getLng()),
-                String.valueOf(departureLocation.getLat())
-        );
-
-        TmapLocation destination = new TmapLocation(
-                destinationLocation.getName(),
-                String.valueOf(destinationLocation.getLng()),
-                String.valueOf(destinationLocation.getLat())
-        );
-
-        WaypointsContainer waypointsContainer;
-        if (waypointsList == null || waypointsList.isEmpty()) {
-            waypointsContainer = null; 
-        } else {
-            List<TmapWaypoint> waypoints = waypointsList.stream()
-                    .map(wp -> new TmapWaypoint(String.valueOf(wp.getLng()), String.valueOf(wp.getLat())))
-                    .collect(Collectors.toList());
-            waypointsContainer = new WaypointsContainer(waypoints);
-        }
-
-        TmapRoutesInfo routesInfo = new TmapRoutesInfo(departure, destination, waypointsContainer, "departure", tmapDepartureTime, "00", "car");
-        return new TmapRouteRequest(routesInfo);
-    }
 }
-
-

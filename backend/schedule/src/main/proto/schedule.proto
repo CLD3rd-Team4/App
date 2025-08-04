@@ -85,6 +85,7 @@ message Waypoint {
   double lat = 1;
   double lng = 2;
   string name = 3;
+  string arrivalTime = 4; // 경유지 도착 시간
 }
 
 message MealTimeSlot {
@@ -275,8 +276,7 @@ message ProcessScheduleRequest {
 }
 
 message ProcessScheduleResponse {
-  string message = 1;
-  bool success = 2;
+  GetScheduleDetailResponse.ScheduleDetail schedule = 1;
 }
 
 enum ProcessType {
