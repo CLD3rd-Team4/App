@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import { useSchedule } from "@/hooks/useSchedule"
+import { scheduleApi } from "@/services/api"
 import BottomNavigation from "@/components/common/BottomNavigation"
 import { Plus } from "lucide-react"
 import type { Schedule } from "@/types"
@@ -38,10 +39,14 @@ export default function ScheduleListScreen() {
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
 
   const handleScheduleSelect = async (schedule: Schedule) => {
+    if (!schedule || !schedule.id) {
+      console.error("Invalid schedule or schedule ID");
+      alert("유효하지 않은 스케줄입니다.");
+      return;
+    }
     setIsProcessing(schedule.id);
     try {
       await scheduleApi.processSchedule(schedule.id, { type: 'SELECT' });
-      selectSchedule(schedule);
       router.push('/');
     } catch (error) { 
       console.error("스케줄 처리 실패:", error);
@@ -52,12 +57,23 @@ export default function ScheduleListScreen() {
   };
 
   const handleScheduleEdit = (schedule: Schedule) => {
+    if (!schedule || !schedule.id) {
+      console.error("Invalid schedule or schedule ID");
+      alert("유효하지 않은 스케줄입니다.");
+      return;
+    }
     router.push(`/schedule/edit/${schedule.id}/`)
   }
 
   const handleScheduleDelete = async (scheduleId: string) => {
+    if (!scheduleId) {
+      console.error("Invalid schedule ID");
+      alert("유효하지 않은 스케줄 ID입니다.");
+      return;
+    }
     try {
-      await deleteSchedule(scheduleId)
+      // TODO: 실제 사용자 ID로 교체해야 합니다.
+      await deleteSchedule(scheduleId, "test-user-123")
     } catch (error) {
       console.error("스케줄 삭제 실패:", error)
     }

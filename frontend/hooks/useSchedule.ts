@@ -85,10 +85,10 @@ export function useSchedule() {
     }
   }
 
-  const deleteSchedule = async (scheduleId: string) => {
+  const deleteSchedule = async (scheduleId: string, userId: string) => { // userId 추가
     try {
-      // TODO: REST API 연동 - 스케줄 삭제
-      await scheduleApi.deleteSchedule(scheduleId)
+      // userId를 API 호출에 전달
+      await scheduleApi.deleteSchedule(scheduleId, userId)
       const updatedSchedules = schedules.filter((schedule) => schedule.id !== scheduleId)
       setSchedules(updatedSchedules)
       localStorage.setItem("schedules", JSON.stringify(updatedSchedules))

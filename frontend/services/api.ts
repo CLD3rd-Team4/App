@@ -170,7 +170,8 @@ export const scheduleApi = {
       throw new Error('Failed to fetch schedules');
     }
     const data = await response.json();
-    return data.schedules || [];
+    // scheduleId를 id로 매핑
+    return data.schedules ? data.schedules.map((s: any) => ({ ...s, id: s.scheduleId })) : [];
   },
 
   createSchedule: async (scheduleData: any) => {
@@ -182,18 +183,27 @@ export const scheduleApi = {
       body: JSON.stringify(scheduleData),
     });
     if (!response.ok) {
+      const errorBody = await response.text();
+      console.error("스케줄 생성 실패 응답:", errorBody);
       throw new Error('Failed to create schedule');
     }
-    return response.json();
+    const result = await response.json();
+    // 반환된 scheduleId를 id로 매핑
+    return { ...result, id: result.scheduleId };
   },
 
   updateSchedule: async (scheduleData: any) => {
-    const response = await fetch(`${API_BASE_URL}/schedule/${scheduleData.id}`, {
+    const { id, ...rest } = scheduleData;
+    const requestBody = {
+      ...rest,
+      scheduleId: id, // id를 scheduleId로 매핑
+    };
+    const response = await fetch(`${API_BASE_URL}/schedule/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(scheduleData),
+      body: JSON.stringify(requestBody),
     });
     if (!response.ok) {
       throw new Error('Failed to update schedule');
@@ -201,12 +211,10 @@ export const scheduleApi = {
     return response.json();
   },
 
-  deleteSchedule: async (scheduleId: string, userId: string) => { // userId 추가
-    const response = await fetch(`${API_BASE_URL}/schedule/${scheduleId}`, {
+  deleteSchedule: async (scheduleId: string, userId: string) => {
+    // userId를 쿼리 파라미터로 전달
+    const response = await fetch(`${API_BASE_URL}/schedule/${scheduleId}?userId=${userId}`, {
       method: 'DELETE',
-      headers: {
-        'X-User-ID': userId, // 헤더에 userId 추가
-      },
     });
     if (!response.ok) {
       throw new Error('Failed to delete schedule');
@@ -215,12 +223,16 @@ export const scheduleApi = {
   },
 
   processSchedule: async (scheduleId: string, data: any) => {
+    const requestBody = {
+      ...data,
+      userId: 'test-user-123', // TODO: 실제 사용자 ID로 교체
+    };
     const response = await fetch(`${API_BASE_URL}/schedule/${scheduleId}/process`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(requestBody),
     });
     if (!response.ok) {
       throw new Error('Failed to process schedule');
