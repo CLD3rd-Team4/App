@@ -71,12 +71,26 @@
             <artifactId>s3</artifactId>
             <version>2.21.29</version>
         </dependency>
+        
+        <!-- S3 Presigner for secure URLs -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3-presigner</artifactId>
+            <version>2.21.29</version>
+        </dependency>
 
         <!-- Google Cloud Vision API -->
         <dependency>
             <groupId>com.google.cloud</groupId>
             <artifactId>google-cloud-vision</artifactId>
             <version>3.38.0</version>
+        </dependency>
+        
+        <!-- Google Auth Library -->
+        <dependency>
+            <groupId>com.google.auth</groupId>
+            <artifactId>google-auth-library-oauth2-http</artifactId>
+            <version>1.19.0</version>
         </dependency>
 
         <!-- Google API Common Protos for gRPC HTTP Transcoding -->
@@ -96,6 +110,18 @@
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+        
+        <!-- Spring Data Redis for caching -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+        
+        <!-- Spring Cache abstraction -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-cache</artifactId>
         </dependency>
         
         <!-- Spring Kafka for async processing -->

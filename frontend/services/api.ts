@@ -1,5 +1,5 @@
 // API 기본 설정
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.mapzip.com"
+const API_BASE_URL = "https://api.mapzip.shop";
 
 // 테스트용 데이터 - 실제 API 연동 시 제거
 const TEST_DATA = {
@@ -165,10 +165,11 @@ export const authApi = {
 
 export const scheduleApi = {
   getSchedules: async () => {
-    // TODO: 실제 API 연동
-    return new Promise((resolve) => {
-      setTimeout(() => resolve(TEST_DATA.schedules), 500)
-    })
+    const response = await fetch(`${API_BASE_URL}/schedule`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch schedules');
+    }
+    return response.json();
   },
 
   createSchedule: async (scheduleData: any) => {
@@ -220,32 +221,117 @@ export const visitedRestaurantApi = {
 }
 
 export const ocrApi = {
-  processReceipt: async (imageData: string) => {
-    // TODO: 실제 API 연동
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          restaurantName: "맛있는 한식당",
-          visitDate: "2024.07.18",
-          isValid: true,
-          extractedText: "영수증 텍스트 내용...",
-        })
-      }, 2000)
-    })
+  processReceipt: async (imageData: string, expectedRestaurantName: string, expectedAddress: string) => {
+    const formData = new FormData();
+    const blob = await (await fetch(imageData)).blob();
+    formData.append('receiptImage', blob, 'receipt.jpg');
+    formData.append('expectedRestaurantName', expectedRestaurantName);
+    formData.append('expectedAddress', expectedAddress);
+
+    const response = await fetch(`${API_BASE_URL}/review/verify-receipt`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to process receipt');
+    }
+    return response.json();
   },
-}
+};
 
 export const reviewApi = {
   createReview: async (reviewData: any) => {
-    // TODO: 실제 API 연동
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          id: Date.now().toString(),
-          ...reviewData,
-          createdAt: new Date().toISOString(),
-        })
-      }, 1000)
-    })
+    const formData = new FormData();
+    formData.append('restaurantId', reviewData.restaurantId);
+    formData.append('restaurantName', reviewData.restaurantName);
+    formData.append('restaurantAddress', reviewData.restaurantAddress);
+    formData.append('rating', reviewData.rating.toString());
+    formData.append('content', reviewData.content);
+
+    if (reviewData.receiptImages) {
+      for (const image of reviewData.receiptImages) {
+        const blob = await (await fetch(image)).blob();
+        formData.append('receiptImages', blob, 'receipt.jpg');
+      }
+    }
+
+    if (reviewData.reviewImages) {
+      for (const image of reviewData.reviewImages) {
+        const blob = await (await fetch(image)).blob();
+        formData.append('reviewImages', blob, 'review.jpg');
+      }
+    }
+
+    const response = await fetch(`${API_BASE_URL}/review`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to create review');
+    }
+    return response.json();
   },
+};
+
+// 🆕 새로 추가: 위치 관련 유틸리티 함수들
+export const locationUtils = {
+  // 직선거리 계산 (km 단위)
+  calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 6371 // 지구 반지름 (km)
+    const dLat = (lat2 - lat1) * Math.PI / 180
+    const dLng = (lng2 - lng1) * Math.PI / 180
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng/2) * Math.sin(dLng/2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+    return R * c
+  },
+
+  // 예상 소요시간 계산 (분 단위)
+  estimateTravelTime(distance: number, transportType: 'car' | 'walk' | 'public' = 'car'): number {
+    const speeds = {
+      car: 40,     // km/h (도시 평균)
+      walk: 4,     // km/h
+      public: 25   // km/h (대중교통 평균)
+    }
+    
+    return Math.round((distance / speeds[transportType]) * 60)
+  },
+
+  // 위치 데이터 검증
+  validateLocationData(locationData: LocationData): boolean {
+    if (!locationData.departure || !locationData.destination) {
+      return false
+    }
+
+    // 위도/경도 범위 검증
+    const isValidCoord = (lat: number, lng: number) => {
+      return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180
+    }
+
+    if (!isValidCoord(locationData.departure.lat, locationData.departure.lng) ||
+        !isValidCoord(locationData.destination.lat, locationData.destination.lng)) {
+      return false
+    }
+
+    // 경유지 검증
+    for (const waypoint of locationData.waypoints) {
+      if (waypoint && !isValidCoord(waypoint.lat, waypoint.lng)) {
+        return false
+      }
+    }
+
+    return true
+  },
+
+  // 위치 데이터를 문자열로 변환 (기존 시스템과의 호환성)
+  locationToString(locationData: LocationData) {
+    return {
+      departure: locationData.departure?.name || "",
+      destination: locationData.destination?.name || "",
+      waypoints: locationData.waypoints.map(w => w?.name).filter(Boolean)
+    }
+  }
 }
