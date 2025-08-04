@@ -65,6 +65,7 @@ aws:
     bucket-name: mapzip-${TERRAFORM_WORKSPACE:dev}-image
     region: ${AWS_REGION:ap-northeast-2}
     presign-duration: ${S3_PRESIGN_DURATION:PT1H}  # Pre-signed URL 유효시간 (1시간)
+    cloudfront-domain: ${CLOUDFRONT_IMAGE_DOMAIN:https://img.mapzip.shop}  # CloudFront 이미지 도메인
     
   # MSK Kafka 설정 (main 클러스터) - 환경변수 필수
   kafka:

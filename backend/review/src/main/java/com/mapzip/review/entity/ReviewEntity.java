@@ -44,12 +44,9 @@ public class ReviewEntity {
         this.createdAtUserId = createdAtUserId;
     }
     
-    // 리뷰 ID는 생성 시간과 사용자 ID에서 추출
+    // 리뷰 ID는 복합키(Sort Key)와 동일
     public String getReviewId() {
-        if (createdAtUserId != null && createdAtUserId.contains("#")) {
-            return createdAtUserId.replace("#", "-");
-        }
-        return null;
+        return this.createdAtUserId;
     }
 
     @DynamoDbSecondaryPartitionKey(indexNames = "UserIdIndex")

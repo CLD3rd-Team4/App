@@ -6,6 +6,8 @@ spring:
     name: review
   config:
     import: optional:configserver:http://config.service-platform.svc.cluster.local:8888
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
 
 # gRPC 설정
 grpc:
@@ -19,9 +21,10 @@ grpc:
 aws:
   region: ${AWS_REGION:ap-northeast-2}
   dynamodb:
-    table-name: ${DYNAMODB_TABLE_NAME:reviews}
+    table-name: ${DYNAMODB_TABLE_NAME:mapzip-dev-reviews}
   s3:
-    bucket: ${S3_BUCKET_NAME:mapzip-images}
+    bucket-name: ${S3_BUCKET_NAME:mapzip-dev-image}
+    cloudfront-domain: ${CLOUDFRONT_IMAGE_DOMAIN:https://img.mapzip.shop}
 
 # Google Cloud Vision API (Config Server에서 암호화된 값 제공)
 google:
