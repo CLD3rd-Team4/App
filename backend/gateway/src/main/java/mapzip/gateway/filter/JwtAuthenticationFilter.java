@@ -39,8 +39,8 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
 
             log.info("JWT Filter - Request: {} {}", request.getMethod(), path);
 
-            // 로그인 요청은 JWT 검증 제외
-            if (path.startsWith("/auth/kakao/login")) {
+            // 로그인 요청, 액세스 토큰 쿠키 재발급 요청은 JWT 검증 제외
+            if (path.startsWith("/auth/kakao/login")|| path.startsWith("/auth/token/refresh")) {
                 log.info("JWT Filter - Skipping auth for login path: {}", path);
                 return chain.filter(exchange);
             }
