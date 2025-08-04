@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -17,12 +17,14 @@ interface ScheduleCreateOptionalScreenProps {
   onComplete: (data: OptionalData) => void
   onBack: () => void
   initialData?: OptionalData
+  isEdit?: boolean // isEdit prop 추가
 }
 
 export default function ScheduleCreateOptionalScreen({
   onComplete,
   onBack,
   initialData,
+  isEdit = false, // isEdit prop 받기
 }: ScheduleCreateOptionalScreenProps) {
   const [formData, setFormData] = useState<OptionalData>(
     initialData || {
@@ -31,6 +33,13 @@ export default function ScheduleCreateOptionalScreen({
       companions: [],
     },
   )
+
+  // initialData가 변경될 때 formData를 업데이트하는 useEffect 추가
+  useEffect(() => {
+    if (initialData) {
+      setFormData(initialData);
+    }
+  }, [initialData]);
 
   const companionOptions = ["혼자", "부모님", "연인", "지인", "자녀"]
 
@@ -118,7 +127,7 @@ export default function ScheduleCreateOptionalScreen({
             <span className="text-sm text-gray-600 ml-3">2/2</span>
           </div>
           <Button onClick={handleComplete} className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2">
-            완료
+            {isEdit ? "수정완료" : "완료"}
           </Button>
         </div>
       </div>

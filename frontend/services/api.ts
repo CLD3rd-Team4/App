@@ -194,10 +194,13 @@ export const scheduleApi = {
 
   updateSchedule: async (scheduleData: any) => {
     const { id, ...rest } = scheduleData;
+    // 백엔드 gRPC 요청 형식에 맞게 id를 scheduleId로, userId를 명시적으로 전달합니다.
     const requestBody = {
       ...rest,
-      scheduleId: id, // id를 scheduleId로 매핑
+      scheduleId: id,
+      userId: scheduleData.userId || 'test-user-123', // 임시 userId 추가
     };
+    // URL 경로에 ID를 다시 포함시키고, PUT 요청을 보냅니다.
     const response = await fetch(`${API_BASE_URL}/schedule/${id}`, {
       method: 'PUT',
       headers: {
@@ -206,6 +209,8 @@ export const scheduleApi = {
       body: JSON.stringify(requestBody),
     });
     if (!response.ok) {
+      const errorBody = await response.text();
+      console.error("스케줄 업데이트 실패 응답:", errorBody);
       throw new Error('Failed to update schedule');
     }
     return response.json();
@@ -246,9 +251,9 @@ export const scheduleApi = {
       throw new Error('Failed to fetch schedule detail');
     }
     const data = await response.json();
-    // scheduleId를 id로 매핑하고, schedule 객체를 반환
+    // 백엔드 응답에 ID가 포함되지 않을 수 있으므로, 요청 시 사용한 scheduleId를 직접 주입해줍니다.
     if (data.schedule) {
-      return { ...data, schedule: { ...data.schedule, id: data.schedule.scheduleId } };
+      data.schedule.id = scheduleId;
     }
     return data;
   },

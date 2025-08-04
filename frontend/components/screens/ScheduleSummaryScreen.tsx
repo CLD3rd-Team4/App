@@ -185,7 +185,6 @@ export default function ScheduleSummaryScreen() {
     }
 
     return items
-      .filter((item) => item.time)
       .sort((a, b) => {
         if (!a.time || !b.time) return 0
         return a.time.localeCompare(b.time)

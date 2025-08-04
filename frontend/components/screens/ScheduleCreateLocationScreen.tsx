@@ -34,6 +34,13 @@ export default function ScheduleCreateLocationScreen({
     },
   )
 
+  // initialData prop이 변경될 때 formData 상태를 업데이트합니다.
+  useEffect(() => {
+    if (initialData) {
+      setFormData(initialData);
+    }
+  }, [initialData]);
+
   const [searchKeyword, setSearchKeyword] = useState("")
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [isSearching, setIsSearching] = useState(false)
