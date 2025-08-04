@@ -6,74 +6,143 @@ server:
 spring:
   application:
     name: review
+    
   # 파일 업로드 설정 (리뷰 이미지)
   servlet:
     multipart:
       max-file-size: ${MAX_FILE_SIZE:10MB}
       max-request-size: ${MAX_REQUEST_SIZE:50MB}
+      
   # Kubernetes 서비스 디스커버리 활성화
   cloud:
     kubernetes:
       discovery:
         enabled: true
+        
+  # Redis 캐싱 설정 (ElastiCache 연결)
+  data:
+    redis:
+      host: ${ELASTICACHE_ENDPOINT}
+      port: 6379
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
+          
+  # 캐시 설정
+  cache:
+    type: redis
+    redis:
+      time-to-live: 600000  # 기본 10분 TTL (밀리초)
+      cache-null-values: false
+      
+  jackson:
+    default-property-inclusion: NON_NULL
 
 # gRPC 설정
 grpc:
   server:
-    port: 50051
+    port: ${GRPC_SERVER_PORT:50051}
   client:
     GLOBAL:
       negotiation-type: plaintext
 
-# AWS DynamoDB 설정 (테라폼에서 생성된 reviews 테이블) - 환경변수 필수
+# AWS 설정
 aws:
-  region: ap-northeast-2
+  region: ${AWS_REGION:ap-northeast-2}
+  
+  # DynamoDB 연결 (IRSA 사용으로 자격증명 불필요)
   dynamodb:
-    # 테라폼에서 생성된 DynamoDB 테이블명 (workspace 포함)
-    table-name: mapzip-${TERRAFORM_WORKSPACE:dev}-reviews
-  # S3 설정 (리뷰 이미지 업로드용)
+    table-name: ${DYNAMODB_TABLE_NAME}
+    endpoint: ${DYNAMODB_ENDPOINT:}
+    region: ${AWS_REGION:ap-northeast-2}
+    
+  # S3 설정 (IRSA 사용으로 자격증명 불필요)
   s3:
-    # 테라폼에서 생성된 S3 이미지 버킷
     bucket-name: mapzip-${TERRAFORM_WORKSPACE:dev}-image
-    region: ap-northeast-2
+    region: ${AWS_REGION:ap-northeast-2}
+    presign-duration: ${S3_PRESIGN_DURATION:PT1H}  # Pre-signed URL 유효시간 (1시간)
+    
+  # MSK Kafka 설정 (main 클러스터) - 환경변수 필수
+  kafka:
+    bootstrap-servers: ${MSK_BOOTSTRAP_SERVERS}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: ${KAFKA_PRODUCER_ACKS:all}
+      retries: ${KAFKA_PRODUCER_RETRIES:3}
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      group-id: review-service-${ENVIRONMENT:prod}
+      auto-offset-reset: ${KAFKA_CONSUMER_OFFSET_RESET:earliest}
 
 # Google Cloud Vision API (Config Server 암호화 방식)
 google:
   cloud:
     vision:
+      # 서비스 계정 키 JSON 전체를 암호화하여 저장
       api-key: '{cipher}2a049919aabe8d3e61176c877535db0153d24bd98a3afa80145ac1d4d530326dff5b2c6fae218f616b9761a68aef53dd551d5efeb4c299e6fe5b4d4246f42a02'
-
-# DynamoDB 연결 설정 (EKS에서는 IRSA 사용)
-amazon:
-  dynamodb:
-    region: ap-northeast-2
-    # EKS에서는 IAM Role for Service Account (IRSA)를 통한 인증
-    # access-key, secret-key 불필요
-
-# 로깅 설정
-logging:
-  level:
-    com.mapzip.review: DEBUG
-    software.amazon.awssdk: INFO
-    com.google.cloud: INFO
-
-# Health check and metrics
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,prometheus,metrics
-  endpoint:
-    health:
-      show-details: always
-    prometheus:
-      enabled: true
-  metrics:
-    export:
-      prometheus:
-        enabled: true
+      # 이거아니면 또는 Kubernetes Secret을 통한 파일 경로 방식도 가능
+      # credentials-path: ${GOOGLE_APPLICATION_CREDENTIALS:/var/secrets/google/service-account-key.json}
 
 # Eureka 비활성화
 eureka:
   client:
     enabled: false
+
+# Management & Health Check
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: ${HEALTH_SHOW_DETAILS:always}
+      probes:
+        enabled: true
+  health:
+    readiness-state:
+      enabled: true
+    liveness-state:
+      enabled: true
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http:
+          server:
+            requests: true
+      slo:
+        http.server.requests: 100ms,200ms,500ms,1s,2s
+    tags:
+      application: ${spring.application.name}
+      environment: ${ENVIRONMENT:prod}
+      region: ${AWS_REGION:ap-northeast-2}
+    export:
+      prometheus:
+        enabled: true
+
+# 로깅 설정
+logging:
+  level:
+    com.mapzip.review: ${LOG_LEVEL_REVIEW:INFO}
+    software.amazon.awssdk: ${LOG_LEVEL_AWS:WARN}
+    com.google.cloud: ${LOG_LEVEL_GOOGLE:WARN}
+    org.springframework.kafka: ${LOG_LEVEL_KAFKA:INFO}
+
+# Review Service Specific Settings
+review:
+  ocr:
+    confidence-threshold: ${OCR_CONFIDENCE_THRESHOLD:0.6}
+    max-retry-attempts: ${OCR_MAX_RETRY:3}
+  image:
+    max-file-size: ${IMAGE_MAX_SIZE:10MB}
+    allowed-types: ${IMAGE_ALLOWED_TYPES:image/jpeg,image/png,image/jpg}
+  pagination:
+    default-size: ${PAGINATION_DEFAULT_SIZE:20}
+    max-size: ${PAGINATION_MAX_SIZE:100}
