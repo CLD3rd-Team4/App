@@ -16,6 +16,7 @@ public class RecommendRequestDto {
     private String userId;
     private String scheduleId;
     private List<String> recommendationRequestIds;
+    List<String> scheduledTimes;
 
     private Map<String, KakaoSearchResponse> kakaoPlaceList;
 

@@ -23,13 +23,6 @@ public class RecommendController {
 	private final KakaoApiService kakaoApiService;
 	private final RedisTemplate<String, Object> redisTemplate;
 	
-	//////// 1. 스케줄 id 경로로 변수 넣어야할 거 같음 -> api 요청시
-	@PostMapping("/api/recommend")
-	public ResponseEntity<String> sendRecommendRequest(@RequestBody MultiSlotRecommendRequestDto multiSlotRecommendRequestDto) {
-		recommendRequestService.sendRecommendRequest(multiSlotRecommendRequestDto);
-
-        return ResponseEntity.ok("추천 요청이 성공적으로 전송되었습니다.");
-    }
 	
 	//추천 결과 조회
 	

@@ -16,7 +16,7 @@ public class RecommendRedisStoreService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final ObjectMapper objectMapper;
 
-    public void storeRecommendations(String userId, String scheduleId, String recommendPlaceListJson, List<String> slotIds) {
+    public void storeRecommendations(String userId, String scheduleId, String recommendPlaceListJson, List<String> slotIds,List<String> scheduledTimes) {
         try {
             JsonNode root = objectMapper.readTree(recommendPlaceListJson);
             JsonNode recommendations = root.get("recommendations");
@@ -27,6 +27,7 @@ public class RecommendRedisStoreService {
                     JsonNode places = mealNode.get("places");
 
                     String slotId = slotIds.get(mealIndex); 
+                    String scheduledTime = scheduledTimes.get(mealIndex);
 
                     for (int i = 0; i < places.size(); i++) {
                         JsonNode place = places.get(i);
@@ -38,6 +39,7 @@ public class RecommendRedisStoreService {
 
                         ObjectNode simplified = objectMapper.createObjectNode();
                         simplified.put("mealType", "MEAL"); 
+                        simplified.put("scheduledTime", scheduledTime);
                         simplified.put("id", placeId);
                         simplified.put("placeName", placeName);
                         simplified.put("reason", reason);

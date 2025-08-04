@@ -17,24 +17,22 @@ public class RecommendResultConsumer {
 	private final ObjectMapper objectMapper;
 	private final RecommendRedisStoreService recommendRedisStoreService;
 
-    @KafkaListener(topics = "recommend-result", groupId = "recommend-result-group")
-    private void consume(String message) {
-        try {
-            // 로그로 수신 확인
-            RecommendResultDto recommendResultDto = objectMapper.readValue(message, RecommendResultDto.class);
-            log.info("📩 recommend-request 토픽 수신: userId={}, scheduleId={}",
-            		recommendResultDto.getUserId(),recommendResultDto.getScheduleId() );
-            recommendRedisStoreService.storeRecommendations(
-            		recommendResultDto.getUserId(),
-            	    recommendResultDto.getScheduleId(),
-            	    recommendResultDto.getRecommendPlaceListJson(),
-            	    recommendResultDto.getRecommendationRequestIds()
-        
-            	);
+	@KafkaListener(topics = "recommend-result", groupId = "recommend-result-group")
+	private void consume(String message) {
+		try {
+			// 로그로 수신 확인
+			RecommendResultDto recommendResultDto = objectMapper.readValue(message, RecommendResultDto.class);
+			log.info("📩 recommend-request 토픽 수신: userId={}, scheduleId={}", recommendResultDto.getUserId(),
+					recommendResultDto.getScheduleId());
+			recommendRedisStoreService.storeRecommendations(recommendResultDto.getUserId(),
+					recommendResultDto.getScheduleId(), recommendResultDto.getRecommendPlaceListJson(),
+					recommendResultDto.getRecommendationRequestIds(), 
+					recommendResultDto.getScheduledTimes()
 
+			);
 
-        } catch (Exception e) {
-            log.error("❌ recommend-request 처리 중 오류", e);
-        }
-    }
+		} catch (Exception e) {
+			log.error("❌ recommend-request 처리 중 오류", e);
+		}
+	}
 }
