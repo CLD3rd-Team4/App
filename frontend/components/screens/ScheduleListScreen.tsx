@@ -11,12 +11,14 @@ import type { Schedule } from "@/types"
 
 export default function ScheduleListScreen() {
   const router = useRouter()
-  const { schedules, selectSchedule, loadSchedules, deleteSchedule } = useSchedule()
+  const { schedules, selectSchedule, loadSchedules, deleteSchedule, setProcessingStatus } = useSchedule()
   const [isLoading, setIsLoading] = useState(true)
   const [isClient, setIsClient] = useState(false)
 
   useEffect(() => {
     setIsClient(true)
+    // 페이지에 들어올 때 처리 상태를 초기화합니다.
+    setProcessingStatus(false);
   }, [])
 
   useEffect(() => {
@@ -46,12 +48,20 @@ export default function ScheduleListScreen() {
     }
     setIsProcessing(schedule.id);
     try {
+      // 1. 백엔드에 스케줄 처리를 요청합니다.
       await scheduleApi.processSchedule(schedule.id, { type: 'SELECT' });
+      
+      // 2. 전역 상태를 '처리 중'으로 변경하고, 선택된 스케줄의 '초안'을 저장합니다.
+      selectSchedule(schedule);
+      setProcessingStatus(true);
+
+      // 3. 홈 화면으로 이동합니다. (라우팅)
+      // 실제 폴링 및 상태 업데이트는 홈 화면(ScheduleSummaryScreen)에서 처리됩니다.
       router.push('/');
+
     } catch (error) { 
       console.error("스케줄 처리 실패:", error);
-      alert('스케줄 처리에 실패했습니다.');
-    } finally {
+      alert('스케줄 처리에 실패했습니다. 잠시 후 다시 시도해주세요.');
       setIsProcessing(null);
     }
   };
@@ -115,12 +125,20 @@ export default function ScheduleListScreen() {
             </div>
           ) : (
             <div className="space-y-3">
-              {schedules.map((schedule) => (
-                <div key={schedule.id} className="bg-white rounded-lg p-4 shadow-sm">
+              {schedules.map((schedule, index) => (
+                <div key={index} className="bg-white rounded-lg p-4 shadow-sm">
                   <h3 className="font-medium mb-3">{schedule.title}</h3>
                   <div className="flex gap-2">
                     <Button
-                      onClick={() => handleScheduleDelete(schedule.id)}
+                      onClick={(e) => {
+                        e.stopPropagation(); // 이벤트 버블링 방지
+                        if (!schedule.id) {
+                          console.error("Delete Error: Invalid schedule ID", schedule);
+                          alert("유효하지 않은 스케줄 ID입니다.");
+                          return;
+                        }
+                        handleScheduleDelete(schedule.id)
+                      }}
                       size="sm"
                       variant="outline"
                       className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
@@ -128,7 +146,15 @@ export default function ScheduleListScreen() {
                       삭제
                     </Button>
                     <Button
-                      onClick={() => handleScheduleEdit(schedule)}
+                      onClick={(e) => {
+                        e.stopPropagation(); // 이벤트 버블링 방지
+                        if (!schedule.id) {
+                          console.error("Edit Error: Invalid schedule ID", schedule);
+                          alert("유효하지 않은 스케줄 ID입니다.");
+                          return;
+                        }
+                        handleScheduleEdit(schedule)
+                      }}
                       size="sm"
                       variant="outline"
                       className="flex-1 text-gray-700 border-gray-200 hover:bg-gray-50"
@@ -136,7 +162,10 @@ export default function ScheduleListScreen() {
                       수정
                     </Button>
                     <Button
-                      onClick={() => handleScheduleSelect(schedule)}
+                      onClick={(e) => {
+                        e.stopPropagation(); // 이벤트 버블링 방지
+                        handleScheduleSelect(schedule)
+                      }}
                       size="sm"
                       className="flex-1 bg-blue-500 hover:bg-blue-600 text-white"
                       disabled={isProcessing === schedule.id}

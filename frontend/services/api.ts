@@ -239,6 +239,19 @@ export const scheduleApi = {
     }
     return response.json();
   },
+
+  getScheduleDetail: async (scheduleId: string, userId: string) => {
+    const response = await fetch(`${API_BASE_URL}/schedule/${scheduleId}?userId=${userId}`, { cache: 'no-store' });
+    if (!response.ok) {
+      throw new Error('Failed to fetch schedule detail');
+    }
+    const data = await response.json();
+    // scheduleId를 id로 매핑하고, schedule 객체를 반환
+    if (data.schedule) {
+      return { ...data, schedule: { ...data.schedule, id: data.schedule.scheduleId } };
+    }
+    return data;
+  },
 }
 
 export const recommendationApi = {

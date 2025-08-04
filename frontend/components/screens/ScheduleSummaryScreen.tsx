@@ -42,55 +42,52 @@ function RecommendationReadyPopup({ onConfirm }: { onConfirm: () => void }) {
 
 export default function ScheduleSummaryScreen() {
   const router = useRouter()
-  const { selectedSchedule } = useSchedule()
-  const [isLoading, setIsLoading] = useState(true)
+  const { selectedSchedule, selectSchedule, isProcessing, setProcessingStatus } = useSchedule()
   const [isUpdating, setIsUpdating] = useState(false)
   const [showRecommendationPopup, setShowRecommendationPopup] = useState(false)
 
-  const currentSchedule = selectedSchedule
-
   useEffect(() => {
-    if (!currentSchedule) {
-      // 스케줄 정보가 없으면 목록 페이지로 리디렉션
-      router.replace("/schedule");
-      return;
+    // isProcessing 상태일 때 폴링을 시작합니다.
+    if (isProcessing && selectedSchedule?.id) {
+      const pollSchedule = async (retries = 10, delay = 2000) => {
+        for (let i = 0; i < retries; i++) {
+          try {
+            const data = await scheduleApi.getScheduleDetail(selectedSchedule.id!, "test-user-123");
+            // 계산된 도착 시간이 있는지 확인
+            if (data.schedule && data.schedule.calculatedArrivalTime) {
+              selectSchedule(data.schedule); // 최신 정보로 상태 업데이트
+              setProcessingStatus(false); // 처리 완료 상태로 변경
+              return; // 폴링 중단
+            }
+          } catch (error) {
+            console.error("폴링 중 에러 발생:", error);
+          }
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+        // 타임아웃 처리
+        alert("스케줄 처리 시간을 초과했습니다. 다시 시도해주세요.");
+        setProcessingStatus(false);
+        router.push("/schedule"); // 실패 시 목록으로 이동
+      };
+
+      pollSchedule();
     }
-
-    const loadScheduleSummary = async () => {
-      setIsLoading(true)
-      // 2초 후 로딩 완료 (시뮬레이션)
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-      setIsLoading(false)
-
-      // 추천 결과 폴링 시작
-      startRecommendationPolling()
-    }
-
-    loadScheduleSummary()
-  }, [currentSchedule, router])
-
-  const startRecommendationPolling = () => {
-    // 3초 후 추천 결과 준비 완료 팝업 (시뮬레이션)
-    setTimeout(() => {
-      setShowRecommendationPopup(true)
-    }, 3000)
-  }
+  }, [isProcessing, selectedSchedule?.id, selectSchedule, setProcessingStatus, router]);
 
   const handleUpdate = () => {
-    if (!currentSchedule) return;
+    if (!selectedSchedule) return;
 
     setIsUpdating(true);
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
         try {
-          await scheduleApi.processSchedule(currentSchedule.id, {
+          await scheduleApi.processSchedule(selectedSchedule.id, {
             type: 'UPDATE',
             current_lat: latitude,
             current_lng: longitude,
             current_time: new Date().toISOString(),
           });
-          // 성공 시, 스케줄 요약 다시 로드 또는 상태 업데이트
           alert('스케줄이 업데이트되었습니다.');
         } catch (error) {
           console.error("스케줄 업데이트 실패:", error);
@@ -113,43 +110,58 @@ export default function ScheduleSummaryScreen() {
   }
 
   const formatTime = (time: string) => {
-    if (!time) return "시간 미정"
-    const [hour, minute] = time.split(":")
-    const h = Number.parseInt(hour)
-    const period = h >= 12 ? "오후" : "오전"
-    const displayHour = h === 0 ? 12 : h > 12 ? h - 12 : h
-    return `${period} ${displayHour}:${minute}`
+    if (!time || typeof time !== 'string') return "시간 미정";
+
+    // "오전/오후 HH:mm" 형식의 입력을 먼저 처리
+    const match = time.match(/(오전|오후)\s*(\d{1,2}):(\d{2})/);
+    if (match) {
+      // 이미 원하는 형식이므로 그대로 반환
+      return time;
+    }
+
+    // "HH:mm" 또는 "HH:mm:ss" 형식 처리
+    const parts = time.split(":");
+    if (parts.length < 2) return "시간 미정";
+
+    const h = parseInt(parts[0], 10);
+    const m = parts[1];
+
+    if (isNaN(h)) return "시간 미정";
+
+    const period = h >= 12 ? "오후" : "오전";
+    const displayHour = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    return `${period} ${displayHour}:${m}`;
   }
 
   const createTimelineItems = () => {
-    if (!currentSchedule) return [];
+    if (!selectedSchedule) return [];
 
     const items = []
 
-    if (currentSchedule.departureTime && currentSchedule.departure) {
+    if (selectedSchedule.departureTime && selectedSchedule.departure) {
       items.push({
         type: "departure",
-        time: currentSchedule.departureTime,
-        title: currentSchedule.departure,
+        time: selectedSchedule.departureTime,
+        title: selectedSchedule.departure.name,
         icon: "출발",
         color: "red",
       })
     }
 
-    currentSchedule.waypoints?.forEach((waypoint) => {
+    selectedSchedule.waypoints?.forEach((waypoint) => {
       if (waypoint) {
         items.push({
           type: "waypoint",
           time: "", // 실제 시간 계산 필요
-          title: waypoint,
+          title: waypoint.name,
           icon: "경유",
           color: "blue",
         })
       }
     })
 
-    currentSchedule.selectedRestaurants?.forEach((item) => {
-        const mealTime = currentSchedule.targetMealTimes?.find(mt => mt.type === (item.sectionId.includes('meal') ? '식사' : '간식'));
+    selectedSchedule.selectedRestaurants?.forEach((item) => {
+        const mealTime = selectedSchedule.targetMealTimes?.find(mt => mt.type === (item.sectionId.includes('meal') ? '식사' : '간식'));
         items.push({
             type: "restaurant",
             time: mealTime?.time || "",
@@ -162,11 +174,11 @@ export default function ScheduleSummaryScreen() {
         });
     });
 
-    if (currentSchedule.arrivalTime && currentSchedule.destination) {
+    if (selectedSchedule.destination) {
       items.push({
         type: "destination",
-        time: currentSchedule.arrivalTime,
-        title: currentSchedule.destination,
+        time: selectedSchedule.calculatedArrivalTime,
+        title: selectedSchedule.destination.name,
         icon: "도착",
         color: "green",
       })
@@ -182,7 +194,7 @@ export default function ScheduleSummaryScreen() {
 
   const timelineItems = createTimelineItems()
 
-  if (isLoading) {
+  if (isProcessing) {
     return <LoadingPopup />;
   }
 

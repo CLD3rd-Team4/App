@@ -1,36 +1,44 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { scheduleApi } from "@/services/api"
 import type { Schedule, Restaurant } from "@/types"
 
 export function useSchedule() {
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isProcessing, setIsProcessing] = useState(false); // 처리 중 상태 추가
+
+  const initFromLocalStorage = useCallback(() => {
+    setIsLoading(true);
+    try {
+      const savedSchedule = localStorage.getItem("selectedSchedule");
+      if (savedSchedule) {
+        setSelectedSchedule(JSON.parse(savedSchedule));
+      }
+      const savedSchedules = localStorage.getItem("schedules");
+      if (savedSchedules) {
+        setSchedules(JSON.parse(savedSchedules));
+      }
+       const processingState = localStorage.getItem("isProcessing");
+      if (processingState) {
+        setIsProcessing(JSON.parse(processingState));
+      }
+    } catch (error) {
+      console.error("로컬 스토리지 파싱/접근 실패:", error);
+      // 문제가 있는 데이터는 지웁니다.
+      localStorage.removeItem("selectedSchedule");
+      localStorage.removeItem("schedules");
+      localStorage.removeItem("isProcessing");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    // 로컬 스토리지에서 선택된 스케줄 확인
-    const savedSchedule = localStorage.getItem("selectedSchedule")
-    if (savedSchedule) {
-      try {
-        const scheduleData = JSON.parse(savedSchedule)
-        setSelectedSchedule(scheduleData)
-      } catch (error) {
-        console.error("스케줄 정보 파싱 실패:", error)
-      }
-    }
-
-    // 로컬 스토리지에서 스케줄 목록 확인
-    const savedSchedules = localStorage.getItem("schedules")
-    if (savedSchedules) {
-      try {
-        const schedulesData = JSON.parse(savedSchedules)
-        setSchedules(schedulesData)
-      } catch (error) {
-        console.error("스케줄 목록 파싱 실패:", error)
-      }
-    }
-  }, [])
+    initFromLocalStorage();
+  }, [initFromLocalStorage]);
 
   const saveSchedulesToStorage = (scheduleList: Schedule[]) => {
     localStorage.setItem("schedules", JSON.stringify(scheduleList))
@@ -39,7 +47,6 @@ export function useSchedule() {
 
   const loadSchedules = async (userId: string) => {
     try {
-      // TODO: REST API 연동 - 스케줄 목록 가져오기
       const data = await scheduleApi.getSchedules(userId)
       saveSchedulesToStorage(data)
     } catch (error) {
@@ -50,16 +57,10 @@ export function useSchedule() {
 
   const createSchedule = async (scheduleData: Omit<Schedule, "id">) => {
     try {
-      // TODO: REST API 연동 - 스케줄 생성
       const newSchedule = await scheduleApi.createSchedule(scheduleData)
       const updatedSchedules = [...schedules, newSchedule]
       setSchedules(updatedSchedules)
       localStorage.setItem("schedules", JSON.stringify(updatedSchedules))
-
-      // 자동 선택 제거 - 스케줄 목록에만 추가
-      // setSelectedSchedule(newSchedule)
-      // localStorage.setItem("selectedSchedule", JSON.stringify(newSchedule))
-
       return newSchedule
     } catch (error) {
       console.error("스케줄 생성 실패:", error)
@@ -69,25 +70,26 @@ export function useSchedule() {
 
   const updateSchedule = async (scheduleData: Schedule) => {
     try {
-      // TODO: REST API 연동 - 스케줄 수정
-      await scheduleApi.updateSchedule(scheduleData)
-      const updatedSchedules = schedules.map((s) => (s.id === scheduleData.id ? scheduleData : s))
-      saveSchedulesToStorage(updatedSchedules)
+      await scheduleApi.updateSchedule(scheduleData);
+      await loadSchedules(scheduleData.userId); 
 
-      // 선택된 스케줄이 수정된 스케줄이면 업데이트
       if (selectedSchedule?.id === scheduleData.id) {
-        setSelectedSchedule(scheduleData)
-        localStorage.setItem("selectedSchedule", JSON.stringify(scheduleData))
+        const updatedSelected = await scheduleApi.getScheduleDetail(scheduleData.id, scheduleData.userId);
+        if (updatedSelected.schedule) {
+          // selectSchedule이 아닌 setSelectedSchedule을 직접 사용하여 상태만 업데이트
+          const finalSchedule = { ...updatedSelected.schedule, id: updatedSelected.schedule.scheduleId };
+          setSelectedSchedule(finalSchedule);
+          localStorage.setItem("selectedSchedule", JSON.stringify(finalSchedule));
+        }
       }
     } catch (error) {
-      console.error("스케줄 수정 실패:", error)
-      throw error
+      console.error("스케줄 수정 실패:", error);
+      throw error;
     }
-  }
+  };
 
-  const deleteSchedule = async (scheduleId: string, userId: string) => { // userId 추가
+  const deleteSchedule = async (scheduleId: string, userId: string) => {
     try {
-      // userId를 API 호출에 전달
       await scheduleApi.deleteSchedule(scheduleId, userId)
       const updatedSchedules = schedules.filter((schedule) => schedule.id !== scheduleId)
       setSchedules(updatedSchedules)
@@ -96,6 +98,8 @@ export function useSchedule() {
       if (selectedSchedule?.id === scheduleId) {
         setSelectedSchedule(null)
         localStorage.removeItem("selectedSchedule")
+        setIsProcessing(false);
+        localStorage.removeItem("isProcessing");
       }
     } catch (error) {
       console.error("스케줄 삭제 실패:", error)
@@ -103,19 +107,27 @@ export function useSchedule() {
     }
   }
 
-  const selectSchedule = (schedule: Schedule) => {
-    // 목데이터로 targetMealTimes가 없는 경우 기본값 추가
-    const scheduleWithMealTimes = {
-      ...schedule,
-      targetMealTimes: schedule.targetMealTimes || [
-        { type: "식사" as const, time: "12:00" },
-        { type: "간식" as const, time: "15:00" },
-        { type: "식사" as const, time: "18:00" },
-      ],
+  const selectSchedule = (schedule: Schedule | null) => {
+    if (schedule) {
+      const scheduleWithMealTimes = {
+        ...schedule,
+        targetMealTimes: schedule.targetMealTimes || [
+          { type: "식사" as const, time: "12:00" },
+          { type: "간식" as const, time: "15:00" },
+          { type: "식사" as const, time: "18:00" },
+        ],
+      }
+      setSelectedSchedule(scheduleWithMealTimes)
+      localStorage.setItem("selectedSchedule", JSON.stringify(scheduleWithMealTimes))
+    } else {
+      setSelectedSchedule(null);
+      localStorage.removeItem("selectedSchedule");
     }
-
-    setSelectedSchedule(scheduleWithMealTimes)
-    localStorage.setItem("selectedSchedule", JSON.stringify(scheduleWithMealTimes))
+  }
+  
+  const setProcessingStatus = (status: boolean) => {
+    setIsProcessing(status);
+    localStorage.setItem("isProcessing", JSON.stringify(status));
   }
 
   const updateSelectedRestaurant = (restaurant: Restaurant) => {
@@ -132,11 +144,14 @@ export function useSchedule() {
   return {
     schedules,
     selectedSchedule,
+    isLoading,
+    isProcessing, // isProcessing 반환
     loadSchedules,
     createSchedule,
     updateSchedule,
     deleteSchedule,
     selectSchedule,
+    setProcessingStatus, // 처리 상태 설정 함수 반환
     updateSelectedRestaurant,
   }
 }
