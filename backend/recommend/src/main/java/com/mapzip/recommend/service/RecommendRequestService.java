@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mapzip.recommend.dto.MultiSlotRecommendRequestDto;
 import com.mapzip.recommend.dto.RecommendRequestDto;
 
 import lombok.RequiredArgsConstructor;
@@ -19,9 +20,9 @@ public class RecommendRequestService {
     private final ObjectMapper objectMapper;
     private static final String TOPIC_NAME = "recommend-request";
     
-    public void sendRecommendRequest(RecommendRequestDto recommendRequestDto) {
+    public void sendRecommendRequest( MultiSlotRecommendRequestDto multiSlotRecommendRequestDto) {
     	try {
-            String json = objectMapper.writeValueAsString(recommendRequestDto);
+            String json = objectMapper.writeValueAsString(multiSlotRecommendRequestDto);
             kafkaTemplate.send(TOPIC_NAME, json);
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Kafka 메시지 직렬화 실패", e);

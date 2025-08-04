@@ -7,7 +7,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.mapzip.recommend.dto.RecommendRequestDto;
 import com.mapzip.recommend.dto.RecommendResultDto;
-
+import com.mapzip.recommend.dto.kakao.KakaoSearchResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -16,9 +16,8 @@ import software.amazon.awssdk.services.bedrockruntime.BedrockRuntimeClient;
 import software.amazon.awssdk.services.bedrockruntime.model.InvokeModelRequest;
 import software.amazon.awssdk.services.bedrockruntime.model.InvokeModelResponse;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+
 
 @Service
 @RequiredArgsConstructor
@@ -30,16 +29,14 @@ public class RecommendService {
 
     public RecommendResultDto recommendProcess(RecommendRequestDto recommendRequestDto) {
         try {
-            // 프롬프트 생성
             String prompt = buildPrompt(recommendRequestDto);
 
-            // Claude 3 형식에 맞는 요청 생성
             ClaudeMessagesRequest messagesRequest = new ClaudeMessagesRequest(
-            		"bedrock-2023-05-31",
+                    "bedrock-2023-05-31",
                     List.of(new Message("user", prompt)),
-                    1000,   // max_tokens
-                    0.7,    // temperature
-                    0.9     // top_p
+                    1000,
+                    0.7,
+                    0.9
             );
 
             String body = objectMapper.writeValueAsString(messagesRequest);
@@ -50,23 +47,20 @@ public class RecommendService {
                     .accept("application/json")
                     .body(SdkBytes.fromUtf8String(body))
                     .build();
-            
+
             InvokeModelResponse bedrockResult = bedrockRuntimeClient.invokeModel(request);
             String result = bedrockResult.body().asUtf8String();
-            String kakaoPlaceListJson=recommendRequestDto.getKakaoPlaceListJson();
-            String recommendPlaceListJson = buildRecommendPlaceListJson(
-            		kakaoPlaceListJson,
-            	    result
-            	);
-            RecommendResultDto recommendResultDto = new RecommendResultDto(
-            	    recommendRequestDto.getUserId(),
-            	    recommendRequestDto.getScheduleId(),
-            	    recommendRequestDto.getRecommendationRequestIds(),
-            	    recommendPlaceListJson
-            	);
 
-            log.info("🎯 Bedrock 응답 수신 완료 ");
-            return recommendResultDto;
+            String recommendPlaceListJson = buildRecommendPlaceListJson(
+                    recommendRequestDto.getKakaoPlaceList(),
+                    result
+            );
+            return new RecommendResultDto(
+                    recommendRequestDto.getUserId(),
+                    recommendRequestDto.getScheduleId(),
+                    new ArrayList<>(recommendRequestDto.getKakaoPlaceList().keySet()),
+                    recommendPlaceListJson
+            );
 
         } catch (JsonProcessingException e) {
             throw new RuntimeException("❌ Bedrock 요청 JSON 직렬화 실패", e);
@@ -75,18 +69,25 @@ public class RecommendService {
         }
     }
 
-    // 사용자 정보와 장소 리스트 기반 프롬프트 생성
     private String buildPrompt(RecommendRequestDto dto) {
+        StringBuilder slotDescriptions = new StringBuilder();
+        for (Map.Entry<String, KakaoSearchResponse> entry : dto.getKakaoPlaceList().entrySet()) {
+            slotDescriptions.append(String.format("\n[%s 구간]", entry.getKey()));
+            try {
+                slotDescriptions.append("\n").append(objectMapper.writeValueAsString(entry.getValue()));
+            } catch (JsonProcessingException e) {
+                throw new RuntimeException("❌ KakaoSearchResponse 직렬화 실패", e);
+            }
+        }
+
         return String.format("""
         아래는 사용자의 여행 정보입니다.
         목적: %s
         동행자: %s
         참고 메모: %s
-        다음은 사용자가 고려하고 있는 음식점 목록입니다 (카카오 장소 API JSON 형식입니다).
-        %s
+        다음은 사용자가 고려하고 있는 음식점 목록입니다 (카카오 장소 API JSON 형식입니다).%s
 
         사용자는 총 %d개의 시간대에 대해 식당을 추천받고자 합니다.
-        
         아래 형식으로 각 시간대마다 식당을 3개씩 추천하고, 각 식당의 추천 이유를 간단히 작성해 주세요.
         추천은 JSON 형식으로 출력해 주세요.
 
@@ -117,45 +118,20 @@ public class RecommendService {
                 dto.getPurpose(),
                 String.join(", ", dto.getCompanions()),
                 dto.getUserNote(),
-                dto.getKakaoPlaceListJson(),
-                dto.getRecommendationRequestIds().size()
+                slotDescriptions.toString(),
+                dto.getKakaoPlaceList().size()
         );
     }
 
-    // Claude 3 메시지 요청 형식
-    record Message(String role, String content) {}
-    record ClaudeMessagesRequest(
-    		String anthropic_version,
-            List<Message> messages,
-            int max_tokens,
-            double temperature,
-            double top_p
-    ) {}
-    
-    private String buildRecommendPlaceListJson(String kakaoPlaceListJson, String aiResponseJson) {
+    private String buildRecommendPlaceListJson(Map<String, KakaoSearchResponse> slotPlaceMap, String aiResponseJson) {
         try {
-            // 0. AI 응답에서 JSON 텍스트 추출
+            JsonNode raw = objectMapper.readTree(aiResponseJson);
+            String rawText = raw.path("content").get(0).path("text").asText();
 
-        	JsonNode raw = objectMapper.readTree(aiResponseJson);
-        	String rawText = raw
-        	    .path("content")
-        	    .path(0)
-        	    .path("text")
-        	    .asText("");
-
-            // 1. Kakao 장소 리스트 파싱
-            JsonNode kakaoRoot = objectMapper.readTree(kakaoPlaceListJson);
-            ArrayNode documents = (ArrayNode) kakaoRoot.get("documents");
-
-            Map<String, JsonNode> placeMap = new HashMap<String, JsonNode>();
-            for (JsonNode doc : documents) {
-                placeMap.put(doc.get("id").asText(), doc);
-            }
-
-            // 2. Claude 응답 JSON 파싱
             JsonNode aiRoot = objectMapper.readTree(rawText);
             ArrayNode recommendations = (ArrayNode) aiRoot.get("recommendations");
 
+            ObjectNode finalResult = objectMapper.createObjectNode();
             ArrayNode finalRecommendations = objectMapper.createArrayNode();
 
             for (JsonNode rec : recommendations) {
@@ -163,11 +139,25 @@ public class RecommendService {
                 ArrayNode places = (ArrayNode) rec.get("places");
 
                 ArrayNode mergedPlaces = objectMapper.createArrayNode();
+
                 for (JsonNode place : places) {
                     String id = place.get("id").asText();
                     String reason = place.get("reason").asText();
 
-                    JsonNode kakaoPlace = placeMap.get(id);
+                    JsonNode kakaoPlace = slotPlaceMap.values().stream()
+                            .flatMap(res -> res.getDocuments().stream())
+                            .filter(doc -> doc.getId().equals(id))
+                            .findFirst()
+                            .map(doc -> {
+                                try {
+                                    String jsonStr = objectMapper.writeValueAsString(doc);
+                                    return objectMapper.readTree(jsonStr);
+                                } catch (Exception e) {
+                                    throw new RuntimeException("❌ Kakao Document 변환 실패", e);
+                                }
+                            })
+                            .orElse(null);
+
                     if (kakaoPlace != null) {
                         ObjectNode merged = kakaoPlace.deepCopy();
                         merged.put("reason", reason);
@@ -182,9 +172,7 @@ public class RecommendService {
                 finalRecommendations.add(mealObj);
             }
 
-            ObjectNode finalResult = objectMapper.createObjectNode();
             finalResult.set("recommendations", finalRecommendations);
-
             return objectMapper.writeValueAsString(finalResult);
 
         } catch (Exception e) {
@@ -192,5 +180,13 @@ public class RecommendService {
         }
     }
 
+    record Message(String role, String content) {}
 
+    record ClaudeMessagesRequest(
+            String anthropic_version,
+            List<Message> messages,
+            int max_tokens,
+            double temperature,
+            double top_p
+    ) {}
 }

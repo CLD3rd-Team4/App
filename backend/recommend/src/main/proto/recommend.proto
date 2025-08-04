@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.mapzip.recommend.grpc";
+option java_outer_classname = "RecommendProto";
+
+message RecommendRequest {
+  string userId = 1;
+  string scheduleId = 2;
+  repeated string recommendationRequestIds = 3;
+  repeated SlotInfo slots = 4;
+  string userNote = 5;
+  string purpose = 6;
+  repeated string companions = 7;
+}
+
+message SlotInfo {
+  string slotId = 1;
+  double lat = 2;
+  double lon = 3;
+  string mealType = 4;
+  string scheduledTime = 5;
+  int32 radius = 6;
+}
+
+message RecommendResponse {
+  string status = 1;
+  string message = 2;
+}
+
+service RecommendService {
+  rpc SendRecommendRequest (RecommendRequest) returns (RecommendResponse);
+}
