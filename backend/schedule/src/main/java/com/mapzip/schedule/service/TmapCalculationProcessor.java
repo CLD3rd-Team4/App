@@ -83,7 +83,10 @@ public class TmapCalculationProcessor {
         }
 
         Location destinationLocation = convertToObject(jobData.get("destination"), Location.class);
-        List<Waypoint> waypointsList = convertToList(jobData.get("waypoints"), Waypoint.class);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> waypointsList = (List<Map<String, Object>>) jobData.get("waypoints");
+
         String tmapDepartureTime = TimeUtil.toTmapApiFormat(departureDateTime);
         TmapLocation departure = new TmapLocation(departureLocation.getName(), String.valueOf(departureLocation.getLng()), String.valueOf(departureLocation.getLat()));
         TmapLocation destination = new TmapLocation(destinationLocation.getName(), String.valueOf(destinationLocation.getLng()), String.valueOf(destinationLocation.getLat()));
@@ -91,7 +94,7 @@ public class TmapCalculationProcessor {
         WaypointsContainer waypointsContainer = null;
         if (waypointsList != null && !waypointsList.isEmpty()) {
             List<TmapWaypoint> waypoints = waypointsList.stream()
-                    .map(wp -> new TmapWaypoint(String.valueOf(wp.getLng()), String.valueOf(wp.getLat())))
+                    .map(wp -> new TmapWaypoint(String.valueOf(wp.get("lng")), String.valueOf(wp.get("lat"))))
                     .collect(Collectors.toList());
             waypointsContainer = new WaypointsContainer(waypoints);
         }
@@ -133,7 +136,7 @@ public class TmapCalculationProcessor {
             slot.setCalculatedLocation(objectMapper.writeValueAsString(locationJson));
         }
 
-        List<Map<String, Object>> originalWaypoints = objectMapper.readValue(schedule.getWaypoints(), new TypeReference<List<Map<String, Object>>>() {});
+        List<Map<String, Object>> originalWaypoints = gson.fromJson(schedule.getWaypoints(), new com.google.gson.reflect.TypeToken<List<Map<String, Object>>>() {}.getType());
         Map<Integer, String> arrivalTimesByIndex = new HashMap<>();
         long accumulatedTime = 0;
 
@@ -172,7 +175,7 @@ public class TmapCalculationProcessor {
             newWaypoints.add(newWaypoint);
         }
 
-        schedule.setWaypoints(objectMapper.writeValueAsString(newWaypoints));
+        schedule.setWaypoints(gson.toJson(newWaypoints));
         scheduleRepository.save(schedule);
         log.info("스케줄이 Tmap 계산 결과로 업데이트되었습니다: {}", schedule.getId());
     }

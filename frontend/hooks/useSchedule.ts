@@ -14,7 +14,7 @@ export function useSchedule() {
     try {
       const savedSchedule = localStorage.getItem("selectedSchedule");
       if (savedSchedule) {
-        setSelectedSchedule(JSON.parse(savedSchedule));
+        selectSchedule(JSON.parse(savedSchedule));
       }
       const savedSchedules = localStorage.getItem("schedules");
       if (savedSchedules) {
@@ -70,10 +70,8 @@ export function useSchedule() {
       if (selectedSchedule?.id === scheduleData.id) {
         const updatedSelected = await scheduleApi.getScheduleDetail(scheduleData.id, scheduleData.userId);
         if (updatedSelected.schedule) {
-          // selectSchedule이 아닌 setSelectedSchedule을 직접 사용하여 상태만 업데이트
-          const finalSchedule = { ...updatedSelected.schedule, id: updatedSelected.schedule.scheduleId };
-          setSelectedSchedule(finalSchedule);
-          localStorage.setItem("selectedSchedule", JSON.stringify(finalSchedule));
+          // selectSchedule을 호출하여 파싱 로직을 재사용합니다.
+          selectSchedule({ ...updatedSelected.schedule, id: updatedSelected.schedule.scheduleId || scheduleData.id });
         }
       }
     } catch (error) {
@@ -101,9 +99,16 @@ export function useSchedule() {
 
   const selectSchedule = (schedule: Schedule | null) => {
     if (schedule) {
-      const scheduleWithMealTimes = {
+      const parsedSchedule = {
         ...schedule,
-        targetMealTimes: schedule.targetMealTimes || [
+        departure: typeof schedule.departure === 'string' ? JSON.parse(schedule.departure) : schedule.departure,
+        destination: typeof schedule.destination === 'string' ? JSON.parse(schedule.destination) : schedule.destination,
+        waypoints: typeof schedule.waypoints === 'string' ? JSON.parse(schedule.waypoints) : schedule.waypoints,
+      };
+
+      const scheduleWithMealTimes = {
+        ...parsedSchedule,
+        targetMealTimes: parsedSchedule.targetMealTimes || [
           { type: "식사" as const, time: "12:00" },
           { type: "간식" as const, time: "15:00" },
           { type: "식사" as const, time: "18:00" },

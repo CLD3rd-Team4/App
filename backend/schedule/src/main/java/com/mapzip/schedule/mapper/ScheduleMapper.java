@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -26,9 +27,20 @@ public class ScheduleMapper {
     private final MealTimeSlotRepository mealTimeSlotRepository;
     private final SelectedRestaurantRepository selectedRestaurantRepository;
     private final Gson gson = new Gson();
-    private final ObjectMapper objectMapper; // objectMapper는 그대로 두되, 필요한 곳에만 사용
+    private final ObjectMapper objectMapper;
     private static final Type WAYPOINT_LIST_TYPE = new TypeToken<List<Map<String, Object>>>() {}.getType();
     private static final Type STRING_LIST_TYPE = new TypeToken<List<String>>() {}.getType();
+
+    private Map<String, Object> waypointToMap(com.mapzip.schedule.grpc.Waypoint waypoint) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("lat", waypoint.getLat());
+        map.put("lng", waypoint.getLng());
+        map.put("name", waypoint.getName());
+        if (waypoint.getArrivalTime() != null && !waypoint.getArrivalTime().isEmpty()) {
+            map.put("arrivalTime", waypoint.getArrivalTime());
+        }
+        return map;
+    }
 
     public Schedule toEntity(CreateScheduleRequest request) throws JsonProcessingException {
         Schedule schedule = new Schedule();
@@ -39,10 +51,13 @@ public class ScheduleMapper {
         schedule.setUserNote(request.getUserNote());
         schedule.setPurpose(request.getPurpose());
 
-        // Protobuf 객체는 gson으로 직렬화
         schedule.setDepartureLocation(gson.toJson(request.getDeparture()));
         schedule.setDestinationLocation(gson.toJson(request.getDestination()));
-        schedule.setWaypoints(gson.toJson(request.getWaypointsList()));
+
+        List<Map<String, Object>> waypointMaps = request.getWaypointsList().stream()
+                .map(this::waypointToMap)
+                .collect(Collectors.toList());
+        schedule.setWaypoints(gson.toJson(waypointMaps));
         schedule.setCompanions(gson.toJson(request.getCompanionsList()));
 
         return schedule;
@@ -54,15 +69,17 @@ public class ScheduleMapper {
         schedule.setUserNote(request.getUserNote());
         schedule.setPurpose(request.getPurpose());
 
-        // Protobuf 객체는 gson으로 직렬화
         schedule.setDepartureLocation(gson.toJson(request.getDeparture()));
         schedule.setDestinationLocation(gson.toJson(request.getDestination()));
-        schedule.setWaypoints(gson.toJson(request.getWaypointsList()));
+
+        List<Map<String, Object>> waypointMaps = request.getWaypointsList().stream()
+                .map(this::waypointToMap)
+                .collect(Collectors.toList());
+        schedule.setWaypoints(gson.toJson(waypointMaps));
         schedule.setCompanions(gson.toJson(request.getCompanionsList()));
     }
 
     public GetScheduleListResponse.ScheduleSummary toSummary(Schedule schedule) {
-        // JSON 파싱은 gson 사용
         com.mapzip.schedule.grpc.Location destination = gson.fromJson(schedule.getDestinationLocation(), com.mapzip.schedule.grpc.Location.class);
         int totalMealSlots = mealTimeSlotRepository.countBySchedule(schedule);
         int selectedRestaurantsCount = selectedRestaurantRepository.countBySchedule(schedule);
@@ -78,7 +95,6 @@ public class ScheduleMapper {
     }
 
     public GetScheduleDetailResponse.ScheduleDetail toDetail(Schedule schedule) {
-        // JSON 파싱은 gson 사용
         com.mapzip.schedule.grpc.Location departure = gson.fromJson(schedule.getDepartureLocation(), com.mapzip.schedule.grpc.Location.class);
         com.mapzip.schedule.grpc.Location destination = gson.fromJson(schedule.getDestinationLocation(), com.mapzip.schedule.grpc.Location.class);
         
@@ -87,7 +103,6 @@ public class ScheduleMapper {
         if (waypointMaps != null) {
             for (Map<String, Object> map : waypointMaps) {
                 Waypoint.Builder waypointBuilder = Waypoint.newBuilder();
-                // gson이 double로 파싱하므로 Double로 캐스팅
                 if (map.get("lat") != null) waypointBuilder.setLat((Double) map.get("lat"));
                 if (map.get("lng") != null) waypointBuilder.setLng((Double) map.get("lng"));
                 if (map.get("name") != null) waypointBuilder.setName((String) map.get("name"));
