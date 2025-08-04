@@ -20,28 +20,28 @@ service ReviewService {
     // 사용자별 리뷰 목록 조회
     rpc GetUserReviews(GetUserReviewsRequest) returns (GetUserReviewsResponse) {
         option (google.api.http) = {
-            get: "/reviews/user/{user_id}"
+            get: "/review/user/{user_id}"
         };
     }
     
     // 특정 식당의 리뷰 목록 조회
     rpc GetRestaurantReviews(GetRestaurantReviewsRequest) returns (GetRestaurantReviewsResponse) {
         option (google.api.http) = {
-            get: "/reviews/restaurant/{restaurant_id}"
+            get: "/review/restaurant/{restaurant_id}"
         };
     }
     
     // 리뷰 상세 조회
     rpc GetReview(GetReviewRequest) returns (GetReviewResponse) {
         option (google.api.http) = {
-            get: "/reviews/{restaurant_id}/{review_id}"
+            get: "/review/{restaurant_id}/{review_id}"
         };
     }
     
     // 리뷰 수정
     rpc UpdateReview(UpdateReviewRequest) returns (UpdateReviewResponse) {
         option (google.api.http) = {
-            put: "/reviews/{restaurant_id}/{review_id}"
+            put: "/review/{restaurant_id}/{review_id}"
             body: "*"
         };
     }
@@ -49,7 +49,7 @@ service ReviewService {
     // 리뷰 삭제
     rpc DeleteReview(DeleteReviewRequest) returns (DeleteReviewResponse) {
         option (google.api.http) = {
-            delete: "/reviews/{restaurant_id}/{review_id}"
+            delete: "/review/{restaurant_id}/{review_id}"
         };
     }
     
