@@ -16,7 +16,12 @@ public class HeaderInterceptor implements ServerInterceptor {
             ServerCallHandler<ReqT, RespT> next) {
 
         String userId = headers.get(Metadata.Key.of("x-user-id", Metadata.ASCII_STRING_MARSHALLER));
-        logger.info("Extracted User-Id from header: {}", userId);
+        
+        if (userId == null || userId.isEmpty()) {
+            logger.warn("No X-User-Id header found in gRPC request. Method: {}", call.getMethodDescriptor().getFullMethodName());
+        } else {
+            logger.debug("Extracted User-Id from header: {} for method: {}", userId, call.getMethodDescriptor().getFullMethodName());
+        }
 
         Context context = Context.current().withValue(USER_ID_CONTEXT_KEY, userId);
         return Contexts.interceptCall(context, call, headers, next);

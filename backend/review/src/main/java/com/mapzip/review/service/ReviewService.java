@@ -2,7 +2,9 @@ package com.mapzip.review.service;
 
 import com.mapzip.review.dto.OcrResultDto;
 import com.mapzip.review.entity.ReviewEntity;
+import com.mapzip.review.grpc.HeaderInterceptor;
 import com.mapzip.review.repository.ReviewRepository;
+import io.grpc.Context;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,6 +46,9 @@ public class ReviewService {
                                          String restaurantAddress, int rating, String content,
                                          List<byte[]> receiptImages, List<byte[]> reviewImages) {
         try {
+            // 사용자 인증 검증
+            validateUserAuthentication(userId);
+            
             // OCR 검증 수행
             OcrResultDto ocrResult = null;
             boolean isVerified = false;
@@ -76,7 +81,6 @@ public class ReviewService {
             // 리뷰 엔티티 생성
             ReviewEntity review = new ReviewEntity();
             review.setRestaurantId(restaurantId);
-            review.setReviewId(UUID.randomUUID().toString()); // 고유한 리뷰 ID 생성
             review.setUserId(userId);
             review.setRestaurantName(restaurantName);
             review.setRestaurantAddress(restaurantAddress);
@@ -86,6 +90,9 @@ public class ReviewService {
             review.setIsVerified(isVerified);
             review.setCreatedAt(Instant.now());
             review.setUpdatedAt(Instant.now());
+            
+            // DynamoDB 복합키 생성
+            review.generateCompositeKey();
             
             // 방문 날짜 설정 (OCR에서 추출되었다면 사용, 아니면 현재 날짜)
             if (ocrResult != null && ocrResult.getVisitDate() != null && !ocrResult.getVisitDate().isEmpty()) {
@@ -128,6 +135,9 @@ public class ReviewService {
     })
     public ReviewEntity updateReview(String restaurantId, String reviewId, String userId, 
                                    int rating, String content, List<String> imageUrls) {
+        // 사용자 인증 검증
+        validateUserAuthentication(userId);
+        
         Optional<ReviewEntity> existingReview = reviewRepository.findByRestaurantIdAndReviewId(restaurantId, reviewId);
         
         if (existingReview.isEmpty()) {
@@ -156,6 +166,9 @@ public class ReviewService {
         @CacheEvict(value = "reviewStats", allEntries = true)
     })
     public void deleteReview(String restaurantId, String reviewId, String userId) {
+        // 사용자 인증 검증
+        validateUserAuthentication(userId);
+        
         Optional<ReviewEntity> existingReview = reviewRepository.findByRestaurantIdAndReviewId(restaurantId, reviewId);
         
         if (existingReview.isEmpty()) {
@@ -205,6 +218,24 @@ public class ReviewService {
         // 3. 캐싱 레이어 추가하여 자주 요청되는 데이터 성능 개선
         
         return List.of(); // 현재는 빈 리스트 반환
+    }
+    
+    /**
+     * 사용자 인증 검증 메서드
+     * gRPC Context에서 받은 사용자 ID와 요청의 사용자 ID가 일치하는지 확인
+     */
+    private void validateUserAuthentication(String requestedUserId) {
+        String authenticatedUserId = HeaderInterceptor.USER_ID_CONTEXT_KEY.get();
+        
+        if (authenticatedUserId == null || authenticatedUserId.isEmpty()) {
+            throw new SecurityException("인증되지 않은 사용자입니다.");
+        }
+        
+        if (!authenticatedUserId.equals(requestedUserId)) {
+            throw new SecurityException("다른 사용자의 리뷰에 접근할 수 없습니다.");
+        }
+        
+        logger.debug("User authentication validated for userId: {}", authenticatedUserId);
     }
     
     // 내부 클래스: 리뷰 생성 결과
