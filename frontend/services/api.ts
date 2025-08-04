@@ -1,6 +1,7 @@
 // API 기본 설정
 const API_BASE_URL = "https://api.mapzip.shop";
 
+
 // 테스트용 데이터 - 실제 API 연동 시 제거
 const TEST_DATA = {
   schedules: [

@@ -27,14 +27,14 @@ public class CustomRouteLocator {
                         .filters(f -> f
                                 .filter(xssProtectionFilter.apply(new XssProtectionFilter.Config()))
                                 .filter(jwtAuthenticationFilter.apply(new JwtAuthenticationFilter.Config())))
-                        .uri("http://auth.service-platform:50051"))
+                        .uri("http://auth.service-platform:8080"))
 
                 // 추천 서비스 라우팅
                 .route("recommend-service", r -> r.path("/recommend/**")
                         .filters(f -> f
                                 .filter(xssProtectionFilter.apply(new XssProtectionFilter.Config()))
                                 .filter(jwtAuthenticationFilter.apply(new JwtAuthenticationFilter.Config())))
-                        .uri("http://recommend.service-recommend:50051"))
+                        .uri("http://recommend.service-recommend:9090"))
 
                 // 리뷰 서비스 라우팅 (이미지 포함 - HTTP)
                 .route("review-http", r -> r.path("/review", "/review/verify-receipt")
