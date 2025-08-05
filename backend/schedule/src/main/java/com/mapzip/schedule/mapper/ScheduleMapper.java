@@ -9,7 +9,7 @@ import com.mapzip.schedule.entity.Schedule;
 import com.mapzip.schedule.entity.SelectedRestaurant;
 import com.mapzip.schedule.grpc.*;
 import com.mapzip.schedule.repository.MealTimeSlotRepository;
-import com.mapzip.schedule.repository.SelectedRestaurantRepository;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 public class ScheduleMapper {
 
     private final MealTimeSlotRepository mealTimeSlotRepository;
-    private final SelectedRestaurantRepository selectedRestaurantRepository;
+    
     private final Gson gson = new Gson();
     private final ObjectMapper objectMapper;
     private static final Type WAYPOINT_LIST_TYPE = new TypeToken<List<Map<String, Object>>>() {}.getType();
@@ -82,7 +82,7 @@ public class ScheduleMapper {
     public GetScheduleListResponse.ScheduleSummary toSummary(Schedule schedule) {
         com.mapzip.schedule.grpc.Location destination = gson.fromJson(schedule.getDestinationLocation(), com.mapzip.schedule.grpc.Location.class);
         int totalMealSlots = mealTimeSlotRepository.countBySchedule(schedule);
-        int selectedRestaurantsCount = selectedRestaurantRepository.countBySchedule(schedule);
+        
 
         return GetScheduleListResponse.ScheduleSummary.newBuilder()
                 .setScheduleId(schedule.getId())
@@ -90,7 +90,7 @@ public class ScheduleMapper {
                 .setDepartureTime(schedule.getDepartureTime())
                 .setDestinationName(destination.getName())
                 .setTotalMealSlots(totalMealSlots)
-                .setSelectedRestaurantsCount(selectedRestaurantsCount)
+                
                 .build();
     }
 
@@ -117,10 +117,7 @@ public class ScheduleMapper {
                 .map(this::toGrpcMealTimeSlot)
                 .collect(Collectors.toList());
 
-        List<SelectedRestaurant> selectedRestaurantEntities = selectedRestaurantRepository.findBySchedule(schedule);
-        List<com.mapzip.schedule.grpc.SelectedRestaurant> selectedRestaurants = selectedRestaurantEntities.stream()
-                .map(this::toGrpcSelectedRestaurant)
-                .collect(Collectors.toList());
+        
 
         GetScheduleDetailResponse.ScheduleDetail.Builder builder = GetScheduleDetailResponse.ScheduleDetail.newBuilder()
                 .setTitle(schedule.getTitle())
@@ -130,7 +127,7 @@ public class ScheduleMapper {
                 .setDestination(destination)
                 .addAllWaypoints(waypoints)
                 .addAllMealSlots(mealTimeSlots)
-                .addAllSelectedRestaurants(selectedRestaurants)
+                
                 .setUserNote(schedule.getUserNote() != null ? schedule.getUserNote() : "")
                 .setPurpose(schedule.getPurpose() != null ? schedule.getPurpose() : "");
 
@@ -150,13 +147,5 @@ public class ScheduleMapper {
                 .build();
     }
 
-    public com.mapzip.schedule.grpc.SelectedRestaurant toGrpcSelectedRestaurant(SelectedRestaurant entity) {
-        return com.mapzip.schedule.grpc.SelectedRestaurant.newBuilder()
-                .setSlotId(entity.getSlotId())
-                .setRestaurantId(entity.getRestaurantId())
-                .setName(entity.getName())
-                .setScheduledTime(entity.getScheduledTime())
-                .setDetailUrl(entity.getDetailUrl() != null ? entity.getDetailUrl() : "")
-                .build();
-    }
+    
 }

@@ -9,7 +9,7 @@ import com.mapzip.schedule.grpc.*;
 import com.mapzip.schedule.mapper.ScheduleMapper;
 import com.mapzip.schedule.repository.MealTimeSlotRepository;
 import com.mapzip.schedule.repository.ScheduleRepository;
-import com.mapzip.schedule.repository.SelectedRestaurantRepository;
+
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.time.LocalDateTime;
@@ -30,7 +30,7 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
 
     private final ScheduleRepository scheduleRepository;
     private final MealTimeSlotRepository mealTimeSlotRepository;
-    private final SelectedRestaurantRepository selectedRestaurantRepository;
+    
     private final ScheduleMapper scheduleMapper;
     private final ObjectMapper objectMapper;
     private final TmapCalculationProcessor tmapCalculationProcessor;
@@ -218,49 +218,7 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
         }
     }
 
-    @Override
-    @Transactional
-    public void selectRestaurant(SelectRestaurantRequest request, StreamObserver<SelectRestaurantResponse> responseObserver) {
-        try {
-            Schedule schedule = scheduleRepository.findById(request.getScheduleId())
-                    .orElseThrow(() -> Status.NOT_FOUND.withDescription("스케줄을 찾을 수 없습니다: " + request.getScheduleId()).asRuntimeException());
-
-            if (!schedule.getUserId().equals(request.getUserId())) {
-                throw Status.PERMISSION_DENIED.withDescription("이 스케줄에 접근할 권한이 없습니다.").asRuntimeException();
-            }
-
-            MealTimeSlot mealTimeSlot = mealTimeSlotRepository.findById(request.getSlotId())
-                    .orElseThrow(() -> Status.NOT_FOUND.withDescription("시간 슬롯을 찾을 수 없습니다: " + request.getSlotId()).asRuntimeException());
-
-            com.mapzip.schedule.entity.SelectedRestaurant selectedRestaurant = mealTimeSlot.getSelectedRestaurant();
-            if (selectedRestaurant == null) {
-                selectedRestaurant = new com.mapzip.schedule.entity.SelectedRestaurant();
-                selectedRestaurant.setMealTimeSlot(mealTimeSlot);
-                selectedRestaurant.setSchedule(schedule);
-                mealTimeSlot.setSelectedRestaurant(selectedRestaurant);
-            }
-
-            selectedRestaurant.setRestaurantId(request.getRestaurantId());
-            selectedRestaurant.setName(request.getName());
-            selectedRestaurant.setDetailUrl(request.getDetailUrl());
-            selectedRestaurant.setScheduledTime(mealTimeSlot.getScheduledTime());
-            selectedRestaurant.setSelectedAt(java.time.LocalDateTime.now());
-
-            mealTimeSlotRepository.save(mealTimeSlot);
-
-            SelectRestaurantResponse response = SelectRestaurantResponse.newBuilder()
-                    .setSuccess(true)
-                    .setMessage("맛집이 성공적으로 선택되었습니다.")
-                    .build();
-            responseObserver.onNext(response);
-            responseObserver.onCompleted();
-        } catch (Exception e) {
-            responseObserver.onError(Status.INTERNAL
-                    .withDescription("맛집 선택 중 오류 발생: " + e.getMessage())
-                    .withCause(e)
-                    .asRuntimeException());
-        }
-    }
+    
 
     @Override
     public void refreshSchedule(RefreshScheduleRequest request, StreamObserver<RefreshScheduleResponse> responseObserver) {

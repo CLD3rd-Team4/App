@@ -19,9 +19,7 @@ service ScheduleService {
       body: "*"
     };
   }
-  // 맛집 추천 결과 조회
-  rpc GetRecommendationResults(GetRecommendationResultsRequest) returns (GetRecommendationResultsResponse) {
-  }
+  
   // 스케줄 목록 조회
   rpc GetScheduleList(GetScheduleListRequest) returns (GetScheduleListResponse) {
     option (google.api.http) = {
@@ -34,13 +32,7 @@ service ScheduleService {
       get: "/schedule/{scheduleId}"
     };
   }
-  // 맛집 선택 반영
-  rpc SelectRestaurant(SelectRestaurantRequest) returns (SelectRestaurantResponse) {
-    option (google.api.http) = {
-      post: "/schedule/{scheduleId}/restaurant/select"
-      body: "*"
-    };
-  }
+  
   // 스케줄 정보 업데이트
   rpc RefreshSchedule(RefreshScheduleRequest) returns (RefreshScheduleResponse) {
     option (google.api.http) = {
@@ -66,7 +58,7 @@ service ScheduleService {
   // 스케줄 처리 시작 (선택 또는 업데이트 버튼)
   rpc ProcessSchedule(ProcessScheduleRequest) returns (ProcessScheduleResponse) {
     option (google.api.http) = {
-      post: "/schedule/{scheduleId}/process"
+      post: "/schedule/{scheduleId}"
       body: "*"
     };
   }
@@ -107,43 +99,7 @@ message MealLocation {
   string scheduledTime = 4; // 예정 시간
 }
 
-message RestaurantRecommendation {
-  string id = 1;
-  string name = 2;
-  string category = 3;
-  string phone = 4;
-  string address = 5;
-  string roadAddress = 6;
-  double lat = 7;
-  double lng = 8;
-  string detailUrl = 9;
-  int32 distance = 10; // 예상 식사 지점으로부터의 거리(미터)
-  string rating = 11;  // 추천서버에서 분석한 평점
-  string menuInfo = 12; // 추천서버에서 분석한 메뉴 정보
-}
 
-message SelectedRestaurant {
-  string slotId = 1;          // 시간 슬롯 ID
-  string restaurantId = 2;    // 맛집 ID
-  string name = 3;
-  string scheduledTime = 4;   // 예정 시간
-  string detailUrl = 5;
-}
-
-message MealSlotRecommendation {
-  string slotId = 1;
-  MealType mealType = 2;
-  string scheduledTime = 3;
-  RecommendationStatus status = 4;
-  repeated RestaurantRecommendation recommendations = 5;
-  string message = 6;
-}
-
-enum RecommendationStatus {
-  PROCESSING = 0;    // 처리 중
-  COMPLETED = 1;     // 완료
-  FAILED = 2;        // 실패
-}
 
 message ScheduleError {
   ErrorType type = 1;
@@ -185,15 +141,7 @@ message CreateScheduleResponse {
   ScheduleError error = 6;
 }
 
-// 3.2 맛집 추천 결과 조회
-message GetRecommendationResultsRequest {
-  string scheduleId = 1;
-  string userId = 2;
-}
 
-message GetRecommendationResultsResponse {
-  repeated MealSlotRecommendation slotRecommendations = 1;
-}
 
 // 3.3 스케줄 목록 조회
 message GetScheduleListRequest {
@@ -207,7 +155,7 @@ message GetScheduleListResponse {
     string departureTime = 3;
     string destinationName = 4;
     int32 totalMealSlots = 5;
-    int32 selectedRestaurantsCount = 6;
+    
   }
   repeated ScheduleSummary schedules = 1;
 }
@@ -230,26 +178,12 @@ message GetScheduleDetailResponse {
     string userNote = 8;
     string purpose = 9;
     repeated string companions = 10;
-    repeated SelectedRestaurant selectedRestaurants = 11;
+    
   }
   ScheduleDetail schedule = 1;
 }
 
-// 3.5 맛집 선택 반영
-message SelectRestaurantRequest {
-  string scheduleId = 1;
-  string slotId = 2;
-  string restaurantId = 3;
-  string userId = 4;
-  string name = 5;
-  string detailUrl = 6;
-}
 
-message SelectRestaurantResponse {
-  string message = 1;
-  SelectedRestaurant selectedRestaurant = 2;
-  bool success = 3;
-}
 
 // 3.6 스케줄 정보 업데이트
 message RefreshScheduleRequest {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { scheduleApi } from "@/services/api"
-import type { Schedule, Restaurant } from "@/types"
+import type { Schedule } from "@/types"
 
 export function useSchedule() {
   const [schedules, setSchedules] = useState<Schedule[]>([])
@@ -122,16 +122,7 @@ export function useSchedule() {
     }
   }
   
-  const updateSelectedRestaurant = (restaurant: Restaurant) => {
-    if (selectedSchedule) {
-      const updatedSchedule = {
-        ...selectedSchedule,
-        selectedRestaurant: restaurant,
-      }
-      setSelectedSchedule(updatedSchedule)
-      localStorage.setItem("selectedSchedule", JSON.stringify(updatedSchedule))
-    }
-  }
+  
 
   return {
     schedules,
@@ -142,6 +133,5 @@ export function useSchedule() {
     updateSchedule,
     deleteSchedule,
     selectSchedule,
-    updateSelectedRestaurant,
   }
 }

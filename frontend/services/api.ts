@@ -90,7 +90,7 @@ export const scheduleApi = {
       ...data,
       userId: 'test-user-123', // TODO: 실제 사용자 ID로 교체
     };
-    const response = await fetch(`${API_BASE_URL}/schedule/${scheduleId}/process`, {
+    const response = await fetch(`${API_BASE_URL}/schedule/${scheduleId}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -118,13 +118,7 @@ export const scheduleApi = {
   },
 }
 
-export const recommendationApi = {
-  getRecommendations: async (scheduleId?: string) => {
-    // TODO: 실제 API 연동
-    console.log(`추천 목록 요청: scheduleId=${scheduleId}`);
-    return [];
-  },
-}
+
 
 export const visitedRestaurantApi = {
   getVisitedRestaurants: async () => {
