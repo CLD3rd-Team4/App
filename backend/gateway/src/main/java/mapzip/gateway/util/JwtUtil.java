@@ -48,4 +48,13 @@ public class JwtUtil {
             return false;
         }
     }
+    
+    public TokenValidationResult validateTokenWithResult(String token) {
+        try {
+            extractAllClaims(token);
+            return isTokenExpired(token) ? TokenValidationResult.EXPIRED : TokenValidationResult.VALID;
+        } catch (JwtException | IllegalArgumentException e) {
+            return TokenValidationResult.INVALID;
+        }
+    }
 }
