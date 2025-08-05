@@ -14,11 +14,10 @@ class JwtUtilTest {
 
     private JwtUtil jwtUtil;
     private String secret = "test-secret-key-for-jwt-validation-testing-purposes";
-    private Long expiration = 86400000L;
 
     @BeforeEach
     void setUp() {
-        jwtUtil = new JwtUtil(secret, expiration);
+        jwtUtil = new JwtUtil(secret);
     }
 
     @Test
