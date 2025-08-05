@@ -3,6 +3,7 @@ package mapzip.gateway.filter;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import mapzip.gateway.util.JwtUtil;
+import mapzip.gateway.util.TokenValidationResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
@@ -50,16 +51,14 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
 
             if (token == null) {
                 log.warn("JWT Filter - No token found in cookies");
-                ServerHttpResponse response = exchange.getResponse();
-                response.setStatusCode(HttpStatus.UNAUTHORIZED);
-                return response.setComplete();
+                return createErrorResponse(exchange.getResponse(), "TOKEN_INVALID");
             }
 
-            if (!jwtUtil.validateToken(token)) {
-                log.warn("JWT Filter - Invalid token");
-                ServerHttpResponse response = exchange.getResponse();
-                response.setStatusCode(HttpStatus.UNAUTHORIZED);
-                return response.setComplete();
+            TokenValidationResult validationResult = jwtUtil.validateTokenWithResult(token);
+            if (validationResult != TokenValidationResult.VALID) {
+                String errorMessage = validationResult == TokenValidationResult.EXPIRED ? "TOKEN_EXPIRED" : "TOKEN_INVALID";
+                log.warn("JWT Filter - Token validation failed: {}", errorMessage);
+                return createErrorResponse(exchange.getResponse(), errorMessage);
             }
 
             // JWT에서 사용자 ID 추출하여 http 헤더에 추가
@@ -77,6 +76,23 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
     private String extractTokenFromCookie(ServerHttpRequest request) {
         return request.getCookies().getFirst("accessToken") != null ?
                 Objects.requireNonNull(request.getCookies().getFirst("accessToken")).getValue() : null;
+    }
+    
+    private Mono<Void> createErrorResponse(ServerHttpResponse response, String errorMessage) {
+        response.setStatusCode(HttpStatus.UNAUTHORIZED);
+        response.getHeaders().add("Content-Type", "application/json");
+        
+        try {
+            Map<String, String> errorBody = new HashMap<>();
+            errorBody.put("error", errorMessage);
+            String jsonResponse = objectMapper.writeValueAsString(errorBody);
+            
+            org.springframework.core.io.buffer.DataBuffer buffer = response.bufferFactory().wrap(jsonResponse.getBytes());
+            return response.writeWith(Mono.just(buffer));
+        } catch (JsonProcessingException e) {
+            log.error("Error creating JSON response", e);
+            return response.setComplete();
+        }
     }
 
     public static class Config {
