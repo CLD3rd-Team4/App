@@ -98,7 +98,7 @@ export default function ScheduleSummaryScreen() {
   const createTimelineItems = (): TimelineItem[] => {
     if (!selectedSchedule) return [];
 
-    const items = []
+    const items: TimelineItem[] = []
 
     if (selectedSchedule.departureTime && selectedSchedule.departure) {
       items.push({
