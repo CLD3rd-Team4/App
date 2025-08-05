@@ -8,6 +8,7 @@ on:
       - 'frontend/**'
 
 
+
 permissions:
   id-token: write
   contents: read
