@@ -217,7 +217,7 @@ export default function ScheduleSummaryScreen() {
                         </span>
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm text-gray-500">{formatTime(item.time)}</p>
+                        <p className="text-sm text-gray-500">{item.time ? formatTime(item.time) : "시간 미정"}</p>
                         <p className="font-medium">{item.title}</p>
                         {item.description && <p className="text-sm text-gray-600">{item.description}</p>}
                         {item.rating && item.rating > 0 && (
