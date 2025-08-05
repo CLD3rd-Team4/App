@@ -4,6 +4,14 @@ option java_multiple_files = true;
 option java_package = "com.mapzip.recommend.grpc";
 option java_outer_classname = "RecommendProto";
 
+service RecommendService {
+  rpc SendRecommendRequest (RecommendRequest) returns (RecommendResponse);
+  rpc SubmitSelectedPlace (SelectedPlaceRequest) returns (SubmitResponse);
+  rpc GetRecommendationResults(GetRecommendationResultsRequest) returns (GetRecommendationResultsResponse);
+  rpc GetSelectedPlaces(GetSelectedPlacesRequest) returns (GetSelectedPlacesResponse);
+  rpc PlacesForReview(PlacesForReviewRequest) returns (PlacesForReviewResponse);
+}
+
 message RecommendRequest {
   string userId = 1;
   string scheduleId = 2;
@@ -28,6 +36,97 @@ message RecommendResponse {
   string message = 2;
 }
 
-service RecommendService {
-  rpc SendRecommendRequest (RecommendRequest) returns (RecommendResponse);
+
+
+message SelectedPlace {
+  string slotId = 1;
+  string mealType = 2;
+  string scheduledTime = 3;
+  string id = 4;
+  string placeName = 5;
+  string reason = 6;
+  string distance = 7;
+  string placeUrl = 8;
+  string addressName= 9;
+  double rating = 10;
+}
+
+message SelectedPlaceRequest {
+  string userId = 1;
+  string scheduleId = 2;
+  repeated SelectedPlace selectedPlaces = 3;
+}
+
+message SubmitResponse {
+  string status = 1;
+  string message = 2;
+}
+
+message GetRecommendationResultsRequest {
+  string userId = 1;
+  string scheduleId = 2;
+}
+
+
+
+
+message SlotRecommendation {
+  string slotId = 1;
+  repeated PlaceInfo places = 2;
+}
+
+message PlaceInfo {
+  string id = 1;
+  string placeName = 2;
+  string reason = 3;
+  string distance = 4;
+  string scheduledTime = 5;
+  string mealType = 6;
+  string placeUrl = 7;
+  string addressName= 8;
+  double rating = 9;
+}
+
+message GetRecommendationResultsResponse {
+  repeated SlotRecommendation slotRecommendations = 1;
+  string status = 2;
+  string message = 3;
+}
+
+
+
+
+message GetSelectedPlacesRequest {
+  string userId = 1;
+  string scheduleId = 2;
+}
+
+message SlotSelectedPlaces {
+  string slotId = 1;
+  repeated PlaceInfo places = 2;
+}
+
+message GetSelectedPlacesResponse {
+  repeated SlotSelectedPlaces slotPlaces = 1;
+  string status = 2;
+  string message = 3;
+}
+
+
+
+message PlacesForReviewRequest {
+}
+
+message ReviewPlaceInfo {
+  string id = 1;
+  string placeName = 2;
+  string addressName = 3;
+  string placeUrl = 4;
+  string scheduledTime = 5;
+}
+
+message PlacesForReviewResponse {
+  repeated ReviewPlaceInfo places = 1;
+  string status = 2;
+  string message = 3;
 }

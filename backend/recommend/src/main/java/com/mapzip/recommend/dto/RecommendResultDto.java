@@ -13,8 +13,8 @@ public class RecommendResultDto {
     private String userId;
     private String scheduleId;
     private List<String> recommendationRequestIds;
-    List<String> scheduledTimes;
 
     private String recommendPlaceListJson;
+    List<String> scheduledTimes;
 
 }

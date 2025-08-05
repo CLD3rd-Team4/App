@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.mapzip.recommend.dto.RecommendRequestDto;
 import com.mapzip.recommend.dto.RecommendResultDto;
+import com.mapzip.recommend.dto.SlotInfoDto;
 import com.mapzip.recommend.dto.kakao.KakaoSearchResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -59,7 +60,8 @@ public class RecommendService {
                     recommendRequestDto.getUserId(),
                     recommendRequestDto.getScheduleId(),
                     new ArrayList<>(recommendRequestDto.getKakaoPlaceList().keySet()),
-                    recommendPlaceListJson
+                    recommendPlaceListJson,
+                    recommendRequestDto.getScheduledTimes()
             );
 
         } catch (JsonProcessingException e) {

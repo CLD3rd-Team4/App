@@ -19,14 +19,10 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class RecommendController {
 
-	private final RecommendRequestService recommendRequestService;
-	private final KakaoApiService kakaoApiService;
-	private final RedisTemplate<String, Object> redisTemplate;
 	
 	
 	//추천 결과 조회
 	
-	//추천 결과 반영 
 
 	
 }

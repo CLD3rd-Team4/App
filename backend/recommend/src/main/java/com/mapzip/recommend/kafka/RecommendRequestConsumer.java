@@ -41,7 +41,7 @@ public class RecommendRequestConsumer {
             		multiSlotRecommendRequestDto.getUserId(),multiSlotRecommendRequestDto.getScheduleId() );
             // 카카오에 식당 10개 추천 받기 
             Map<String, KakaoSearchResponse> kakaoResults = kakaoApiService.getSlotRestaurantMap(multiSlotRecommendRequestDto);
-            
+            log.info("ddddd {}",kakaoResults);
             RecommendRequestDto recommendRequestDto=RecommendRequestMapper.toRecommendRequestDto(multiSlotRecommendRequestDto, kakaoResults);
             
             //bedrock에 식당 3개 추천 받기 
