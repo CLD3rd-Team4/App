@@ -75,7 +75,13 @@ export default function ScheduleCreateScreen({ isEdit = false, initialData = nul
       };
 
       if (isEdit && initialData?.id) {
-        await updateSchedule({ ...scheduleData, id: initialData.id });
+        const finalScheduleData = {
+          ...scheduleData,
+          id: initialData.id,
+          hasMeal: initialData.hasMeal || false, // 기본값으로 false
+          tags: initialData.tags || [],         // 기본값으로 빈 배열
+        };
+        await updateSchedule(finalScheduleData);
       } else {
         await createSchedule(scheduleData);
       }
