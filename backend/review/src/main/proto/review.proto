@@ -18,19 +18,40 @@ service ReviewService {
     }
     
     // 사용자별 리뷰 목록 조회
-    rpc GetUserReviews(GetUserReviewsRequest) returns (GetUserReviewsResponse);
+    rpc GetUserReviews(GetUserReviewsRequest) returns (GetUserReviewsResponse) {
+        option (google.api.http) = {
+            get: "/review/user/{user_id}"
+        };
+    }
     
     // 특정 식당의 리뷰 목록 조회
-    rpc GetRestaurantReviews(GetRestaurantReviewsRequest) returns (GetRestaurantReviewsResponse);
+    rpc GetRestaurantReviews(GetRestaurantReviewsRequest) returns (GetRestaurantReviewsResponse) {
+        option (google.api.http) = {
+            get: "/review/restaurant/{restaurant_id}"
+        };
+    }
     
     // 리뷰 상세 조회
-    rpc GetReview(GetReviewRequest) returns (GetReviewResponse);
+    rpc GetReview(GetReviewRequest) returns (GetReviewResponse) {
+        option (google.api.http) = {
+            get: "/review/{restaurant_id}/{review_id}"
+        };
+    }
     
     // 리뷰 수정
-    rpc UpdateReview(UpdateReviewRequest) returns (UpdateReviewResponse);
+    rpc UpdateReview(UpdateReviewRequest) returns (UpdateReviewResponse) {
+        option (google.api.http) = {
+            put: "/review/{restaurant_id}/{review_id}"
+            body: "*"
+        };
+    }
     
     // 리뷰 삭제
-    rpc DeleteReview(DeleteReviewRequest) returns (DeleteReviewResponse);
+    rpc DeleteReview(DeleteReviewRequest) returns (DeleteReviewResponse) {
+        option (google.api.http) = {
+            delete: "/review/{restaurant_id}/{review_id}"
+        };
+    }
     
     // OCR 검증 (영수증 인식)
     rpc VerifyReceipt(VerifyReceiptRequest) returns (VerifyReceiptResponse) {

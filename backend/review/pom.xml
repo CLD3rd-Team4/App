@@ -64,19 +64,12 @@
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>dynamodb-enhanced</artifactId>
-            <version>2.21.29</version>
+            <version>2.21.26</version>
         </dependency>
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>s3</artifactId>
-            <version>2.21.29</version>
-        </dependency>
-        
-        <!-- S3 Presigner for secure URLs -->
-        <dependency>
-            <groupId>software.amazon.awssdk</groupId>
-            <artifactId>s3-presigner</artifactId>
-            <version>2.21.29</version>
+            <version>2.21.26</version>
         </dependency>
 
         <!-- Google Cloud Vision API -->
@@ -186,6 +179,7 @@
             </plugin>
 
             <!-- Exec plugin for generating proto descriptor -->
+            <!--
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
@@ -206,6 +200,7 @@
                     </execution>
                 </executions>
             </plugin>
+            -->
         </plugins>
     </build>
 </project>

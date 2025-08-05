@@ -53,8 +53,10 @@ public class OcrService {
                 credentials = GoogleCredentials.getApplicationDefault();
             }
             
+            final GoogleCredentials finalCredentials = credentials;
+            
             ImageAnnotatorSettings settings = ImageAnnotatorSettings.newBuilder()
-                    .setCredentialsProvider(() -> credentials)
+                    .setCredentialsProvider(() -> finalCredentials)
                     .build();
             
             try (ImageAnnotatorClient vision = ImageAnnotatorClient.create(settings)) {
@@ -197,10 +199,16 @@ public class OcrService {
         
         return amounts.stream()
             .filter(amount -> amount.replaceAll("[^\\d]", "").length() >= 4) // 최소 4자리
-            .max((a, b) -> Integer.compare(
-                Integer.parseInt(a.replaceAll("[^\\d]", "")),
-                Integer.parseInt(b.replaceAll("[^\\d]", ""))
-            ))
+            .max((a, b) -> {
+                try {
+                    int amountA = Integer.parseInt(a.replaceAll("[^\\d]", ""));
+                    int amountB = Integer.parseInt(b.replaceAll("[^\\d]", ""));
+                    return Integer.compare(amountA, amountB);
+                } catch (NumberFormatException e) {
+                    logger.warn("Failed to parse amount: {} or {}", a, b);
+                    return 0; // 파싱 실패 시 동일한 값으로 처리
+                }
+            })
             .orElse("");
     }
     

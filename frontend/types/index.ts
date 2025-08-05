@@ -56,6 +56,7 @@ export interface Restaurant {
 export interface VisitedRestaurant {
   id: string
   name: string
+  address?: string           // 누락된 필드 추가
   visitDate: string
   rating?: number
   review?: string
@@ -72,14 +73,45 @@ export interface OCRResult {
   confidence: number        // 신뢰도 (0.0 - 1.0)
 }
 
+// API 요청/응답 관련 타입 추가
+export interface CreateReviewRequest {
+  restaurantId: string
+  restaurantName: string
+  restaurantAddress: string
+  rating: number
+  content: string
+  receiptImages?: string[]   // Data URL 형태
+  reviewImages?: string[]    // Data URL 형태
+  ocrData?: OCRResult
+}
+
+export interface CreateReviewResponse {
+  review: Review
+  ocrResult?: OCRResult
+  message: string
+  success: boolean
+}
+
 export interface Review {
   id: string
+  restaurantId: string       
   restaurantName: string
+  restaurantAddress?: string 
+  userId: string             
   visitDate: string
   rating: number
-  review: string
-  images: string[]
+  content: string            
+  imageUrls: string[]        
+  isVerified?: boolean       
   createdAt: string
+  updatedAt?: string         
+}
+
+// API 에러 타입
+export interface APIErrorData {
+  message: string
+  status: number
+  data?: any
 }
 
 export interface LocationInfo {

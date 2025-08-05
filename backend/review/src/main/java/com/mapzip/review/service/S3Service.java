@@ -12,21 +12,29 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 
+import javax.annotation.PostConstruct;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import software.amazon.awssdk.regions.Region;
 
 @Service
 public class S3Service {
     
     private static final Logger logger = LoggerFactory.getLogger(S3Service.class);
     
-    private final S3Client s3Client;
-    private final S3Presigner s3Presigner;
+    private S3Client s3Client;
+    private S3Presigner s3Presigner;
     
     @Value("${aws.s3.bucket-name}")
     private String bucketName;
+    
+    @Value("${aws.region}")
+    private String awsRegion;
+    
+    @Value("${aws.s3.cloudfront-domain}")
+    private String cloudFrontDomain;
     
     @Value("${review.image.max-file-size:10485760}") // 10MB
     private long maxFileSize;
@@ -38,8 +46,15 @@ public class S3Service {
     private Duration presignDuration;
     
     public S3Service() {
-        this.s3Client = S3Client.builder().build();
-        this.s3Presigner = S3Presigner.builder().build();
+        // 빈 생성자 - PostConstruct에서 초기화
+    }
+    
+    @PostConstruct
+    public void init() {
+        Region region = Region.of(awsRegion);
+        this.s3Client = S3Client.builder().region(region).build();
+        this.s3Presigner = S3Presigner.builder().region(region).build();
+        logger.info("S3Service initialized with region: {} and CloudFront domain: {}", awsRegion, cloudFrontDomain);
     }
     
     public String uploadImage(byte[] imageData, String contentType, String userId) {
@@ -51,7 +66,7 @@ public class S3Service {
             String fileName = generateFileName(userId, contentType);
             String keyName = "reviews/" + fileName;
             
-            // 3. S3 업로드 (Private 버킷)
+            // 3. S3 업로드 (Private 버킷) - CloudFront를 통해 접근 가능
             PutObjectRequest putRequest = PutObjectRequest.builder()
                     .bucket(bucketName)
                     .key(keyName)
@@ -59,10 +74,13 @@ public class S3Service {
                     .build();
             
             s3Client.putObject(putRequest, RequestBody.fromBytes(imageData));
-            logger.info("Image uploaded successfully: {}", keyName);
+            logger.info("Image uploaded successfully to S3: {}", keyName);
             
-            // 4. Pre-signed URL 생성 (보안)
-            return generatePresignedUrl(keyName);
+            // 4. CloudFront URL 반환 (프론트엔드에서 사용할 공개 URL)
+            String cloudFrontUrl = cloudFrontDomain + "/" + keyName;
+            logger.info("Returning CloudFront URL: {}", cloudFrontUrl);
+            
+            return cloudFrontUrl;
             
         } catch (Exception e) {
             logger.error("Failed to upload image to S3", e);
@@ -113,30 +131,13 @@ public class S3Service {
     }
     
     /**
-     * Pre-signed URL 생성 (보안)
+     * CloudFront URL 생성 (향후 확장용)
+     * 현재는 uploadImage에서 직접 처리하지만, 추후 별도 URL 생성이 필요할 때 사용
      */
-    private String generatePresignedUrl(String keyName) {
-        try {
-            GetObjectRequest getObjectRequest = GetObjectRequest.builder()
-                    .bucket(bucketName)
-                    .key(keyName)
-                    .build();
-            
-            GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
-                    .signatureDuration(presignDuration) // 1시간 유효
-                    .getObjectRequest(getObjectRequest)
-                    .build();
-            
-            PresignedGetObjectRequest presignedRequest = s3Presigner.presignGetObject(presignRequest);
-            String presignedUrl = presignedRequest.url().toString();
-            
-            logger.info("Pre-signed URL generated for key: {}", keyName);
-            return presignedUrl;
-            
-        } catch (Exception e) {
-            logger.error("Failed to generate pre-signed URL for key: {}", keyName, e);
-            throw new RuntimeException("이미지 URL 생성 실패: " + e.getMessage());
-        }
+    public String generateCloudFrontUrl(String keyName) {
+        String cloudFrontUrl = cloudFrontDomain + "/" + keyName;
+        logger.debug("Generated CloudFront URL: {}", cloudFrontUrl);
+        return cloudFrontUrl;
     }
     
     private String generateFileName(String userId, String contentType) {

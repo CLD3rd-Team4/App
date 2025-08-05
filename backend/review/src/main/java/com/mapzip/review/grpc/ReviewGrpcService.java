@@ -87,6 +87,18 @@ public class ReviewGrpcService extends ReviewServiceGrpc.ReviewServiceImplBase {
     public void getUserReviews(ReviewProto.GetUserReviewsRequest request,
                              StreamObserver<ReviewProto.GetUserReviewsResponse> responseObserver) {
         try {
+            String authenticatedUserId = HeaderInterceptor.USER_ID_CONTEXT_KEY.get();
+            if (authenticatedUserId == null || authenticatedUserId.isEmpty()) {
+                responseObserver.onError(new StatusRuntimeException(Status.UNAUTHENTICATED.withDescription("User ID is missing")));
+                return;
+            }
+            
+            // 요청한 사용자 ID와 인증된 사용자 ID가 일치하는지 확인
+            if (!authenticatedUserId.equals(request.getUserId())) {
+                responseObserver.onError(new StatusRuntimeException(Status.PERMISSION_DENIED.withDescription("Access denied: Cannot access other user's reviews")));
+                return;
+            }
+            
             List<ReviewEntity> reviews = reviewService.getUserReviews(
                     request.getUserId(), request.getPage(), request.getSize());
             
@@ -141,6 +153,13 @@ public class ReviewGrpcService extends ReviewServiceGrpc.ReviewServiceImplBase {
     public void getReview(ReviewProto.GetReviewRequest request,
                         StreamObserver<ReviewProto.GetReviewResponse> responseObserver) {
         try {
+            String authenticatedUserId = HeaderInterceptor.USER_ID_CONTEXT_KEY.get();
+            // 리뷰 조회는 누구나 가능하므로 인증 체크만 수행 (로그인 여부 확인)
+            if (authenticatedUserId == null || authenticatedUserId.isEmpty()) {
+                responseObserver.onError(new StatusRuntimeException(Status.UNAUTHENTICATED.withDescription("User ID is missing")));
+                return;
+            }
+            
             Optional<ReviewEntity> review = reviewService.getReview(
                     request.getRestaurantId(), request.getReviewId());
             
