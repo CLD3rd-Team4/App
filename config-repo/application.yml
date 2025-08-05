@@ -29,10 +29,11 @@ management:
   endpoint:
     health:
       show-details: always
-  metrics:
-    export:
-      prometheus:
+  prometheus:
+    metrics:
+      export:
         enabled: ${PROMETHEUS_ENABLED:true}
+
 
 # 로깅 설정 (운영 환경 기준)
 logging:

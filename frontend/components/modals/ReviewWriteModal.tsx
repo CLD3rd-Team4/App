@@ -172,15 +172,38 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
                 <p>
                   <span className="font-medium">식당명:</span> {ocrResult.restaurantName}
                 </p>
+                {ocrResult.address && (
+                  <p>
+                    <span className="font-medium">주소:</span> {ocrResult.address}
+                  </p>
+                )}
                 <p>
                   <span className="font-medium">방문일:</span> {ocrResult.visitDate}
                 </p>
+                {ocrResult.totalAmount && (
+                  <p>
+                    <span className="font-medium">결제금액:</span> {ocrResult.totalAmount}
+                  </p>
+                )}
                 <p>
                   <span className="font-medium">검증결과:</span>
                   <span className={ocrResult.isValid ? "text-green-600" : "text-red-600"}>
                     {ocrResult.isValid ? " 통과" : " 실패"}
                   </span>
+                  <span className="text-gray-500 ml-2">
+                    (신뢰도: {Math.round((ocrResult.confidence || 0) * 100)}%)
+                  </span>
                 </p>
+                {ocrResult.rawText && (
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-gray-600 hover:text-gray-800">
+                      원본 텍스트 보기
+                    </summary>
+                    <pre className="mt-1 p-2 bg-gray-50 rounded text-xs whitespace-pre-wrap">
+                      {ocrResult.rawText}
+                    </pre>
+                  </details>
+                )}
               </div>
             </div>
 
