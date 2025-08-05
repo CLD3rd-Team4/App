@@ -1,5 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    env: {
+        NEXT_PUBLIC_KAKAO_APPKEY: process.env.NEXT_PUBLIC_KAKAO_APPKEY,
+    },
+};
   trailingSlash: true,
   skipTrailingSlashRedirect: true,
   distDir: 'out',
