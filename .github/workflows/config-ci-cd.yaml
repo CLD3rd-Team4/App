@@ -27,6 +27,9 @@ jobs:
         run: |
           git fetch origin dev
           
+          # Backend 변경사항도 확인 (중복 재시작 방지)
+          BACKEND_CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '^backend/' | cut -d '/' -f2 | sort | uniq)
+          
           # config-repo/application.yml 변경 확인
           APPLICATION_CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '^config-repo/application\.yml$' | wc -l)
           
@@ -41,9 +44,20 @@ jobs:
             ALL_SERVICES="$CONFIG_SERVICES"
           fi
           
+          # Backend에서 변경된 서비스는 제외 (ArgoCD가 자동 재배포하므로)
+          FILTERED_SERVICES=""
+          for service in $ALL_SERVICES; do
+            if ! echo "$BACKEND_CHANGED" | grep -q "^$service$"; then
+              FILTERED_SERVICES="$FILTERED_SERVICES $service"
+            else
+              echo "⏭️ Skipping $service restart (backend changed - ArgoCD will handle deployment)"
+            fi
+          done
+          
           # JSON 배열로 변환
-          CHANGED=$(echo "$ALL_SERVICES" | tr ' ' '\n' | sort | uniq | jq -R -s -c 'split("\n") | map(select(. != ""))')
+          CHANGED=$(echo "$FILTERED_SERVICES" | tr ' ' '\n' | sort | uniq | jq -R -s -c 'split("\n") | map(select(. != ""))')
           echo "services=$CHANGED" >> $GITHUB_OUTPUT
+          echo "🔄 Services to restart: $FILTERED_SERVICES"
 
   restart-services:
     needs: detect-config-changes
@@ -74,7 +88,7 @@ jobs:
       - name: Restart ${{ matrix.service }} service
         run: |
           SERVICE="${{ matrix.service }}"
-          echo "Restarting $SERVICE service..."
+          echo "🔄 Restarting $SERVICE service (config-only change)..."
           
           # 서비스별 deployment 이름과 네임스페이스 매핑
           case $SERVICE in
@@ -99,7 +113,7 @@ jobs:
               NAMESPACE="service-review"
               ;;
             *)
-              echo "Unknown service: $SERVICE"
+              echo "❌ Unknown service: $SERVICE"
               exit 1
               ;;
           esac
