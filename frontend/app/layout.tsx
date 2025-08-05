@@ -40,7 +40,7 @@ export default function RootLayout({
         {/* 카카오 지도 API 스크립트 */}
         <script 
           type="text/javascript" 
-          src={`//dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_APPKEY}&libraries=services`}
+          src={`//dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_KEY}&libraries=services`}
         ></script>
       </head>
       <body className={inter.className}>

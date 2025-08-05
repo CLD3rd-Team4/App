@@ -1,6 +1,6 @@
 frontend:
   kakao:
-    appkey: ${KAKAO_APP_KEY:default_key}
+    appkey: ${KAKAO_MAP_KEY:default_key}
 
 # 모든 서비스에 공통으로 적용되는 설정 (EKS 환경 우선)
 

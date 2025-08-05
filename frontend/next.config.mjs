@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     env: {
-        NEXT_PUBLIC_KAKAO_APPKEY: process.env.NEXT_PUBLIC_KAKAO_APPKEY,
+        NEXT_PUBLIC_KAKAO_MAP_KEY: process.env.NEXT_PUBLIC_KAKAO_MAP_KEY,
     },
 };
   trailingSlash: true,
