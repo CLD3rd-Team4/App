@@ -1,18 +1,4 @@
-# Stage 1: Build the application using a slim base image
-FROM maven:3.9-eclipse-temurin-17 AS build
-WORKDIR /app
-
-# Copy pom.xml first for better layer caching
-COPY pom.xml .
-
-# Download dependencies
-RUN mvn dependency:go-offline -B
-
-# Copy the source code
-COPY src ./src
-
-# Build the application and create the JAR file
-RUN mvn clean install -DskipTests
+# Stage 1 is removed, assuming the build is done in the CI/CD pipeline
 
 # Stage 2: Create the final, lightweight, and secure image
 FROM eclipse-temurin:17-jre-jammy
@@ -29,8 +15,9 @@ RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 # Create a non-root user to run the application
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 
-# Copy the executable JAR from the build stage
-COPY --from=build /app/target/schedule-0.0.1-SNAPSHOT.jar ./app.jar
+# Copy the executable JAR from the CI/CD build context
+# The CI/CD pipeline should place the JAR file in the context directory
+COPY target/app.jar app.jar
 
 # Change ownership to the appuser
 RUN chown -R appuser:appuser /app
