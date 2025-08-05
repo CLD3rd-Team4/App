@@ -102,3 +102,16 @@ export interface APIErrorData {
   status: number
   data?: any
 }
+
+// 위치 관련 타입
+export interface LocationPoint {
+  name: string
+  lat: number
+  lng: number
+}
+
+export interface LocationData {
+  departure: LocationPoint
+  destination: LocationPoint
+  waypoints: (LocationPoint | null)[]
+}
