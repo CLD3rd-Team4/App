@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Camera, X, Star } from "lucide-react"
-import { ocrApi, reviewApi } from "@/services/api"
+import { ocrApi, reviewApi, APIError } from "@/services/api"
+import type { OCRResult, CreateReviewRequest } from "@/types"
 
 interface ReviewWriteModalProps {
   restaurant: any
@@ -18,12 +19,13 @@ interface ReviewWriteModalProps {
 export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWriteModalProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [capturedImage, setCapturedImage] = useState<string | null>(null)
-  const [ocrResult, setOcrResult] = useState<any>(null)
+  const [ocrResult, setOcrResult] = useState<OCRResult | null>(null)
   const [rating, setRating] = useState(0)
   const [reviewText, setReviewText] = useState("")
   const [reviewImages, setReviewImages] = useState<string[]>([])
   const [visitDate, setVisitDate] = useState(new Date().toISOString().split("T")[0])
   const [isProcessing, setIsProcessing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
 
@@ -43,11 +45,30 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
 
     try {
       setIsProcessing(true)
-      const result = await ocrApi.processReceipt(capturedImage)
+      setError(null)
+      
+      const result = await ocrApi.processReceipt(
+        capturedImage,
+        restaurant.name || '',
+        restaurant.address || ''
+      )
       setOcrResult(result)
       setStep(2)
     } catch (error) {
       console.error("OCR 처리 실패:", error)
+      
+      if (error instanceof APIError) {
+        setError(error.message)
+        
+        // 인증 에러인 경우 로그인 페이지로 이동
+        if (error.status === 401) {
+          // TODO: 로그인 페이지로 리다이렉트
+          alert('로그인이 필요합니다. 다시 로그인해주세요.')
+          return
+        }
+      } else {
+        setError('영수증 처리 중 오류가 발생했습니다. 다시 시도해주세요.')
+      }
     } finally {
       setIsProcessing(false)
     }
@@ -72,20 +93,37 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
 
   const handleComplete = async () => {
     try {
-      const reviewData = {
-        id: Date.now().toString(),
+      setIsProcessing(true)
+      setError(null)
+      
+      const reviewData: CreateReviewRequest = {
+        restaurantId: restaurant.id || '',
         restaurantName: restaurant.name,
-        visitDate,
+        restaurantAddress: restaurant.address || '',
         rating,
-        review: reviewText,
-        images: reviewImages,
-        ocrData: ocrResult,
+        content: reviewText,
+        receiptImages: capturedImage ? [capturedImage] : [],
+        reviewImages: reviewImages,
+        ocrData: ocrResult || undefined,
       }
 
-      await reviewApi.createReview(reviewData)
-      onComplete(reviewData)
+      const result = await reviewApi.createReview(reviewData)
+      onComplete(result)
     } catch (error) {
       console.error("리뷰 작성 실패:", error)
+      
+      if (error instanceof APIError) {
+        setError(error.message)
+        
+        if (error.status === 401) {
+          alert('로그인이 필요합니다. 다시 로그인해주세요.')
+          return
+        }
+      } else {
+        setError('리뷰 작성 중 오류가 발생했습니다. 다시 시도해주세요.')
+      }
+    } finally {
+      setIsProcessing(false)
     }
   }
 
@@ -106,6 +144,19 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
               <p className="text-sm text-gray-600 mb-2">식당명: {restaurant.name}</p>
               <p className="text-sm text-gray-600">주소: {restaurant.address || "주소 정보"}</p>
             </div>
+
+            {/* 에러 메시지 표시 */}
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600">{error}</p>
+                <button
+                  onClick={() => setError(null)}
+                  className="text-xs text-red-500 hover:text-red-700 mt-1"
+                >
+                  확인
+                </button>
+              </div>
+            )}
 
             {!capturedImage ? (
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center mb-4">
@@ -139,9 +190,9 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
               <Button
                 onClick={handleOCRProcess}
                 disabled={!capturedImage || isProcessing}
-                className="flex-1 bg-blue-500 hover:bg-blue-600 text-white"
+                className="flex-1 bg-blue-500 hover:bg-blue-600 text-white disabled:bg-gray-400"
               >
-                {isProcessing ? "처리 중..." : "다음"}
+                {isProcessing ? "영수증을 분석하고 있습니다..." : "다음"}
               </Button>
             </div>
 
@@ -172,15 +223,38 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
                 <p>
                   <span className="font-medium">식당명:</span> {ocrResult.restaurantName}
                 </p>
+                {ocrResult.address && (
+                  <p>
+                    <span className="font-medium">주소:</span> {ocrResult.address}
+                  </p>
+                )}
                 <p>
                   <span className="font-medium">방문일:</span> {ocrResult.visitDate}
                 </p>
+                {ocrResult.totalAmount && (
+                  <p>
+                    <span className="font-medium">결제금액:</span> {ocrResult.totalAmount}
+                  </p>
+                )}
                 <p>
                   <span className="font-medium">검증결과:</span>
                   <span className={ocrResult.isValid ? "text-green-600" : "text-red-600"}>
                     {ocrResult.isValid ? " 통과" : " 실패"}
                   </span>
+                  <span className="text-gray-500 ml-2">
+                    (신뢰도: {Math.round((ocrResult.confidence || 0) * 100)}%)
+                  </span>
                 </p>
+                {ocrResult.rawText && (
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-gray-600 hover:text-gray-800">
+                      원본 텍스트 보기
+                    </summary>
+                    <pre className="mt-1 p-2 bg-gray-50 rounded text-xs whitespace-pre-wrap">
+                      {ocrResult.rawText}
+                    </pre>
+                  </details>
+                )}
               </div>
             </div>
 
@@ -291,10 +365,10 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
               </Button>
               <Button
                 onClick={handleComplete}
-                disabled={rating === 0 || !reviewText.trim()}
-                className="flex-1 bg-blue-500 hover:bg-blue-600 text-white"
+                disabled={rating === 0 || !reviewText.trim() || isProcessing}
+                className="flex-1 bg-blue-500 hover:bg-blue-600 text-white disabled:bg-gray-400"
               >
-                완료
+                {isProcessing ? "리뷰를 작성하고 있습니다..." : "완료"}
               </Button>
             </div>
 

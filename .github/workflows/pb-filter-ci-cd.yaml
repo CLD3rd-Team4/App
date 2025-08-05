@@ -1,0 +1,139 @@
+name: pb filter CI/CD
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'backend/**/**_proto.pb'
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  build-pb-image:
+    runs-on: ubuntu-latest
+    outputs:
+      short_sha: ${{ steps.vars.outputs.short_sha }}
+      changed_services: ${{ steps.servers.outputs.changed_services }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/mapzip-dev-GitHubActionsOIDCRole
+          role-session-name: GitHub_to_AWS_via_FederatedOIDC
+          aws-region: ap-northeast-2
+
+      - name: Login to Amazon ECR Private
+        id: login-ecr-private
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Get short SHA
+        id: vars
+        run: echo "short_sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      - name: Extract changed server names
+        id: servers
+        run: |
+          BASE_SHA="${{ github.event.before }}"
+          if [ -z "$BASE_SHA" ]; then
+            BASE_SHA="HEAD~1"
+          fi
+
+          echo "🔍 BASE_SHA: $BASE_SHA"
+          echo "🔍 CURRENT_SHA: ${{ github.sha }}"
+
+          SERVER_NAMES=$(git diff --name-only $BASE_SHA ${{ github.sha }} | grep '_proto.pb' | awk -F '/' '{print $2}' | sort -u | xargs)
+          echo "changed_services=$SERVER_NAMES" >> $GITHUB_OUTPUT
+          echo "🔧 Changed services: $SERVER_NAMES"
+
+      - name: Copy all .pb files
+        run: |
+          mkdir -p pb-files
+          find backend -name "*_proto.pb" -exec cp {} pb-files/ \;
+
+      - name: Create Dockerfile
+        run: |
+          echo 'FROM busybox:1.36' > pb-files/Dockerfile
+          for f in pb-files/*_proto.pb; do
+            echo "COPY $(basename "$f") /data/" >> pb-files/Dockerfile
+          done
+          echo 'CMD ["sleep", "3600"]' >> pb-files/Dockerfile
+
+      - name: Build Docker image
+        env:
+          REGISTRY: ${{ steps.login-ecr-private.outputs.registry }}
+          IMAGE_TAG: ${{ steps.vars.outputs.short_sha }}
+        run: |
+            docker build -t "$REGISTRY/mapzip-dev-ecr-pb:$IMAGE_TAG" "pb-files"
+            docker push "$REGISTRY/mapzip-dev-ecr-pb:$IMAGE_TAG"
+
+
+  change-infra-yaml:
+    needs: build-pb-image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout infra repository
+        uses: actions/checkout@v3
+        with:
+          repository: CLD3rd-Team4/Infra
+          ref: dev
+          token: ${{ secrets.INFRA_PAT }}
+
+      - name: Install yq
+        run: |
+          sudo wget https://github.com/mikefarah/yq/releases/download/v4.43.1/yq_linux_amd64 -O /usr/local/bin/yq
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Patch ArgoCD YAML files
+        env:
+          SHORT_SHA: ${{ needs.build-pb-image.outputs.short_sha }}
+          SERVICES: ${{ needs.build-pb-image.outputs.changed_services }}
+        run: |
+          for srv in $SERVICES; do
+            YAML_FILE="argocd/$srv/$srv.yaml"
+            if [ -f "$YAML_FILE" ]; then
+              echo "🔧 패치 중: $YAML_FILE"
+
+              IMAGE="061039804626.dkr.ecr.ap-northeast-2.amazonaws.com/mapzip-dev-ecr-pb:$SHORT_SHA"
+              PB_FILE="${srv}_proto.pb"
+
+              yq e '
+                if has("initContainers") then
+                  .initContainers[] |= (
+                    select(.name == "copy-pb") |= (
+                      .image = "'"$IMAGE"'"
+                    )
+                  )
+                else
+                  .initContainers = [{
+                    name: "copy-pb",
+                    image: "'"$IMAGE"'",
+                    command: ["/bin/sh", "-c"],
+                    args: ["cp /data/'"$PB_FILE"' /shared/"],
+                    volumeMounts: [{
+                      name: "pb-volume",
+                      mountPath: "/shared"
+                    }]
+                  }]
+                end
+              ' -i "$YAML_FILE"
+            else
+              echo "⚠️ 파일 없음: $YAML_FILE"
+            fi
+          done
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add argocd/
+          git commit -m "ci: update initContainer image" && git push || echo "No changes to commit"

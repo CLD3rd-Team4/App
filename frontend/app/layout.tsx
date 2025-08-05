@@ -6,8 +6,8 @@ import "./globals.css"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "map.zip - 스마트한 여행 스케줄 관리",
-  description: "스마트한 여행 스케줄 관리 앱",
+  title: "map.zip - 스케줄 기반 맛집 추천 서비스",
+  description: "스케줄 기반 맛집 추천 서비스",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -37,6 +37,11 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="map.zip" />
+        {/* 카카오 지도 API 스크립트 */}
+        <script 
+          type="text/javascript" 
+          src={`//dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_KEY}&libraries=services`}
+        ></script>
       </head>
       <body className={inter.className}>
         <div className="min-h-screen bg-gray-100">

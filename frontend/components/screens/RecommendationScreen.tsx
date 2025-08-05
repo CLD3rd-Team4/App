@@ -126,7 +126,7 @@ const MOCK_PREVIOUS_SELECTIONS = {
 
 export default function RecommendationScreen() {
   const router = useRouter()
-  const { selectedSchedule, updateSelectedRestaurant } = useSchedule()
+  const { selectedSchedule } = useSchedule()
   const [mealSections, setMealSections] = useState<MealSection[]>([])
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
   const [selectedRestaurants, setSelectedRestaurants] = useState<{ [key: string]: Restaurant }>({})
@@ -140,26 +140,12 @@ export default function RecommendationScreen() {
     try {
       setIsLoading(true)
 
-      // 목데이터용 스케줄 확인 - 백엔드 연동 시 주석 해제
-      // if (!selectedSchedule) {
-      //   console.error("선택된 스케줄이 없습니다.")
-      //   setIsLoading(false)
-      //   return
-      // }
-
       // 목데이터 - 백엔드 연동 시 selectedSchedule.targetMealTimes 사용
       const targetMealTimes = [
         { type: "식사" as const, time: "12:00" },
         { type: "식사" as const, time: "18:00" },
         { type: "간식" as const, time: "15:00" },
       ]
-
-      // 백엔드 연동 시 주석 해제
-      // const targetMealTimes = selectedSchedule.targetMealTimes || [
-      //   { type: "식사" as const, time: "12:00" },
-      //   { type: "간식" as const, time: "15:00" },
-      //   { type: "식사" as const, time: "18:00" },
-      // ]
 
       if (targetMealTimes.length === 0) {
         console.error("목표 식사 시간이 설정되지 않았습니다.")
@@ -169,9 +155,6 @@ export default function RecommendationScreen() {
 
       // 목데이터 사용 - 백엔드 연동 시 주석 처리하고 아래 주석 해제
       const allRestaurants = MOCK_RESTAURANTS
-
-      // 백엔드 연동 시 주석 해제
-      // const allRestaurants = await recommendationApi.getRecommendations(selectedSchedule?.id)
 
       // 목표 식사 시간을 기반으로 섹션 생성
       const sections: MealSection[] = []
@@ -200,11 +183,7 @@ export default function RecommendationScreen() {
             index: mealCount,
             time: meal.time,
             restaurants: sectionRestaurants,
-            // 목데이터 - 이전 선택 테스트용 (백엔드 연동 시 아래 주석 해제)
             previousSelection: MOCK_PREVIOUS_SELECTIONS[sectionId as keyof typeof MOCK_PREVIOUS_SELECTIONS],
-            // 백엔드 연동 시 주석 해제
-            // previousSelection: selectedSchedule?.selectedRestaurants?.find((item: any) => item.sectionId === sectionId)
-            //   ?.restaurant,
           })
           mealCount++
         } else {
@@ -216,11 +195,7 @@ export default function RecommendationScreen() {
             index: snackCount,
             time: meal.time,
             restaurants: sectionRestaurants,
-            // 목데이터 - 이전 선택 테스트용 (백엔드 연동 시 아래 주석 해제)
             previousSelection: MOCK_PREVIOUS_SELECTIONS[sectionId as keyof typeof MOCK_PREVIOUS_SELECTIONS],
-            // 백엔드 연동 시 주석 해제
-            // previousSelection: selectedSchedule?.selectedRestaurants?.find((item: any) => item.sectionId === sectionId)
-            //   ?.restaurant,
           })
           snackCount++
         }
@@ -262,9 +237,14 @@ export default function RecommendationScreen() {
     return `${period} ${displayHour}:${minute}`
   }
 
+  // 모든 섹션에서 선택이 완료되었는지 확인
+  const isAllSectionsSelected = () => {
+    return mealSections.every((section) => selectedRestaurants[section.id])
+  }
+
   const handleComplete = () => {
-    if (Object.keys(selectedRestaurants).length === 0) {
-      alert("최소 하나의 식당을 선택해주세요.")
+    if (!isAllSectionsSelected()) {
+      alert("모든 식사/간식 시간에 대해 식당을 선택해주세요.")
       return
     }
 
@@ -272,18 +252,6 @@ export default function RecommendationScreen() {
       sectionId,
       restaurant,
     }))
-
-    // 목데이터 테스트용 - 백엔드 연동 시 주석 해제
-    // if (selectedSchedule) {
-    //   const updatedSchedule = {
-    //     ...selectedSchedule,
-    //     selectedRestaurants: selectedList,
-    //     selectedRestaurant: selectedList[0].restaurant, // 첫 번째 선택을 메인으로
-    //   }
-
-    //   localStorage.setItem("selectedSchedule", JSON.stringify(updatedSchedule))
-    //   updateSelectedRestaurant(selectedList[0].restaurant)
-    // }
 
     // 목데이터 테스트용 - 로컬스토리지에 직접 저장
     const mockSchedule = {
@@ -298,40 +266,26 @@ export default function RecommendationScreen() {
     router.push("/")
   }
 
-  // 목데이터 테스트용 - 백엔드 연동 시 주석 해제
-  // if (!selectedSchedule) {
-  //   return (
-  //     <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-  //       <div className="text-center">
-  //         <p className="text-gray-600 mb-4">선택된 스케줄이 없습니다.</p>
-  //         <Button onClick={() => router.push("/schedule")} className="bg-blue-500 hover:bg-blue-600 text-white">
-  //           스케줄 선택하기
-  //         </Button>
-  //       </div>
-  //     </div>
-  //   )
-  // }
-
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
       <div className="bg-white p-4 shadow-sm flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center">
-          <Button onClick={() => router.back()} variant="ghost" size="sm" className="mr-3">
+          <Button onClick={() => router.push("/")} variant="ghost" size="sm" className="mr-3">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className="text-lg font-medium">추천 결과</h1>
         </div>
         <Button
           onClick={handleComplete}
-          disabled={Object.keys(selectedRestaurants).length === 0}
+          disabled={!isAllSectionsSelected()}
           size="sm"
           className={`px-4 py-2 font-medium ${
-            Object.keys(selectedRestaurants).length === 0
+            !isAllSectionsSelected()
               ? "bg-gray-300 text-gray-500 cursor-not-allowed"
               : "bg-blue-500 hover:bg-blue-600 text-white shadow-md"
           }`}
         >
-          입력완료 ({Object.keys(selectedRestaurants).length})
+          입력완료 ({Object.keys(selectedRestaurants).length}/{mealSections.length})
         </Button>
       </div>
 
@@ -431,6 +385,20 @@ export default function RecommendationScreen() {
                                     </span>
                                   </div>
                                 </div>
+                                {/* 이전 선택 식당 선택 버튼 추가 */}
+                                <Button
+                                  onClick={() => handleRestaurantSelect(section.id, section.previousSelection!)}
+                                  size="sm"
+                                  className={`w-full mt-2 ${
+                                    selectedRestaurants[section.id]?.id === section.previousSelection!.id
+                                      ? "bg-green-500 hover:bg-green-600 text-white"
+                                      : "bg-blue-500 hover:bg-blue-600 text-white"
+                                  }`}
+                                >
+                                  {selectedRestaurants[section.id]?.id === section.previousSelection!.id
+                                    ? "✓ 선택됨"
+                                    : "다시 선택"}
+                                </Button>
                               </div>
                             </div>
                           </div>

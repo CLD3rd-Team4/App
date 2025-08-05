@@ -1,7 +1,7 @@
 {
   "name": "map.zip",
   "short_name": "map.zip",
-  "description": "스마트한 여행 스케줄 관리 앱",
+  "description": "스케줄 기반 맛집 추천 서비스",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f3f4f6",

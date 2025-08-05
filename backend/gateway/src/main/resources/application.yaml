@@ -1,0 +1,8 @@
+#from config server
+spring:
+  application:
+    name: gateway
+  config:
+    import: "configserver:http://config.service-platform.svc.cluster.local:8888"
+  profiles:
+    active: dev

@@ -1,0 +1,64 @@
+spring:
+  application:
+    name: gateway
+  main:
+    web-application-type: reactive
+  cloud:
+    config:
+      enabled: true
+    gateway:
+      server:
+        webflux:
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowed-origins: 
+                  - "https://www.mapzip.shop"
+                allowed-methods:
+                  - GET
+                  - POST
+                  - PUT
+                  - DELETE
+                  - OPTIONS
+                allowed-headers: "*"
+                allow-credentials: true
+                max-age: 3600
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    readiness-state:
+      enabled: true
+    liveness-state:
+      enabled: true
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http:
+          server:
+            requests: true
+      slo:
+        http.server.requests: 100ms,200ms,500ms,1s,2s
+    tags:
+      application: ${spring.application.name}
+      environment: ${ENVIRONMENT:dev}
+      region: ${AWS_REGION:ap-northeast-2}
+
+logging:
+  level:
+    mapzip.gateway.filter: DEBUG
+
+jwt:
+  secret: '{cipher}b356ec0ec47d0edbdd8697a765f3d79102c36736d159d067d5b3cb3cbed63346269f3e8af80154ec3e7ae41c53822a2e153f144b1523dfce4e50c1cf074a146a'
+
+server:
+  port: 8080

@@ -1,0 +1,94 @@
+# Schedule 서비스 설정 (EKS 환경 기본)
+
+server:
+  port: ${SERVER_PORT:8084}
+
+spring:
+  application:
+    name: schedule
+    
+  # Aurora PostgreSQL 연결 (schedule 클러스터)
+  datasource:
+    url: jdbc:postgresql://mapzip-dev-schedule-db.cluster-c3qme6c6e7fj.ap-northeast-2.rds.amazonaws.com:5432/schedule_db
+    username: mapzip
+    password: '{cipher}831b8fc2d97a893e91fbc1a6b04553fb81b73c4664a9a309210f8ea138c78f01'
+    driver-class-name: org.postgresql.Driver
+    
+  # JPA 설정 (운영 환경 기준)
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+  # Kubernetes 서비스 디스커버리 활성화
+  cloud:
+    kubernetes:
+      discovery:
+        enabled: true
+
+# gRPC 서버 설정
+grpc:
+  server:
+    port: 9090
+    reflection-service-enabled: true
+  client:
+    kakao-api-service:
+      address: static://localhost:9090
+      negotiation-type: plaintext
+
+# 로깅 설정
+logging:
+  level:
+    com.mapzip.schedule: DEBUG
+
+# Health check and metrics
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# 스케줄링 관련 설정
+scheduling:
+  enabled: ${SCHEDULING_ENABLED:true}
+  pool-size: ${SCHEDULING_POOL_SIZE:10}
+
+# Eureka 비활성화
+eureka:
+  client:
+    enabled: false
+
+# AWS 자격 증명 설정
+cloud:
+  aws:
+    credentials:
+      access-key: ${AWS_ACCESS_KEY_ID}
+      secret-key: ${AWS_SECRET_ACCESS_KEY}
+    region:
+      static: ${AWS_REGION:ap-northeast-2}
+
+# 외부 API 설정
+external:
+  api:
+    tmap:
+      url: https://apis.openapi.sk.com
+      key: '{cipher}b4164c17f59386ba11272ff9aaf04f9a184680c6e7362e0772830576667b0bc29b9bfe829ec5e4e4c9a585c861629e77a1c2db6594b9fdea2fc0c3dc4c2e1dc7'
+    
+
+# 개발 환경용 인증 설정
+auth:
+  enabled: false
