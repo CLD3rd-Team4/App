@@ -8,6 +8,7 @@ import { scheduleApi } from "@/services/api"
 import BottomNavigation from "@/components/common/BottomNavigation"
 import { Plus } from "lucide-react"
 import type { Schedule } from "@/types"
+import api from "@/lib/interceptor" 
 
 export default function ScheduleListScreen() {
   const router = useRouter()
@@ -23,8 +24,19 @@ export default function ScheduleListScreen() {
   useEffect(() => {
     if (isClient) {
       loadScheduleList()
+      testApiInterceptor()
     }
   }, [isClient])
+
+    // 테스트용 함수 직접 추가
+  async function testApiInterceptor() {
+    try {
+      const res = await api.get("/review/resource")
+      console.log("테스트 요청 성공:", res.data)
+    } catch (error: any) {
+      console.error("테스트 요청 에러:", error.response?.data || error.message)
+    }
+  }
 
   const loadScheduleList = async () => {
     try {
