@@ -22,21 +22,23 @@ spring:
   # Redis 캐싱 설정 (ElastiCache 연결)
   data:
     redis:
-      host: ${ELASTICACHE_ENDPOINT}
-      port: 6379
-      timeout: 2000ms
+      host: ${REDIS_HOST:elasticache-review.service-platform.svc.cluster.local}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      timeout: ${REDIS_TIMEOUT:2000ms}
       lettuce:
         pool:
-          max-active: 8
-          max-idle: 8
-          min-idle: 0
-          max-wait: -1ms
+          max-active: ${REDIS_POOL_MAX_ACTIVE:8}
+          max-idle: ${REDIS_POOL_MAX_IDLE:8}
+          min-idle: ${REDIS_POOL_MIN_IDLE:0}
+          max-wait: ${REDIS_POOL_MAX_WAIT:-1ms}
           
   # 캐시 설정
   cache:
     type: redis
     redis:
-      time-to-live: 600000  # 기본 10분 TTL (밀리초)
+      time-to-live: ${CACHE_DEFAULT_TTL:1800000}  # 기본 30분 TTL (밀리초)
       cache-null-values: false
       
   jackson:
@@ -56,7 +58,7 @@ aws:
   
   # DynamoDB 연결 (IRSA 사용으로 자격증명 불필요)
   dynamodb:
-    table-name: ${DYNAMODB_TABLE_NAME}
+    table-name: ${DYNAMODB_TABLE_NAME:${TERRAFORM_WORKSPACE:dev}-mapzip-reviews}
     endpoint: ${DYNAMODB_ENDPOINT:}
     region: ${AWS_REGION:ap-northeast-2}
     
@@ -65,6 +67,7 @@ aws:
     bucket-name: mapzip-${TERRAFORM_WORKSPACE:dev}-image
     region: ${AWS_REGION:ap-northeast-2}
     presign-duration: ${S3_PRESIGN_DURATION:PT1H}  # Pre-signed URL 유효시간 (1시간)
+    cloudfront-domain: ${CLOUDFRONT_IMAGE_DOMAIN:https://img.mapzip.shop}  # CloudFront 이미지 도메인
     
   # MSK Kafka 설정 (main 클러스터) - 환경변수 필수
   kafka:
@@ -142,7 +145,13 @@ review:
     max-retry-attempts: ${OCR_MAX_RETRY:3}
   image:
     max-file-size: ${IMAGE_MAX_SIZE:10MB}
-    allowed-types: ${IMAGE_ALLOWED_TYPES:image/jpeg,image/png,image/jpg}
+    allowed-formats: ${IMAGE_ALLOWED_FORMATS:jpg,jpeg,png,webp}
   pagination:
     default-size: ${PAGINATION_DEFAULT_SIZE:20}
     max-size: ${PAGINATION_MAX_SIZE:100}
+  cache:
+    user-reviews-ttl: ${CACHE_USER_REVIEWS_TTL:3600}      # 1시간 (초)
+    restaurant-reviews-ttl: ${CACHE_RESTAURANT_REVIEWS_TTL:7200}  # 2시간 (초)
+    review-stats-ttl: ${CACHE_REVIEW_STATS_TTL:21600}     # 6시간 (초)
+    ocr-results-ttl: ${CACHE_OCR_RESULTS_TTL:86400}       # 24시간 (초)
+    recommendation-ttl: ${CACHE_RECOMMENDATION_TTL:14400}  # 4시간 (초)

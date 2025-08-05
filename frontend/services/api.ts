@@ -1,6 +1,28 @@
 // API 기본 설정
 const API_BASE_URL = "https://api.mapzip.shop";
 
+// 타입 임포트 추가
+import type { OCRResult, CreateReviewRequest, CreateReviewResponse } from "@/types";
+
+// 커스텀 에러 클래스
+export class APIError extends Error {
+  public status: number;
+  public data: any;
+
+  constructor(message: string, status: number, data?: any) {
+    super(message);
+    this.name = 'APIError';
+    this.status = status;
+    this.data = data;
+  }
+}
+
+// 공통 헤더 설정 함수
+const getCommonHeaders = (): Record<string, string> => {
+  return {
+  };
+};
+
 
 // 테스트용 데이터 - 실제 API 연동 시 제거
 const TEST_DATA = {
@@ -166,36 +188,121 @@ export const authApi = {
 
 export const scheduleApi = {
   getSchedules: async () => {
-    const response = await fetch(`${API_BASE_URL}/schedule`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch schedules');
+    try {
+      const response = await fetch(`${API_BASE_URL}/schedule`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getCommonHeaders(),
+        },
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new APIError(
+          errorData.message || '스케줄 목록을 가져오는데 실패했습니다',
+          response.status,
+          errorData
+        );
+      }
+      
+      return response.json();
+    } catch (error) {
+      if (error instanceof APIError) {
+        throw error;
+      }
+      throw new APIError('네트워크 오류가 발생했습니다', 0, { originalError: error });
     }
-    return response.json();
   },
 
   createSchedule: async (scheduleData: any) => {
-    // TODO: 실제 API 연동
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const newSchedule = {
-          id: Date.now().toString(),
-          ...scheduleData,
-        }
-        resolve(newSchedule)
-      }, 1000)
-    })
+    try {
+      const response = await fetch(`${API_BASE_URL}/schedule`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getCommonHeaders(),
+        },
+        credentials: 'include',
+        body: JSON.stringify(scheduleData),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new APIError(
+          errorData.message || '스케줄 생성에 실패했습니다',
+          response.status,
+          errorData
+        );
+      }
+      
+      return response.json();
+    } catch (error) {
+      if (error instanceof APIError) {
+        throw error;
+      }
+      throw new APIError('네트워크 오류가 발생했습니다', 0, { originalError: error });
+    }
   },
 
   updateSchedule: async (scheduleData: any) => {
-    // TODO: 실제 API 연동
-    return new Promise((resolve) => {
-      setTimeout(() => resolve(scheduleData), 1000)
-    })
+    try {
+      const response = await fetch(`${API_BASE_URL}/schedule/${scheduleData.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getCommonHeaders(),
+        },
+        credentials: 'include',
+        body: JSON.stringify(scheduleData),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new APIError(
+          errorData.message || '스케줄 수정에 실패했습니다',
+          response.status,
+          errorData
+        );
+      }
+      
+      return response.json();
+    } catch (error) {
+      if (error instanceof APIError) {
+        throw error;
+      }
+      throw new APIError('네트워크 오류가 발생했습니다', 0, { originalError: error });
+    }
   },
 
   deleteSchedule: async (scheduleId: string) => {
-    // TODO: 실제 API 연동
-    return new Promise((resolve) => setTimeout(resolve, 500))
+    try {
+      const response = await fetch(`${API_BASE_URL}/schedule/${scheduleId}`, {
+        method: 'DELETE',
+        headers: {
+          // Gateway에서 JWT 쿠키 검증 후 x-user-id 헤더 자동 추가
+          ...getCommonHeaders(),
+        },
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new APIError(
+          errorData.message || '스케줄 삭제에 실패했습니다',
+          response.status,
+          errorData
+        );
+      }
+      
+      return response.json();
+    } catch (error) {
+      if (error instanceof APIError) {
+        throw error;
+      }
+      throw new APIError('네트워크 오류가 발생했습니다', 0, { originalError: error });
+    }
   },
 }
 
@@ -222,57 +329,130 @@ export const visitedRestaurantApi = {
 }
 
 export const ocrApi = {
-  processReceipt: async (imageData: string, expectedRestaurantName: string, expectedAddress: string) => {
-    const formData = new FormData();
-    const blob = await (await fetch(imageData)).blob();
-    formData.append('receiptImage', blob, 'receipt.jpg');
-    formData.append('expectedRestaurantName', expectedRestaurantName);
-    formData.append('expectedAddress', expectedAddress);
+  processReceipt: async (imageData: string, expectedRestaurantName: string, expectedAddress: string): Promise<OCRResult> => {
+    try {
+      const formData = new FormData();
+      
+      // Data URL을 Blob으로 변환하는 올바른 방법
+      const dataUrlToBlob = (dataUrl: string): Blob => {
+        const arr = dataUrl.split(',');
+        const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        return new Blob([u8arr], { type: mime });
+      };
 
-    const response = await fetch(`${API_BASE_URL}/review/verify-receipt`, {
-      method: 'POST',
-      body: formData,
-    });
+      const blob = dataUrlToBlob(imageData);
+      formData.append('receiptImage', blob, 'receipt.jpg');
+      formData.append('expectedRestaurantName', expectedRestaurantName);
+      formData.append('expectedAddress', expectedAddress);
 
-    if (!response.ok) {
-      throw new Error('Failed to process receipt');
+      const response = await fetch(`${API_BASE_URL}/review/verify-receipt`, {
+        method: 'POST',
+        headers: {
+          // Gateway에서 JWT 쿠키 검증 후 x-user-id 헤더 자동 추가
+          ...getCommonHeaders(),
+        },
+        credentials: 'include', // 쿠키 포함 (JWT 토큰용)
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new APIError(
+          errorData.message || 'OCR 처리에 실패했습니다',
+          response.status,
+          errorData
+        );
+      }
+      
+      return response.json();
+    } catch (error) {
+      if (error instanceof APIError) {
+        throw error;
+      }
+      throw new APIError('네트워크 오류가 발생했습니다', 0, { originalError: error });
     }
-    return response.json();
   },
 };
 
 export const reviewApi = {
-  createReview: async (reviewData: any) => {
-    const formData = new FormData();
-    formData.append('restaurantId', reviewData.restaurantId);
-    formData.append('restaurantName', reviewData.restaurantName);
-    formData.append('restaurantAddress', reviewData.restaurantAddress);
-    formData.append('rating', reviewData.rating.toString());
-    formData.append('content', reviewData.content);
+  createReview: async (reviewData: CreateReviewRequest): Promise<CreateReviewResponse> => {
+    try {
+      const formData = new FormData();
+      
+      // Data URL을 Blob으로 변환하는 헬퍼 함수
+      const dataUrlToBlob = (dataUrl: string): Blob => {
+        const arr = dataUrl.split(',');
+        const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        return new Blob([u8arr], { type: mime });
+      };
 
-    if (reviewData.receiptImages) {
-      for (const image of reviewData.receiptImages) {
-        const blob = await (await fetch(image)).blob();
-        formData.append('receiptImages', blob, 'receipt.jpg');
+      formData.append('restaurantId', reviewData.restaurantId);
+      formData.append('restaurantName', reviewData.restaurantName);
+      formData.append('restaurantAddress', reviewData.restaurantAddress);
+      formData.append('rating', reviewData.rating.toString());
+      formData.append('content', reviewData.content);
+
+      // 영수증 이미지 처리
+      if (reviewData.receiptImages && reviewData.receiptImages.length > 0) {
+        for (let i = 0; i < reviewData.receiptImages.length; i++) {
+          const image = reviewData.receiptImages[i];
+          if (image) {
+            const blob = dataUrlToBlob(image);
+            formData.append('receiptImages', blob, `receipt_${i}.jpg`);
+          }
+        }
       }
-    }
 
-    if (reviewData.reviewImages) {
-      for (const image of reviewData.reviewImages) {
-        const blob = await (await fetch(image)).blob();
-        formData.append('reviewImages', blob, 'review.jpg');
+      // 리뷰 이미지 처리
+      if (reviewData.reviewImages && reviewData.reviewImages.length > 0) {
+        for (let i = 0; i < reviewData.reviewImages.length; i++) {
+          const image = reviewData.reviewImages[i];
+          if (image) {
+            const blob = dataUrlToBlob(image);
+            formData.append('reviewImages', blob, `review_${i}.jpg`);
+          }
+        }
       }
-    }
 
-    const response = await fetch(`${API_BASE_URL}/review`, {
-      method: 'POST',
-      body: formData,
-    });
+      const response = await fetch(`${API_BASE_URL}/review`, {
+        method: 'POST',
+        headers: {
+          // FormData 사용 시 Content-Type을 자동으로 설정하도록 함
+          // Gateway에서 JWT 쿠키 검증 후 x-user-id 헤더 자동 추가
+          ...getCommonHeaders(),
+        },
+        credentials: 'include',
+        body: formData,
+      });
 
-    if (!response.ok) {
-      throw new Error('Failed to create review');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new APIError(
+          errorData.message || '리뷰 작성에 실패했습니다',
+          response.status,
+          errorData
+        );
+      }
+      
+      return response.json();
+    } catch (error) {
+      if (error instanceof APIError) {
+        throw error;
+      }
+      throw new APIError('네트워크 오류가 발생했습니다', 0, { originalError: error });
     }
-    return response.json();
   },
 };
 

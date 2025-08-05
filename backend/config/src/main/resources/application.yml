@@ -21,12 +21,12 @@ spring:
           username: ${GIT_USERNAME:}
           password: ${GIT_TOKEN:}
 
-# Actuator 설정 (헬스체크용)
+# Actuator 설정 (헬스체크 + 모니터링)
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,env,configprops,refresh,encrypt,decrypt
+        include: health,info,env,configprops,refresh,encrypt,decrypt,prometheus,metrics
   endpoint:
     health:
       show-details: always
@@ -38,6 +38,17 @@ management:
       enabled: true
     decrypt:
       enabled: true
+    prometheus:
+      enabled: true
+    metrics:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      service: config
+      environment: ${spring.profiles.active:dev}
   health:
     livenessstate:
       enabled: true
