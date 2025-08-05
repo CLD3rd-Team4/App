@@ -126,7 +126,7 @@ const MOCK_PREVIOUS_SELECTIONS = {
 
 export default function RecommendationScreen() {
   const router = useRouter()
-  const { selectedSchedule, updateSelectedRestaurant } = useSchedule()
+  const { selectedSchedule } = useSchedule()
   const [mealSections, setMealSections] = useState<MealSection[]>([])
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
   const [selectedRestaurants, setSelectedRestaurants] = useState<{ [key: string]: Restaurant }>({})

@@ -16,11 +16,6 @@
 #             typed_config:
 #               "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
 #           http_filters:
-#           # CORS filter
-#           - name: envoy.filters.http.cors
-#             typed_config:
-#               "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.Cors
-#           # gRPC-JSON transcoder filter
 #           - name: envoy.filters.http.grpc_json_transcoder
 #             typed_config:
 #               "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
@@ -35,11 +30,12 @@
 #               match_incoming_request_route: true
 #               ignored_query_parameters:
 #                 - "_"
-#           # gRPC-Web filter
+#           - name: envoy.filters.http.cors
+#             typed_config:
+#               "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.Cors
 #           - name: envoy.filters.http.grpc_web
 #             typed_config:
 #               "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_web.v3.GrpcWeb
-#           # Router filter (마지막에 위치해야 함)
 #           - name: envoy.filters.http.router
 #             typed_config:
 #               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -48,14 +44,12 @@
 #             virtual_hosts:
 #             - name: local_service
 #               domains: ["*"]
+#               cors:
+#                 allow_origin_string_match:
+#                   - prefix: "*"
+#                 allow_headers: "*"
+#                 allow_methods: "*"
 #               routes:
-#               # HTTP API 라우트 (JSON 트랜스코딩용)
-#               - match:
-#                   prefix: "/schedule"
-#                 route:
-#                   cluster: schedule_service_cluster
-#                   timeout: 60s
-#               # gRPC/gRPC-Web 라우트 
 #               - match:
 #                   prefix: "/"
 #                 route:

@@ -10,6 +10,7 @@ import { ArrowLeft } from "lucide-react"
 interface MealTime {
   type: "식사" | "간식"
   time: string
+  radius: "5km" | "10km" | "20km"
 }
 
 interface RequiredData {
@@ -17,7 +18,6 @@ interface RequiredData {
   departureTime: string
   arrivalTime: string
   estimatedArrivalTime: string
-  mealRadius: "5km" | "10km" | "20km"
   targetMealTimes: MealTime[]
 }
 
@@ -38,7 +38,6 @@ export default function ScheduleCreateRequiredScreen({
       departureTime: "12:00",
       arrivalTime: "",
       estimatedArrivalTime: "18:30", // 백엔드에서 계산해서 받을 예정
-      mealRadius: "5km",
       targetMealTimes: [],
     },
   )
@@ -75,7 +74,7 @@ export default function ScheduleCreateRequiredScreen({
     const minTime = getMinTimeForMeal(formData.targetMealTimes.length)
     setFormData((prev) => ({
       ...prev,
-      targetMealTimes: [...prev.targetMealTimes, { type: "식사", time: minTime }],
+      targetMealTimes: [...prev.targetMealTimes, { type: "식사", time: minTime, radius: "5km" }], // 기본 반경 5km 추가
     }))
   }
 
@@ -189,22 +188,7 @@ export default function ScheduleCreateRequiredScreen({
           </div>
 
           {/* 식사 반경 */}
-          <div>
-            <Label className="text-base font-medium">식사 반경</Label>
-            <div className="flex gap-2 mt-2">
-              {["5km", "10km", "20km"].map((radius) => (
-                <Button
-                  key={radius}
-                  onClick={() => setFormData((prev) => ({ ...prev, mealRadius: radius as any }))}
-                  variant={formData.mealRadius === radius ? "default" : "outline"}
-                  size="sm"
-                  className={formData.mealRadius === radius ? "bg-blue-500 text-white" : ""}
-                >
-                  {radius}
-                </Button>
-              ))}
-            </div>
-          </div>
+          {/* 이 부분은 각 식사 시간 카드 내부로 이동 */}
 
           {/* 목표 식사 시간 */}
           <div>
@@ -246,6 +230,24 @@ export default function ScheduleCreateRequiredScreen({
                   onChange={(time) => updateMealTime(index, "time", time)}
                   label={`시간 선택 (${getMinTimeForMeal(index)} 이후)`}
                 />
+
+                {/* 개별 식사 반경 */}
+                <div className="mt-3">
+                  <Label className="text-sm font-medium">식사 반경</Label>
+                  <div className="flex gap-2 mt-1">
+                    {["5km", "10km", "20km"].map((radiusOption) => (
+                      <Button
+                        key={radiusOption}
+                        onClick={() => updateMealTime(index, "radius", radiusOption as any)}
+                        variant={mealTime.radius === radiusOption ? "default" : "outline"}
+                        size="sm"
+                        className={mealTime.radius === radiusOption ? "bg-blue-500 text-white" : ""}
+                      >
+                        {radiusOption}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
               </div>
             ))}
 

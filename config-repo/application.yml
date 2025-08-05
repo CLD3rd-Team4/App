@@ -1,3 +1,7 @@
+frontend:
+  kakao:
+    appkey: ${KAKAO_MAP_KEY:default_key}
+
 # 모든 서비스에 공통으로 적용되는 설정 (EKS 환경 우선)
 
 # Kubernetes 네이티브 서비스 디스커버리 (기본 활성화)

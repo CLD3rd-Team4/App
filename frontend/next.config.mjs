@@ -1,22 +1,12 @@
+/** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'export',
-  trailingSlash: true,
-  skipTrailingSlashRedirect: true,
-  distDir: 'out',
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   images: {
-    unoptimized: true
+    unoptimized: true,
   },
-  assetPrefix: process.env.NODE_ENV === 'production' ? '' : '',
-  basePath: '',
-  experimental: {
-    esmExternals: false
-  }
-}
+  env: {
+    NEXT_PUBLIC_KAKAO_MAP_KEY: process.env.NEXT_PUBLIC_KAKAO_MAP_KEY,
+  },
+};
 
-export default nextConfig
+export default nextConfig;

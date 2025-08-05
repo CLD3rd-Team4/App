@@ -66,8 +66,11 @@
     "@types/node": "^22",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/react-toastify": "^4.1.0",
     "postcss": "^8.5",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5"
+    "typescript": "^5",
+    "axios": "^1.7.2",
+    "@types/axios": "^0.14.0"
   }
 }
