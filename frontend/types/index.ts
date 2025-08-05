@@ -28,10 +28,8 @@ export interface Schedule {
   departureTime: string
   arrivalTime: string // 이 필드는 calculatedArrivalTime로 대체될 수 있습니다.
   calculatedArrivalTime?: string; // 계산된 도착 시간 추가
-  hasMeal: boolean
   companions: string[]
   purpose: string
-  tags: string[]
   selectedRestaurant?: Restaurant
   selectedRestaurants?: Array<{
     sectionId: string
