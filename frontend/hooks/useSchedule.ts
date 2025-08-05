@@ -63,6 +63,11 @@ export function useSchedule() {
   }
 
   const updateSchedule = async (scheduleData: Schedule) => {
+    if (!scheduleData.userId) {
+      console.error("업데이트를 위한 userId가 없습니다.");
+      return;
+    }
+
     try {
       await scheduleApi.updateSchedule(scheduleData);
       await loadSchedules(scheduleData.userId); 
