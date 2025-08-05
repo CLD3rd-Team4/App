@@ -76,7 +76,7 @@ export default function ScheduleListScreen() {
       alert("유효하지 않은 스케줄입니다.");
       return;
     }
-    router.push(`/schedule/edit/${schedule.id}/`)
+    router.push(`/schedule/edit?id=${schedule.id}`)
   }
 
   const handleScheduleDelete = async (scheduleId: string) => {

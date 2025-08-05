@@ -1,14 +1,14 @@
-"use client"
+'use client';
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import { scheduleApi } from "@/services/api";
-import ScheduleCreateScreen from "@/components/screens/ScheduleCreateScreen";
-import type { Schedule } from "@/types";
+import { useEffect, useState, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { scheduleApi } from '@/services/api';
+import ScheduleCreateScreen from '@/components/screens/ScheduleCreateScreen';
+import type { Schedule } from '@/types';
 
-export default function ScheduleEditPage() {
-  const params = useParams();
-  const id = params.id as string;
+function EditPageContent() {
+  const searchParams = useSearchParams();
+  const id = searchParams.get('id');
   const [initialData, setInitialData] = useState<Schedule | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -19,11 +19,10 @@ export default function ScheduleEditPage() {
         try {
           setIsLoading(true);
           // TODO: 실제 userId로 교체 필요
-          const data = await scheduleApi.getScheduleDetail(id, "test-user-123");
-          console.log("API Response:", JSON.stringify(data, null, 2)); // 응답 데이터 확인
+          const data = await scheduleApi.getScheduleDetail(id, 'test-user-123');
           setInitialData(data.schedule);
         } catch (err) {
-          setError("스케줄 정보를 불러오는데 실패했습니다.");
+          setError('스케줄 정보를 불러오는데 실패했습니다.');
           console.error(err);
         } finally {
           setIsLoading(false);
@@ -61,4 +60,12 @@ export default function ScheduleEditPage() {
   }
 
   return <ScheduleCreateScreen isEdit={true} initialData={initialData} />;
+}
+
+export default function ScheduleEditPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <EditPageContent />
+    </Suspense>
+  );
 }
