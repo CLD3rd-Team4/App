@@ -7,6 +7,19 @@ import { useSchedule } from "@/hooks/useSchedule"
 import BottomNavigation from "@/components/common/BottomNavigation"
 import { RefreshCw, Star } from "lucide-react"
 import { scheduleApi } from "@/services/api"
+import type { Restaurant } from "@/types";
+
+// 타임라인 아이템 타입을 명시적으로 정의
+type TimelineItem = {
+  type: "departure" | "waypoint" | "destination" | "restaurant";
+  time?: string;
+  title: string;
+  icon: string;
+  color: string;
+  description?: string;
+  rating?: number;
+  restaurant?: Restaurant;
+};
 
 function RecommendationReadyPopup({ onConfirm }: { onConfirm: () => void }) {
   return (
@@ -82,7 +95,7 @@ export default function ScheduleSummaryScreen() {
     return `${period} ${displayHour}:${m}`;
   }
 
-  const createTimelineItems = () => {
+  const createTimelineItems = (): TimelineItem[] => {
     if (!selectedSchedule) return [];
 
     const items = []
@@ -219,12 +232,16 @@ export default function ScheduleSummaryScreen() {
                       <div className="flex-1">
                         <p className="text-sm text-gray-500">{item.time ? formatTime(item.time) : "시간 미정"}</p>
                         <p className="font-medium">{item.title}</p>
-                        {item.type === 'restaurant' && item.description && <p className="text-sm text-gray-600">{item.description}</p>}
-                        {item.type === 'restaurant' && item.rating && item.rating > 0 && (
-                          <div className="flex items-center mt-1">
-                            <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                            <span className="text-sm ml-1">{item.rating}</span>
-                          </div>
+                        {item.type === 'restaurant' && (
+                          <>
+                            {item.description && <p className="text-sm text-gray-600">{item.description}</p>}
+                            {item.rating && item.rating > 0 && (
+                              <div className="flex items-center mt-1">
+                                <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                                <span className="text-sm ml-1">{item.rating}</span>
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
