@@ -10,18 +10,26 @@ export interface MealTime {
   time: string
 }
 
+// Waypoint 타입을 명확하게 정의합니다.
+export interface Waypoint {
+  lat: number;
+  lng: number;
+  name: string;
+  arrivalTime?: string; // 도착 시간은 선택적 필드
+}
+
 export interface Schedule {
   id: string
   title: string
-  departure: string
-  destination: string
-  waypoints?: string[]
+  // departure와 destination도 LocationInfo 타입을 사용하도록 개선할 수 있으나, 우선 waypoints만 수정합니다.
+  departure: any 
+  destination: any
+  waypoints?: Waypoint[] // string[]에서 Waypoint[]로 수정
   departureTime: string
-  arrivalTime: string
-  hasMeal: boolean
+  arrivalTime: string // 이 필드는 calculatedArrivalTime로 대체될 수 있습니다.
+  calculatedArrivalTime?: string; // 계산된 도착 시간 추가
   companions: string[]
   purpose: string
-  tags: string[]
   selectedRestaurant?: Restaurant
   selectedRestaurants?: Array<{
     sectionId: string
@@ -30,6 +38,7 @@ export interface Schedule {
   mealRadius?: "5km" | "10km" | "20km"
   targetMealTimes?: MealTime[]
   userRequirements?: string
+  userId?: string; // userId 추가
 }
 
 export interface Restaurant {
@@ -101,4 +110,17 @@ export interface APIErrorData {
   message: string
   status: number
   data?: any
+}
+
+export interface LocationInfo {
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+}
+
+export interface LocationData {
+  departure: LocationInfo | null;
+  destination: LocationInfo | null;
+  waypoints: (LocationInfo | null)[];
 }

@@ -1,38 +1,27 @@
 package com.mapzip.schedule.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.protobuf.GeneratedMessageV3;
-import com.mapzip.schedule.client.KakaoClient;
-import com.mapzip.schedule.client.TmapClient;
-import com.mapzip.schedule.dto.TmapRouteRequest;
-import com.mapzip.schedule.dto.TmapRouteResponse;
+import com.mapzip.schedule.dto.MealSlotData;
 import com.mapzip.schedule.entity.MealTimeSlot;
 import com.mapzip.schedule.entity.Schedule;
 import com.mapzip.schedule.grpc.*;
 import com.mapzip.schedule.mapper.ScheduleMapper;
 import com.mapzip.schedule.repository.MealTimeSlotRepository;
 import com.mapzip.schedule.repository.ScheduleRepository;
-import com.mapzip.schedule.repository.SelectedRestaurantRepository;
-import com.mapzip.schedule.util.TimeUtil;
+
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import net.devh.boot.grpc.server.service.GrpcService;
-import org.springframework.transaction.annotation.Transactional;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
-
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-
-import com.mapzip.schedule.grpc.KakaoApiServiceGrpc;
-import com.mapzip.schedule.grpc.KakaoSearchRequest;
-import net.devh.boot.grpc.client.inject.GrpcClient;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import net.devh.boot.grpc.server.service.GrpcService;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @GrpcService
@@ -41,34 +30,20 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
 
     private final ScheduleRepository scheduleRepository;
     private final MealTimeSlotRepository mealTimeSlotRepository;
-    private final SelectedRestaurantRepository selectedRestaurantRepository;
+    
     private final ScheduleMapper scheduleMapper;
-    private final TmapClient tmapClient;
-    private final RouteService routeService;
-    private final ObjectMapper objectMapper; // [수정] ObjectMapper 다시 추가
-
-    @GrpcClient("kakao-api-service")
-    private KakaoApiServiceGrpc.KakaoApiServiceBlockingStub kakaoApiServiceBlockingStub;
+    private final ObjectMapper objectMapper;
+    private final TmapCalculationProcessor tmapCalculationProcessor;
 
     @Override
     @Transactional
     public void createSchedule(CreateScheduleRequest request, StreamObserver<CreateScheduleResponse> responseObserver) {
         try {
             Schedule schedule = scheduleMapper.toEntity(request);
-
-            // --- 디버깅 로그 추가 시작 ---
-            log.info("Mapped Schedule Entity: ID={}, UserID={}, Title={}, DepartureTime={}",
-                     schedule.getId(), schedule.getUserId(), schedule.getTitle(), schedule.getDepartureTime());
-            log.info("Mapped Schedule Locations: Departure={}, Destination={}, Waypoints={}",
-                     schedule.getDepartureLocation(), schedule.getDestinationLocation(), schedule.getWaypoints());
-            // --- 디버깅 로그 추가 끝 ---
-
-            // user_id 기본값 처리
             if (schedule.getUserId() == null || schedule.getUserId().isEmpty()) {
-                schedule.setUserId("test-user-123"); // TODO: 추후 실제 로그인 유저 ID로 교체 필요
+                schedule.setUserId("test-user-123");
             }
 
-            // MealTimeSlot 저장 로직 추가
             List<com.mapzip.schedule.grpc.MealTimeSlot> mealSlotsRequest = request.getMealSlotsList();
             if (mealSlotsRequest != null && !mealSlotsRequest.isEmpty()) {
                 List<MealTimeSlot> mealTimeSlotEntities = new ArrayList<>();
@@ -76,18 +51,15 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
                     MealTimeSlot mealTimeSlot = new MealTimeSlot();
                     mealTimeSlot.setId(java.util.UUID.randomUUID().toString());
                     mealTimeSlot.setSchedule(schedule);
-                    // meal_type 변환 (Enum -> int)
                     mealTimeSlot.setMealType(slotRequest.getMealType().getNumber());
                     mealTimeSlot.setScheduledTime(slotRequest.getScheduledTime());
-                    mealTimeSlot.setRadius(slotRequest.getRadius() > 0 ? slotRequest.getRadius() : 1000); // 기본값 1000m
+                    mealTimeSlot.setRadius(slotRequest.getRadius() > 0 ? slotRequest.getRadius() : 1000);
                     mealTimeSlotEntities.add(mealTimeSlot);
                 }
                 schedule.getMealTimeSlots().addAll(mealTimeSlotEntities);
             }
 
-            scheduleRepository.save(schedule); // DB에 스케줄 및 연관된 MealTimeSlot 저장
-
-            // executeTmapAndKakaoProcess(schedule, request); // Tmap/Kakao 연동 로직은 여기서는 호출 안 함
+            scheduleRepository.save(schedule);
 
             CreateScheduleResponse response = CreateScheduleResponse.newBuilder()
                     .setSuccess(true)
@@ -102,7 +74,54 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
         }
     }
 
-    
+    @Override
+    @Transactional
+    public void processSchedule(ProcessScheduleRequest request, StreamObserver<ProcessScheduleResponse> responseObserver) {
+        try {
+            Schedule schedule = scheduleRepository.findById(request.getScheduleId())
+                    .orElseThrow(() -> Status.NOT_FOUND.withDescription("스케줄을 찾을 수 없습니다: " + request.getScheduleId()).asRuntimeException());
+
+            schedule.setCalculatedArrivalTime(null);
+
+            Map<String, Object> jobData = new HashMap<>();
+            jobData.put("scheduleId", schedule.getId());
+            jobData.put("userId", schedule.getUserId());
+            jobData.put("type", request.getType().toString());
+            jobData.put("departureTime", schedule.getDepartureTime());
+
+            TypeReference<Map<String, Object>> mapTypeRef = new TypeReference<>() {};
+            TypeReference<List<Map<String, Object>>> listMapTypeRef = new TypeReference<>() {};
+            jobData.put("departure", objectMapper.readValue(schedule.getDepartureLocation(), mapTypeRef));
+            jobData.put("destination", objectMapper.readValue(schedule.getDestinationLocation(), mapTypeRef));
+            jobData.put("waypoints", objectMapper.readValue(schedule.getWaypoints(), listMapTypeRef));
+
+            List<MealSlotData> mealSlotDataList = schedule.getMealTimeSlots().stream()
+                    .map(slot -> new MealSlotData(slot.getId(), slot.getMealType(), slot.getScheduledTime(), slot.getRadius()))
+                    .collect(Collectors.toList());
+            jobData.put("mealSlots", mealSlotDataList);
+            jobData.put("createdAt", LocalDateTime.now().toString());
+
+            if (request.getType() == ProcessType.UPDATE) {
+                jobData.put("currentLat", request.getCurrentLat());
+                jobData.put("currentLng", request.getCurrentLng());
+                jobData.put("currentTime", request.getCurrentTime());
+            }
+
+            Schedule updatedSchedule = tmapCalculationProcessor.calculateAndSave(jobData);
+
+            GetScheduleDetailResponse.ScheduleDetail scheduleDetail = scheduleMapper.toDetail(updatedSchedule);
+
+            ProcessScheduleResponse response = ProcessScheduleResponse.newBuilder()
+                    .setSchedule(scheduleDetail)
+                    .build();
+
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+        } catch (Exception e) {
+            log.error("스케줄 처리 요청 중 오류 발생", e);
+            responseObserver.onError(Status.INTERNAL.withDescription("스케줄 처리 요청 중 오류: " + e.getMessage()).withCause(e).asRuntimeException());
+        }
+    }
 
     @Override
     @Transactional
@@ -117,11 +136,25 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
 
             scheduleMapper.updateEntity(schedule, request);
 
-            if (schedule.getMealTimeSlots() != null && !schedule.getMealTimeSlots().isEmpty()) {
-                schedule.clearMealTimeSlots();
+            if (schedule.getMealTimeSlots() != null) {
+                schedule.getMealTimeSlots().clear();
+            }
+            List<com.mapzip.schedule.grpc.MealTimeSlot> mealSlotsRequest = request.getMealSlotsList();
+            if (mealSlotsRequest != null && !mealSlotsRequest.isEmpty()) {
+                List<MealTimeSlot> mealTimeSlotEntities = new ArrayList<>();
+                for (com.mapzip.schedule.grpc.MealTimeSlot slotRequest : mealSlotsRequest) {
+                    MealTimeSlot mealTimeSlot = new MealTimeSlot();
+                    mealTimeSlot.setId(java.util.UUID.randomUUID().toString());
+                    mealTimeSlot.setSchedule(schedule);
+                    mealTimeSlot.setMealType(slotRequest.getMealType().getNumber());
+                    mealTimeSlot.setScheduledTime(slotRequest.getScheduledTime());
+                    mealTimeSlot.setRadius(slotRequest.getRadius() > 0 ? slotRequest.getRadius() : 1000);
+                    mealTimeSlotEntities.add(mealTimeSlot);
+                }
+                schedule.getMealTimeSlots().addAll(mealTimeSlotEntities);
             }
 
-            executeTmapAndKakaoProcess(schedule, request); // 동기 호출
+            scheduleRepository.save(schedule);
 
             GetScheduleDetailResponse response = GetScheduleDetailResponse.newBuilder()
                     .setSchedule(scheduleMapper.toDetail(schedule))
@@ -134,102 +167,17 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
         }
     }
 
-    private void executeTmapAndKakaoProcess(Schedule schedule, GeneratedMessageV3 request) {
-        // ... (이전 코드는 동일) ...
-        List<com.mapzip.schedule.grpc.MealTimeSlot> mealSlotsRequest;
-        String departureTimeRequest;
-
-        if (request instanceof CreateScheduleRequest) {
-            CreateScheduleRequest r = (CreateScheduleRequest) request;
-            mealSlotsRequest = r.getMealSlotsList();
-            departureTimeRequest = r.getDepartureTime();
-        } else if (request instanceof UpdateScheduleRequest) {
-            UpdateScheduleRequest r = (UpdateScheduleRequest) request;
-            mealSlotsRequest = r.getMealSlotsList();
-            departureTimeRequest = r.getDepartureTime();
-        } else {
-            throw new IllegalArgumentException("지원하지 않는 요청 타입입니다.");
-        }
-
-        LocalDateTime departureDateTime = TimeUtil.parseKoreanAmPmToFuture(departureTimeRequest, java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul")));
-        if (departureDateTime.isBefore(TimeUtil.now())) {
-            departureDateTime = departureDateTime.plusDays(1);
-        }
-
-        List<MealTimeSlot> mealTimeSlotEntities = new ArrayList<>();
-        for (com.mapzip.schedule.grpc.MealTimeSlot slotRequest : mealSlotsRequest) {
-            MealTimeSlot mealTimeSlot = new MealTimeSlot();
-            mealTimeSlot.setId(java.util.UUID.randomUUID().toString());
-            mealTimeSlot.setSchedule(schedule);
-            mealTimeSlot.setMealType(slotRequest.getMealType().getNumber());
-            mealTimeSlot.setScheduledTime(slotRequest.getScheduledTime());
-            mealTimeSlot.setRadius(slotRequest.getRadius() > 0 ? slotRequest.getRadius() : 1000);
-            mealTimeSlotEntities.add(mealTimeSlot);
-        }
-        schedule.getMealTimeSlots().addAll(mealTimeSlotEntities);
-        
-        TmapRouteRequest tmapRequest = scheduleMapper.toTmapRequest(request, departureDateTime);
-        TmapRouteResponse tmapResponse = tmapClient.getRoutePrediction(tmapRequest).block();
-
-        if (tmapResponse == null) {
-            throw new RuntimeException("Tmap API로부터 응답을 받지 못했습니다.");
-        }
-
-        List<RouteService.CalculatedLocation> calculatedLocations = routeService.calculateMealLocations(
-                tmapResponse, mealTimeSlotEntities, departureDateTime
-        );
-
-        calculatedLocations.forEach(location -> {
-            try {
-                MealTimeSlot slot = mealTimeSlotEntities.stream()
-                        .filter(s -> s.getId().equals(location.getSlotId()))
-                        .findFirst()
-                        .orElseThrow(() -> new IllegalStateException("Cannot find meal slot for location: " + location.getSlotId()));
-
-                // [수정] DB 저장을 위해 엔티티에 계산된 좌표 설정
-                Map<String, Object> locationJson = new HashMap<>();
-                locationJson.put("lat", location.getLat());
-                locationJson.put("lon", location.getLon());
-                locationJson.put("scheduled_time", slot.getScheduledTime());
-                slot.setCalculatedLocation(objectMapper.writeValueAsString(locationJson));
-
-                // gRPC 호출
-                KakaoSearchRequest searchRequest = KakaoSearchRequest.newBuilder()
-                        .setSlotId(location.getSlotId())
-                        .setLat(location.getLat())
-                        .setLon(location.getLon())
-                        .setRadius(slot.getRadius())
-                        .build();
-                
-                kakaoApiServiceBlockingStub.searchRestaurants(searchRequest);
-                log.info("gRPC call to KakaoApiService succeeded for slot {}", location.getSlotId());
-
-            } catch (Exception e) {
-                log.error("gRPC call to KakaoApiService failed for slot {}", location.getSlotId(), e);
-            }
-        });
-
-        int totalTimeInSeconds = tmapResponse.getFeatures().get(0).getProperties().getTotalTime();
-        LocalDateTime arrivalDateTime = departureDateTime.plusSeconds(totalTimeInSeconds);
-        schedule.setCalculatedArrivalTime(TimeUtil.toKoreanAmPm(arrivalDateTime));
-
-        scheduleRepository.save(schedule);
-    }
-
     @Override
     @Transactional(readOnly = true)
     public void getScheduleList(GetScheduleListRequest request, StreamObserver<GetScheduleListResponse> responseObserver) {
         try {
             List<Schedule> schedules = scheduleRepository.findByUserIdOrderByCreatedAtDesc(request.getUserId());
-
             List<GetScheduleListResponse.ScheduleSummary> summaries = schedules.stream()
                     .map(scheduleMapper::toSummary)
                     .collect(Collectors.toList());
-
             GetScheduleListResponse response = GetScheduleListResponse.newBuilder()
                     .addAllSchedules(summaries)
                     .build();
-
             responseObserver.onNext(response);
             responseObserver.onCompleted();
         } catch (Exception e) {
@@ -254,14 +202,11 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
             }
 
             GetScheduleDetailResponse.ScheduleDetail detail = scheduleMapper.toDetail(schedule);
-
             GetScheduleDetailResponse response = GetScheduleDetailResponse.newBuilder()
                     .setSchedule(detail)
                     .build();
-
             responseObserver.onNext(response);
             responseObserver.onCompleted();
-
         } catch (IllegalArgumentException e) {
             responseObserver.onError(io.grpc.Status.NOT_FOUND
                     .withDescription(e.getMessage())
@@ -273,50 +218,7 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
         }
     }
 
-    @Override
-    @Transactional
-    public void selectRestaurant(SelectRestaurantRequest request, StreamObserver<SelectRestaurantResponse> responseObserver) {
-        try {
-            Schedule schedule = scheduleRepository.findById(request.getScheduleId())
-                    .orElseThrow(() -> Status.NOT_FOUND.withDescription("스케줄을 찾을 수 없습니다: " + request.getScheduleId()).asRuntimeException());
-
-            if (!schedule.getUserId().equals(request.getUserId())) {
-                throw Status.PERMISSION_DENIED.withDescription("이 스케줄에 접근할 권한이 없습니다.").asRuntimeException();
-            }
-
-            MealTimeSlot mealTimeSlot = mealTimeSlotRepository.findById(request.getSlotId())
-                    .orElseThrow(() -> Status.NOT_FOUND.withDescription("시간 슬롯을 찾을 수 없습니다: " + request.getSlotId()).asRuntimeException());
-
-            com.mapzip.schedule.entity.SelectedRestaurant selectedRestaurant = mealTimeSlot.getSelectedRestaurant();
-            if (selectedRestaurant == null) {
-                selectedRestaurant = new com.mapzip.schedule.entity.SelectedRestaurant();
-                selectedRestaurant.setMealTimeSlot(mealTimeSlot);
-                selectedRestaurant.setSchedule(schedule);
-                mealTimeSlot.setSelectedRestaurant(selectedRestaurant);
-            }
-
-            selectedRestaurant.setRestaurantId(request.getRestaurantId());
-            selectedRestaurant.setName(request.getName());
-            selectedRestaurant.setDetailUrl(request.getDetailUrl());
-            selectedRestaurant.setScheduledTime(mealTimeSlot.getScheduledTime());
-            selectedRestaurant.setSelectedAt(java.time.LocalDateTime.now());
-
-            mealTimeSlotRepository.save(mealTimeSlot);
-
-            SelectRestaurantResponse response = SelectRestaurantResponse.newBuilder()
-                    .setSuccess(true)
-                    .setMessage("맛집이 성공적으로 선택되었습니다.")
-                    .build();
-
-            responseObserver.onNext(response);
-            responseObserver.onCompleted();
-        } catch (Exception e) {
-            responseObserver.onError(Status.INTERNAL
-                    .withDescription("맛집 선택 중 오류 발생: " + e.getMessage())
-                    .withCause(e)
-                    .asRuntimeException());
-        }
-    }
+    
 
     @Override
     public void refreshSchedule(RefreshScheduleRequest request, StreamObserver<RefreshScheduleResponse> responseObserver) {
@@ -340,10 +242,8 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
                     .setSuccess(true)
                     .setMessage("스케줄이 성공적으로 삭제되었습니다.")
                     .build();
-
             responseObserver.onNext(response);
             responseObserver.onCompleted();
-
         } catch (Exception e) {
             log.error("스케줄 삭제 중 오류 발생", e);
             responseObserver.onError(Status.INTERNAL
@@ -353,5 +253,3 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
         }
     }
 }
-
-

@@ -1,12 +1,20 @@
-version: '3.8'
-services:
-  envoy:
-    image: envoyproxy/envoy:v1.29-latest
-    container_name: envoy-proxy
-    volumes:
-      - ./envoy.yaml:/etc/envoy/envoy.yaml
-      - ./backend/schedule/target/descriptor.pb:/etc/envoy/proto.pb  # .pb 파일 마운트
-    ports:
-      - "8000:8000" # HTTP 요청을 받을 포트
-      - "9901:9901" # Envoy admin 포트
-    command: /usr/local/bin/envoy -c /etc/envoy/envoy.yaml --service-cluster schedule-proxy
+
+# services:
+#   envoy:
+#     image: envoyproxy/envoy:v1.29-latest
+#     container_name: envoy-proxy
+#     volumes:
+#       - ./envoy.yaml:/etc/envoy/envoy.yaml
+#       - ./backend/schedule/schedule_proto.pb:/etc/envoy/proto.pb
+#     ports:
+#       - "8000:8000"
+#       - "9901:9901"
+#     command: /usr/local/bin/envoy -c /etc/envoy/envoy.yaml --service-cluster schedule-proxy
+
+#   valkey:
+#     image: valkey/valkey:7.2-alpine
+#     container_name: valkey
+#     ports:
+#       - "6379:6379"
+
+  
