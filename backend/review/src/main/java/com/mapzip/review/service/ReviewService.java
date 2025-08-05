@@ -319,16 +319,18 @@ public class ReviewService {
                 .filter(review -> !isSpamReview(review.getContent())) // 스팸 리뷰 제외
                 .sorted((r1, r2) -> {
                     // 정렬 우선순위: 1) 검증된 리뷰 2) 최신순 3) 높은 평점순
-                    int verifiedCompare = Boolean.compare(
-                        r2.getIsVerified() != null ? r2.getIsVerified() : false,
-                        r1.getIsVerified() != null ? r1.getIsVerified() : false
-                    );
+                    // NPE 방지를 위한 안전한 null 체크
+                    boolean r1Verified = Boolean.TRUE.equals(r1.getIsVerified());
+                    boolean r2Verified = Boolean.TRUE.equals(r2.getIsVerified());
+                    int verifiedCompare = Boolean.compare(r2Verified, r1Verified);
                     if (verifiedCompare != 0) return verifiedCompare;
                     
                     int timeCompare = r2.getCreatedAt().compareTo(r1.getCreatedAt());
                     if (timeCompare != 0) return timeCompare;
                     
-                    return Integer.compare(r2.getRating(), r1.getRating());
+                    int r1Rating = r1.getRating() != null ? r1.getRating() : 0;
+                    int r2Rating = r2.getRating() != null ? r2.getRating() : 0;
+                    return Integer.compare(r2Rating, r1Rating);
                 })
                 .collect(Collectors.toList());
     }

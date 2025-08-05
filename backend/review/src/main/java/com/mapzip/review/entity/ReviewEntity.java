@@ -49,7 +49,7 @@ public class ReviewEntity {
         return this.createdAtUserId;
     }
 
-    @DynamoDbSecondaryPartitionKey(indexNames = "UserIdIndex")
+    @DynamoDbSecondaryPartitionKey(indexNames = {"UserIdIndex", "VerifiedReviewsIndex", "RatingIndex"})
     @DynamoDbAttribute("user_id")
     public String getUserId() {
         return userId;
@@ -77,13 +77,26 @@ public class ReviewEntity {
         this.restaurantAddress = restaurantAddress;
     }
 
-    @DynamoDbAttribute("rating")  
+    @DynamoDbAttribute("rating")
+    @DynamoDbSecondarySortKey(indexNames = "RatingIndex")
     public Integer getRating() {
         return rating;
     }
 
     public void setRating(Integer rating) {
         this.rating = rating;
+    }
+
+    // 평점 기반 GSI를 위한 카테고리 필드 추가
+    @DynamoDbSecondaryPartitionKey(indexNames = "RatingIndex")
+    @DynamoDbAttribute("rating_category")
+    public String getRatingCategory() {
+        if (rating == null) return "RATING_0";
+        return "RATING_" + rating;
+    }
+    
+    public void setRatingCategory(String ratingCategory) {
+        // DynamoDB Enhanced Client를 위한 setter
     }
 
     @DynamoDbAttribute("content")
@@ -114,6 +127,7 @@ public class ReviewEntity {
     }
 
     @DynamoDbAttribute("is_verified")
+    @DynamoDbSecondarySortKey(indexNames = "VerifiedReviewsIndex")
     public Boolean getIsVerified() {
         return isVerified;
     }
@@ -123,7 +137,7 @@ public class ReviewEntity {
     }
 
     @DynamoDbAttribute("created_at")
-    @DynamoDbSecondarySortKey(indexNames = "UserIdIndex")
+    @DynamoDbSecondarySortKey(indexNames = {"UserIdIndex", "VerifiedReviewsIndex", "RatingIndex"})
     public Instant getCreatedAt() {
         return createdAt;
     }
@@ -135,6 +149,44 @@ public class ReviewEntity {
     // GSI를 위한 ISO 문자열 형태의 created_at
     public String getCreatedAtString() {
         return createdAt != null ? createdAt.toString() : null;
+    }
+    
+    // 추천용 GSI를 위한 검증상태와 평점 결합 필드 (NPE 방지 강화)
+    @DynamoDbSecondaryPartitionKey(indexNames = "RecommendationIndex")
+    @DynamoDbAttribute("verified_rating_status")
+    public String getVerifiedRatingStatus() {
+        // null 체크 강화
+        boolean verified = Boolean.TRUE.equals(isVerified);
+        int safeRating = rating != null ? rating : 0;
+        
+        String verificationStatus = verified ? "VERIFIED" : "UNVERIFIED";
+        String ratingStatus = safeRating >= 3 ? "HIGH_RATING" : "LOW_RATING";
+        
+        return verificationStatus + "#" + ratingStatus;
+    }
+    
+    public void setVerifiedRatingStatus(String verifiedRatingStatus) {
+        // DynamoDB Enhanced Client를 위한 setter (실제로는 사용하지 않음)
+    }
+    
+    // 지역 기반 검색용 GSI를 위한 주소 해시 필드
+    @DynamoDbSecondaryPartitionKey(indexNames = "AddressIndex")
+    @DynamoDbAttribute("address_region")
+    public String getAddressRegion() {
+        if (restaurantAddress != null && !restaurantAddress.isEmpty()) {
+            // 서울시 강남구, 경기도 성남시 등에서 주요 지역 추출
+            String[] addressParts = restaurantAddress.split(" ");
+            if (addressParts.length >= 2) {
+                return addressParts[0] + " " + addressParts[1]; // "서울시 강남구"
+            } else {
+                return addressParts[0]; // "서울시"
+            }
+        }
+        return "UNKNOWN";
+    }
+    
+    public void setAddressRegion(String addressRegion) {
+        // DynamoDB Enhanced Client를 위한 setter (실제로는 사용하지 않음)
     }
 
     @DynamoDbAttribute("updated_at")

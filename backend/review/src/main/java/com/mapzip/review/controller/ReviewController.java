@@ -17,7 +17,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/reviews")
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = {"https://www.mapzip.shop", "https://mapzip.shop"})
 public class ReviewController {
     
     private static final Logger logger = LoggerFactory.getLogger(ReviewController.class);
