@@ -12,12 +12,9 @@ import java.util.Date;
 public class JwtUtil {
 
     private final String secret;
-    private final Long expiration;
 
-    public JwtUtil(@Value("${jwt.secret}") String secret,
-                   @Value("${jwt.expiration}") Long expiration) {
+    public JwtUtil(@Value("${jwt.secret}") String secret) {
         this.secret = secret;
-        this.expiration = expiration;
     }
     
     private SecretKey getSigningKey() {
@@ -35,26 +32,15 @@ public class JwtUtil {
     public String extractUserId(String token) {
         return extractAllClaims(token).getSubject();
     }
-    
-    public boolean isTokenExpired(String token) {
-        return extractAllClaims(token).getExpiration().before(new Date());
-    }
-    
-    public boolean validateToken(String token) {
-        try {
-            extractAllClaims(token);
-            return !isTokenExpired(token);
-        } catch (JwtException | IllegalArgumentException e) {
-            return false;
-        }
-    }
-    
+
     public TokenValidationResult validateTokenWithResult(String token) {
         try {
             extractAllClaims(token);
-            return isTokenExpired(token) ? TokenValidationResult.EXPIRED : TokenValidationResult.VALID;
+            return TokenValidationResult.VALID;
+        } catch (ExpiredJwtException e) {
+            return TokenValidationResult.EXPIRED;  // 만료된 토큰
         } catch (JwtException | IllegalArgumentException e) {
-            return TokenValidationResult.INVALID;
+            return TokenValidationResult.INVALID;  // 서명 오류 등
         }
     }
 }
