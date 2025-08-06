@@ -5,10 +5,6 @@ spring:
   application:
     name: auth
 
-  security:
-    web:
-      ignore: "/actuator/health"  # health 엔드포인트만 인증 제외
-
   datasource:
     url: "{cipher}da0b4a60517ad7080fa0e371bab0211efb3887a249aadc45a5f7776c2373239f5106ed0b15c00a2e1bdabc63529cb58f8f20708557040969de251fe579d8b62414511e3e7569065a0c7360949c84916e0542e4b28d5e390cbf91a6f846d03ca6bda7070e6f25097a880a61f0f4f95450f08740e7b83c71508d2e1b61cdfad828"
     username: "{cipher}8fe5ea8cbe4b0df0e727b44fa8c26685ce7f3da4582b182f819d6227b39bcfc3"
@@ -51,6 +47,9 @@ management:
       enabled: true
     liveness-state:
       enabled: true
+  # Health Check 엔드포인트는 인증 없이 접근 허용
+  security:
+    enabled: false
 
 jwt:
   secret: "{cipher}e6748d8b7f4ecf1019e4ff7508e1aec7c8086d4b1c63317d844bf6265438abf0619aa20d71617c5be93aae71f0ff4ad67bafcea41389f55c51715ebf6bf4d972"
