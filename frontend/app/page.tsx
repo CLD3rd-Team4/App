@@ -49,6 +49,8 @@ export default function HomePage() {
     <>
       {!isAuthenticated ? <LoginScreen /> : selectedSchedule ? <ScheduleSummaryScreen /> : <HomeScreen />}
       <PWAInstaller />
+
+      
     </>
   )
 }

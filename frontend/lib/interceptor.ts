@@ -1,5 +1,4 @@
 import axios from "axios"
-import { toast } from "react-toastify"
 
 const api = axios.create({
     baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || "",
@@ -42,7 +41,9 @@ api.interceptors.response.use(
         } = error
 
         const originalRequest = config
-
+        // 디버깅용 출력
+        // console.error("API Error Status:", status)
+        // console.error("API Error Message:", data?.error)
         if (status === 401 && data?.error === "TOKEN_EXPIRED") {
         if (!isRefreshing) {
             isRefreshing = true
@@ -63,8 +64,8 @@ api.interceptors.response.use(
             } catch (e) {
             isRefreshing = false
             onRefreshFailed(e)
-            toast.warn("세션이 만료되었습니다. 다시 로그인해주세요.")
-            window.location.href = "/login"
+            alert("세션이 만료되었습니다. 다시 로그인해주세요.")
+            window.location.href = "/login.html"
             return Promise.reject(e)
             }
         }
@@ -79,13 +80,12 @@ api.interceptors.response.use(
         }
 
         if (status === 401 && data?.error === "TOKEN_INVALID") {
-            toast.warn("인증되지 않은 사용자입니다. 다시 로그인해주세요.")
-            window.location.href = "/login"
+            alert("인증되지 않은 사용자입니다. 로그인해주세요.")
+            window.location.href = "/login.html"
             return Promise.reject(error)
         }
 
-
-        toast.error("문제가 발생했습니다. 홈으로 이동합니다.")
+        alert("문제가 발생했습니다. 홈으로 이동합니다.")
         window.location.href = "/"
         return Promise.reject(error)
 
