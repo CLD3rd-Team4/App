@@ -41,7 +41,8 @@ api.interceptors.response.use(
         } = error
 
         const originalRequest = config
-
+        console.error("API Error Status:", status)
+        console.error("API Error Message:", data?.error)
         if (status === 401 && data?.error === "TOKEN_EXPIRED") {
         if (!isRefreshing) {
             isRefreshing = true
@@ -78,7 +79,7 @@ api.interceptors.response.use(
         }
 
         if (status === 401 && data?.error === "TOKEN_INVALID") {
-            alert("인증되지 않은 사용자입니다. 다시 로그인해주세요.")
+            alert("인증되지 않은 사용자입니다. 로그인해주세요.")
             window.location.href = "/login.html"
             return Promise.reject(error)
         }
