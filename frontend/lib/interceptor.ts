@@ -65,7 +65,7 @@ api.interceptors.response.use(
             onRefreshFailed(e)
             toast.warn("세션이 만료되었습니다. 다시 로그인해주세요.")
             setTimeout(() => {
-                window.location.href = "/login"
+                window.location.href = "/login.html"
             }, 1500)
             return Promise.reject(e)
             }
@@ -83,7 +83,7 @@ api.interceptors.response.use(
         if (status === 401 && data?.error === "TOKEN_INVALID") {
             toast.warn("인증되지 않은 사용자입니다. 다시 로그인해주세요.")
             setTimeout(() => {
-                window.location.href = "/login"
+                window.location.href = "/login.html"
             }, 1500)
             return Promise.reject(error)
         }
