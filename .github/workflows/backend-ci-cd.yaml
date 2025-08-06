@@ -14,7 +14,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       services: ${{ steps.detect.outputs.services }}
-      has_changes: ${{ steps.detect.outputs.has_changes }}
       commit_hash: ${{ steps.hash.outputs.commit_hash }}
     steps:
       - name: Checkout
@@ -28,15 +27,6 @@ jobs:
           git fetch origin dev
           CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '^backend/' | cut -d '/' -f2 | sort | uniq | jq -R -s -c 'split("\n") | map(select(. != ""))')
           echo "services=$CHANGED" >> $GITHUB_OUTPUT
-          
-          # 변경사항이 있는지 확인
-          if [ "$CHANGED" = "[]" ] || [ "$CHANGED" = "" ]; then
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-            echo "🔍 No backend services changed"
-          else
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-            echo "🔍 Changed backend services: $CHANGED"
-          fi
 
       - name: Get short git commit hash
         id: hash
@@ -45,7 +35,7 @@ jobs:
   build-and-push:
     needs: detect-changes
     runs-on: ubuntu-latest
-    if: ${{ needs.detect-changes.outputs.has_changes == 'true' }}
+    if: ${{ fromJson(needs.detect-changes.outputs.services) != '[]' }}
     strategy:
       matrix:
         service: ${{ fromJson(needs.detect-changes.outputs.services) }}
@@ -108,7 +98,7 @@ jobs:
       - detect-changes
       - build-and-push
     runs-on: ubuntu-latest
-    if: ${{ needs.detect-changes.outputs.has_changes == 'true' }}
+    if: ${{ fromJson(needs.detect-changes.outputs.services) != '[]' }}
     steps:
       - name: Download all success artifacts
         uses: actions/download-artifact@v4
