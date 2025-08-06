@@ -5,19 +5,6 @@ const api = axios.create({
     withCredentials: true,
 })
 
-// 요청 인터셉터 (x-user-id 헤더 추가)
-api.interceptors.request.use(
-    (config) => {
-        // 임시로 사용자 ID를 헤더에 추가합니다.
-        // TODO: 실제 로그인 구현 시, 이 부분은 삭제하거나 실제 사용자 정보로 대체해야 합니다.
-        config.headers['x-user-id'] = 'test-user-123';
-        return config;
-    },
-    (error) => {
-        return Promise.reject(error);
-    }
-);
-
 let isRefreshing = false
 
 type Subscriber = {
