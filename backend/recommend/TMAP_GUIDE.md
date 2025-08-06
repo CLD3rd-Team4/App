@@ -42,59 +42,64 @@
 
 ## 3. `recommend` 서비스 구현 가이드
 
-### 3.1. `recommend.proto` gRPC 인터페이스 정의 (가장 먼저 할 일)
+### 3.1. `recommend.yml` 설정 추가 (`config-repo`)
+
+`recommend` 서비스가 Tmap API를 호출하고 gRPC 서버로 동작하려면, `config-repo` 레포지토리에 **`recommend.yml`** 파일을 생성하고 아래 설정들을 추가해야 합니다.
+
+```yaml
+# recommend.yml
+
+server:
+  port: 8081 # 다른 서비스와 겹치지 않는 포트 (예시)
+
+spring:
+  application:
+    name: recommend
+
+# gRPC 서버 설정
+grpc:
+  server:
+    port: 9091 # 다른 서비스와 겹치지 않는 gRPC 포트 (예시)
+    reflection-service-enabled: true # gRPC 클라이언트가 서버의 API를 탐색할 수 있도록 허용 (개발 시 유용)
+
+# 외부 Tmap API 설정
+external:
+  api:
+    tmap:
+      url: https://apis.openapi.sk.com
+      # schedule.yml에 있던 암호화된 Tmap API 키를 여기에 붙여넣으세요.
+      key: '{cipher}b4164c17f59386ba11272ff9aaf04f9a184680c6e7362e0772830576667b0bc29b9bfe829ec5e4e4c9a585c861629e77a1c2db6594b9fdea2fc0c3dc4c2e1dc7'
+
+# 로깅 레벨 설정 (개발 중 디버깅을 위해 DEBUG로 설정)
+logging:
+  level:
+    com.mapzip.recommend: DEBUG
+```
+
+### 3.2. `recommend.proto` gRPC 인터페이스 정의
 
 `recommend` 서비스가 제공할 gRPC API의 명세(`proto` 파일)를 작성해야 합니다. 참고용으로 복사된 `schedule.proto`와 `ScheduleGrpcService_reference.java`를 활용하여 `RouteRequest` 메시지를 정의할 수 있습니다.
 
 **핵심:** `TmapCalculationProcessor`가 동작하려면 `schedule` 서비스로부터 특정 데이터들이 필요합니다. **`ScheduleGrpcService_reference.java`** 파일의 `processSchedule` 메소드를 보면, `jobData`라는 `Map`에 필요한 데이터들을 담는 과정이 있습니다. 이 `jobData`가 바로 `RouteRequest` 메시지의 설계도입니다.
 
-```java
-// In: ScheduleGrpcService_reference.java (참고용)
-
-Map<String, Object> jobData = new HashMap<>();
-jobData.put("scheduleId", schedule.getId());
-jobData.put("userId", schedule.getUserId());
-jobData.put("type", request.getType().toString()); // "SELECT" or "UPDATE"
-jobData.put("departureTime", schedule.getDepartureTime());
-jobData.put("departure", ...); // Location 객체
-jobData.put("destination", ...); // Location 객체
-jobData.put("waypoints", ...); // List<Waypoint> 객체
-jobData.put("mealSlots", ...); // List<MealSlotData> 객체
-// ... (UPDATE 시 필요한 currentLat, currentLng, currentTime)
-```
-
-**결론:** 위 `jobData`의 키를 바탕으로, `backend/recommend/src/main/proto/` 경로에 **새로운 `recommend.proto` 파일**을 작성하고 `RouteRequest` 메시지에 해당하는 필드(`schedule_id`, `user_id` 등)를 정의해야 합니다.
-
-### 3.2. `RouteService.java` 시그니처 수정 (필수)
+### 3.3. `RouteService.java` 시그니처 수정 (필수)
 
 코드를 이전하면서 `RouteService`가 `schedule` 서비스의 엔티티를 참조하게 되어 컴파일 오류가 발생합니다. 이 메소드가 gRPC 메시지 타입을 받도록 아래와 같이 수정해야 합니다.
 
 ```java
 // In: backend/recommend/src/main/java/com/mapzip/recommend/service/RouteService.java
 
-// TO-BE (Correct)
 public List<CalculatedLocation> calculateMealLocations(
         TmapRouteResponse tmapResponse,
         List<com.mapzip.recommend.grpc.MealSlot> mealSlots, // gRPC 메시지를 받도록 수정
         LocalDateTime departureDateTime
-) {
-    // ...
-    for (var mealSlot : mealSlots) { // mealSlot은 이제 gRPC 메시지 타입입니다.
-        // ...
-    }
-    // ...
-}
+) { ... }
 ```
 
-### 3.3. gRPC 서비스 구현
+### 3.4. gRPC 서비스 및 비즈니스 로직 구현
 
-- 3.1에서 정의한 `recommend.proto`를 구현하는 `RouteCalculatorGrpcService.java` 클래스를 생성합니다.
-- 이 클래스는 `RouteRequest`를 받아 `TmapCalculationProcessor`를 호출하고, 그 결과를 `RouteResponse`로 변환하여 반환하는 로직을 담게 됩니다.
-
-### 3.4. `TmapCalculationProcessor` 수정
-
-- **DB 의존성 제거:** `ScheduleRepository`에 대한 의존성을 제거합니다. `recommend` 서비스는 DB에 직접 접근하지 않습니다.
-- **반환 타입 변경:** `calculateAndSave` 메소드의 이름을 `calculateAndBuildResponse` 등으로 변경하고, `Schedule` 엔티티를 반환하는 대신 `RouteResponse` gRPC 메시지를 생성하여 반환하도록 로직을 수정합니다.
+- 3.2에서 정의한 `recommend.proto`를 구현하는 `RouteCalculatorGrpcService.java` 클래스를 생성합니다.
+- `TmapCalculationProcessor`에서 `ScheduleRepository` 의존성을 제거하고, DB 저장 로직 없이 `RouteResponse` gRPC 메시지를 생성하여 반환하도록 수정합니다.
 
 ---
 

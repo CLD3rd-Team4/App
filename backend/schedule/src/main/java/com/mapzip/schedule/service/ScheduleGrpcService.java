@@ -1,25 +1,20 @@
 package com.mapzip.schedule.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mapzip.schedule.dto.MealSlotData;
 import com.mapzip.schedule.entity.MealTimeSlot;
 import com.mapzip.schedule.entity.Schedule;
 import com.mapzip.schedule.grpc.*;
 import com.mapzip.schedule.mapper.ScheduleMapper;
 import com.mapzip.schedule.repository.MealTimeSlotRepository;
 import com.mapzip.schedule.repository.ScheduleRepository;
-
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.devh.boot.grpc.client.inject.GrpcClient;
 import net.devh.boot.grpc.server.service.GrpcService;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,10 +25,11 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
 
     private final ScheduleRepository scheduleRepository;
     private final MealTimeSlotRepository mealTimeSlotRepository;
-    
     private final ScheduleMapper scheduleMapper;
     private final ObjectMapper objectMapper;
-    private final TmapCalculationProcessor tmapCalculationProcessor;
+
+    // @GrpcClient("recommend-service")
+    // private RouteCalculatorServiceGrpc.RouteCalculatorServiceBlockingStub recommendClient;
 
     @Override
     @Transactional
@@ -74,54 +70,7 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
         }
     }
 
-    @Override
-    @Transactional
-    public void processSchedule(ProcessScheduleRequest request, StreamObserver<ProcessScheduleResponse> responseObserver) {
-        try {
-            Schedule schedule = scheduleRepository.findById(request.getScheduleId())
-                    .orElseThrow(() -> Status.NOT_FOUND.withDescription("스케줄을 찾을 수 없습니다: " + request.getScheduleId()).asRuntimeException());
-
-            schedule.setCalculatedArrivalTime(null);
-
-            Map<String, Object> jobData = new HashMap<>();
-            jobData.put("scheduleId", schedule.getId());
-            jobData.put("userId", schedule.getUserId());
-            jobData.put("type", request.getType().toString());
-            jobData.put("departureTime", schedule.getDepartureTime());
-
-            TypeReference<Map<String, Object>> mapTypeRef = new TypeReference<>() {};
-            TypeReference<List<Map<String, Object>>> listMapTypeRef = new TypeReference<>() {};
-            jobData.put("departure", objectMapper.readValue(schedule.getDepartureLocation(), mapTypeRef));
-            jobData.put("destination", objectMapper.readValue(schedule.getDestinationLocation(), mapTypeRef));
-            jobData.put("waypoints", objectMapper.readValue(schedule.getWaypoints(), listMapTypeRef));
-
-            List<MealSlotData> mealSlotDataList = schedule.getMealTimeSlots().stream()
-                    .map(slot -> new MealSlotData(slot.getId(), slot.getMealType(), slot.getScheduledTime(), slot.getRadius()))
-                    .collect(Collectors.toList());
-            jobData.put("mealSlots", mealSlotDataList);
-            jobData.put("createdAt", LocalDateTime.now().toString());
-
-            if (request.getType() == ProcessType.UPDATE) {
-                jobData.put("currentLat", request.getCurrentLat());
-                jobData.put("currentLng", request.getCurrentLng());
-                jobData.put("currentTime", request.getCurrentTime());
-            }
-
-            Schedule updatedSchedule = tmapCalculationProcessor.calculateAndSave(jobData);
-
-            GetScheduleDetailResponse.ScheduleDetail scheduleDetail = scheduleMapper.toDetail(updatedSchedule);
-
-            ProcessScheduleResponse response = ProcessScheduleResponse.newBuilder()
-                    .setSchedule(scheduleDetail)
-                    .build();
-
-            responseObserver.onNext(response);
-            responseObserver.onCompleted();
-        } catch (Exception e) {
-            log.error("스케줄 처리 요청 중 오류 발생", e);
-            responseObserver.onError(Status.INTERNAL.withDescription("스케줄 처리 요청 중 오류: " + e.getMessage()).withCause(e).asRuntimeException());
-        }
-    }
+    
 
     @Override
     @Transactional
@@ -220,10 +169,7 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
 
     
 
-    @Override
-    public void refreshSchedule(RefreshScheduleRequest request, StreamObserver<RefreshScheduleResponse> responseObserver) {
-        responseObserver.onError(Status.UNIMPLEMENTED.withDescription("Method not implemented").asRuntimeException());
-    }
+    
 
     @Override
     @Transactional
