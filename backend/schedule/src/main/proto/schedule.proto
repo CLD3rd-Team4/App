@@ -19,9 +19,7 @@ service ScheduleService {
       body: "*"
     };
   }
-  // 맛집 추천 결과 조회
-  rpc GetRecommendationResults(GetRecommendationResultsRequest) returns (GetRecommendationResultsResponse) {
-  }
+  
   // 스케줄 목록 조회
   rpc GetScheduleList(GetScheduleListRequest) returns (GetScheduleListResponse) {
     option (google.api.http) = {
@@ -31,27 +29,21 @@ service ScheduleService {
   // 특정 스케줄 상세 조회
   rpc GetScheduleDetail(GetScheduleDetailRequest) returns (GetScheduleDetailResponse) {
     option (google.api.http) = {
-      get: "/schedule/{schedule_id}"
+      get: "/schedule/{scheduleId}"
     };
   }
-  // 맛집 선택 반영
-  rpc SelectRestaurant(SelectRestaurantRequest) returns (SelectRestaurantResponse) {
-    option (google.api.http) = {
-      post: "/schedule/{schedule_id}/restaurant/select"
-      body: "*"
-    };
-  }
+  
   // 스케줄 정보 업데이트
   rpc RefreshSchedule(RefreshScheduleRequest) returns (RefreshScheduleResponse) {
     option (google.api.http) = {
-      post: "/schedule/{schedule_id}/refresh"
+      post: "/schedule/{scheduleId}/refresh"
       body: "*"
     };
   }
   // 스케줄 수정
   rpc UpdateSchedule(UpdateScheduleRequest) returns (GetScheduleDetailResponse) {
     option (google.api.http) = {
-      put: "/schedule/{schedule_id}"
+      put: "/schedule/{scheduleId}"
       body: "*"
     };
   }
@@ -59,7 +51,15 @@ service ScheduleService {
   // 스케줄 삭제
   rpc DeleteSchedule(DeleteScheduleRequest) returns (DeleteScheduleResponse) {
     option (google.api.http) = {
-      delete: "/schedule/{schedule_id}"
+      delete: "/schedule/{scheduleId}"
+    };
+  }
+
+  // 스케줄 처리 시작 (선택 또는 업데이트 버튼)
+  rpc ProcessSchedule(ProcessScheduleRequest) returns (ProcessScheduleResponse) {
+    option (google.api.http) = {
+      post: "/schedule/{scheduleId}"
+      body: "*"
     };
   }
 }
@@ -77,12 +77,13 @@ message Waypoint {
   double lat = 1;
   double lng = 2;
   string name = 3;
+  string arrivalTime = 4; // 경유지 도착 시간
 }
 
 message MealTimeSlot {
-  string slot_id = 1;          // 고유 슬롯 ID
-  MealType meal_type = 2;      // 식사/간식 구분
-  string scheduled_time = 3;   // 예정 시간 (예: "오후 12:30")
+  string slotId = 1;          // 고유 슬롯 ID
+  MealType mealType = 2;      // 식사/간식 구분
+  string scheduledTime = 3;   // 예정 시간 (예: "오후 12:30")
   int32 radius = 4;           // 검색 반경 (미터, 기본값: 1000)
 }
 
@@ -92,59 +93,22 @@ enum MealType {
 }
 
 message MealLocation {
-  string slot_id = 1;
+  string slotId = 1;
   double lat = 2;
   double lng = 3;
-  string scheduled_time = 4; // 예정 시간
+  string scheduledTime = 4; // 예정 시간
 }
 
-message RestaurantRecommendation {
-  string id = 1;
-  string name = 2;
-  string category = 3;
-  string phone = 4;
-  string address = 5;
-  string road_address = 6;
-  double lat = 7;
-  double lng = 8;
-  string detail_url = 9;
-  int32 distance = 10; // 예상 식사 지점으로부터의 거리(미터)
-  string rating = 11;  // 추천서버에서 분석한 평점
-  string menu_info = 12; // 추천서버에서 분석한 메뉴 정보
-}
 
-message SelectedRestaurant {
-  string slot_id = 1;          // 시간 슬롯 ID
-  string restaurant_id = 2;    // 맛집 ID
-  string name = 3;
-  string scheduled_time = 4;   // 예정 시간
-  string detail_url = 5;
-}
-
-message MealSlotRecommendation {
-  string slot_id = 1;
-  MealType meal_type = 2;
-  string scheduled_time = 3;
-  RecommendationStatus status = 4;
-  repeated RestaurantRecommendation recommendations = 5;
-  string message = 6;
-}
-
-enum RecommendationStatus {
-  PROCESSING = 0;    // 처리 중
-  COMPLETED = 1;     // 완료
-  FAILED = 2;        // 실패
-}
 
 message ScheduleError {
   ErrorType type = 1;
   string message = 2;
-  string retry_after = 3;  // API 제한일 때만
+  string retryAfter = 3;  // API 제한일 때만
 }
 
 enum ErrorType {
   TMAP_API_FAILED = 0;
-  KAKAO_API_FAILED = 1;
   INVALID_ROUTE = 2;        // 비현실적인 경로
   NO_RESTAURANTS_FOUND = 3;
   RECOMMENDATION_SERVICE_UNAVAILABLE = 4;
@@ -155,128 +119,125 @@ enum ErrorType {
 
 // 3.1 스케줄 생성
 message CreateScheduleRequest {
-  string user_id = 1;
+  string userId = 1;
   string title = 2;
-  string departure_time = 3;
-  string arrival_time = 11; // 추가
-  repeated MealTimeSlot meal_slots = 4;
+  string departureTime = 3;
+  string arrivalTime = 11; // 추가
+  repeated MealTimeSlot mealSlots = 4;
   Location departure = 5;
   repeated Waypoint waypoints = 6;
   Location destination = 7;
-  string user_note = 8;
+  string userNote = 8;
   string purpose = 9;
   repeated string companions = 10;
 }
 
 message CreateScheduleResponse {
-  string schedule_id = 1;
+  string scheduleId = 1;
   string message = 2;
   bool success = 3;
-  repeated string recommendation_request_ids = 4;
-  string calculated_arrival_time = 5;
+  repeated string recommendationRequestIds = 4;
+  string calculatedArrivalTime = 5;
   ScheduleError error = 6;
 }
 
-// 3.2 맛집 추천 결과 조회
-message GetRecommendationResultsRequest {
-  string schedule_id = 1;
-  string user_id = 2;
-}
 
-message GetRecommendationResultsResponse {
-  repeated MealSlotRecommendation slot_recommendations = 1;
-}
 
 // 3.3 스케줄 목록 조회
 message GetScheduleListRequest {
-  string user_id = 1;
+  string userId = 1;
 }
 
 message GetScheduleListResponse {
   message ScheduleSummary {
-    string schedule_id = 1;
+    string scheduleId = 1;
     string title = 2;
-    string departure_time = 3;
-    string destination_name = 4;
-    int32 total_meal_slots = 5;
-    int32 selected_restaurants_count = 6;
+    string departureTime = 3;
+    string destinationName = 4;
+    int32 totalMealSlots = 5;
+    
   }
   repeated ScheduleSummary schedules = 1;
 }
 
 // 3.4 특정 스케줄 상세 조회
 message GetScheduleDetailRequest {
-  string schedule_id = 1;
-  string user_id = 2;
+  string scheduleId = 1;
+  string userId = 2;
 }
 
 message GetScheduleDetailResponse {
   message ScheduleDetail {
     string title = 1;
-    string departure_time = 2;
-    string calculated_arrival_time = 3;
-    repeated MealTimeSlot meal_slots = 4;
+    string departureTime = 2;
+    string calculatedArrivalTime = 3;
+    repeated MealTimeSlot mealSlots = 4;
     Location departure = 5;
     repeated Waypoint waypoints = 6;
     Location destination = 7;
-    string user_note = 8;
+    string userNote = 8;
     string purpose = 9;
     repeated string companions = 10;
-    repeated SelectedRestaurant selected_restaurants = 11;
+    
   }
   ScheduleDetail schedule = 1;
 }
 
-// 3.5 맛집 선택 반영
-message SelectRestaurantRequest {
-  string schedule_id = 1;
-  string slot_id = 2;
-  string restaurant_id = 3;
-  string user_id = 4;
-  string name = 5;
-  string detail_url = 6;
-}
 
-message SelectRestaurantResponse {
-  string message = 1;
-  SelectedRestaurant selected_restaurant = 2;
-  bool success = 3;
-}
 
 // 3.6 스케줄 정보 업데이트
 message RefreshScheduleRequest {
-  string schedule_id = 1;
-  string user_id = 2;
+  string scheduleId = 1;
+  string userId = 2;
 }
 
 message RefreshScheduleResponse {
-  repeated string recommendation_request_ids = 1;
-  string calculated_arrival_time = 2;
+  repeated string recommendationRequestIds = 1;
+  string calculatedArrivalTime = 2;
   bool success = 3;
   ScheduleError error = 4;
-  string next_refresh_available_time = 5;
+  string nextRefreshAvailableTime = 5;
+}
+
+// 3.6.1 스케줄 처리 시작
+message ProcessScheduleRequest {
+  string scheduleId = 1;
+  string userId = 2;
+  ProcessType type = 3;
+  double currentLat = 4;        // 업데이트 시 현재 GPS 위도
+  double currentLng = 5;        // 업데이트 시 현재 GPS 경도
+  string currentTime = 6;       // 업데이트 시 현재 시간 (ISO 8601 형식)
+}
+
+message ProcessScheduleResponse {
+  GetScheduleDetailResponse.ScheduleDetail schedule = 1;
+}
+
+enum ProcessType {
+  SELECT = 0;     // 스케줄 선택 시 (기존 스케줄 정보 사용)
+  UPDATE = 1;     // 업데이트 버튼 시 (현재 위치 기준)
 }
 
 // 3.7 스케줄 수정
 message UpdateScheduleRequest {
-  string schedule_id = 1;
-  string user_id = 2;
+  string scheduleId = 1;
+  string userId = 2;
   string title = 3;
-  string departure_time = 4;
-  string arrival_time = 5;
-  repeated MealTimeSlot meal_slots = 6;
+  string departureTime = 4;
+  string arrivalTime = 5;
+  repeated MealTimeSlot mealSlots = 6;
   Location departure = 7;
   repeated Waypoint waypoints = 8;
   Location destination = 9;
-  string user_note = 10;
+  string userNote = 10;
   string purpose = 11;
   repeated string companions = 12;
 }
 
 // 3.8 스케줄 삭제
 message DeleteScheduleRequest {
-  string schedule_id = 1;
-  string user_id = 2;
+  string scheduleId = 1;
+  string userId = 2;
 }
 
 message DeleteScheduleResponse {
@@ -288,37 +249,18 @@ message DeleteScheduleResponse {
 
 // 4.1 맛집 추천 요청 (to Recommendation Service)
 message RestaurantRecommendationRequest {
-  string schedule_id = 1;
-  string slot_id = 2;
-  MealType meal_type = 3;
-  string scheduled_time = 4;
-  MealLocation meal_location = 5;
+  string scheduleId = 1;
+  string slotId = 2;
+  MealType mealType = 3;
+  string scheduledTime = 4;
+  MealLocation mealLocation = 5;
   int32 radius = 6;
-  string user_note = 7;
+  string userNote = 7;
 }
 
 message RestaurantRecommendationResponse {
-  string request_id = 1; // 추천 요청 ID (Kafka 처리용 -> gRPC에서는 트랜잭션 ID로 사용 가능)
+  string requestId = 1; // 추천 요청 ID (Kafka 처리용 -> gRPC에서는 트랜잭션 ID로 사용 가능)
   bool success = 2;
 }
 
-// 5. 내부 로직용 서비스 (Internal Logic Services)
 
-// Kakao API 호출을 담당하는 내부 서비스
-service KakaoApiService {
-  // Kakao Local API를 이용한 식당 검색 요청
-  rpc SearchRestaurants(KakaoSearchRequest) returns (KakaoSearchResponse);
-}
-
-message KakaoSearchRequest {
-  string slot_id = 1;
-  double lat = 2;
-  double lon = 3;
-  int32 radius = 4;
-  // 요청에 필요한 추가적인 필드가 있다면 여기에 정의
-}
-
-message KakaoSearchResponse {
-  bool success = 1;
-  string message = 2;
-}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useSchedule } from "@/hooks/useSchedule"
 import ScheduleCreateLocationScreen from "./ScheduleCreateLocationScreen"
@@ -9,12 +9,40 @@ import ScheduleCreateOptionalScreen from "./ScheduleCreateOptionalScreen"
 
 type CreateStep = "location" | "required" | "optional"
 
-export default function ScheduleCreateScreen() {
+export default function ScheduleCreateScreen({ isEdit = false, initialData = null }: { isEdit?: boolean, initialData?: any }) {
   const router = useRouter()
-  const { createSchedule } = useSchedule()
+  const { createSchedule, updateSchedule } = useSchedule()
   const [currentStep, setCurrentStep] = useState<CreateStep>("location")
-  const [locationData, setLocationData] = useState<any>(null)
-  const [requiredData, setRequiredData] = useState<any>(null)
+
+  // 각 단계의 상태를 초기화합니다.
+  const [locationData, setLocationData] = useState<any>(null);
+  const [requiredData, setRequiredData] = useState<any>(null);
+  const [optionalData, setOptionalData] = useState<any>(null);
+
+  // initialData prop이 비동기적으로 업데이트될 때 상태를 동기화하는 useEffect
+  useEffect(() => {
+    if (initialData) {
+      setLocationData({
+        departure: initialData.departure,
+        waypoints: initialData.waypoints,
+        destination: initialData.destination,
+      });
+      setRequiredData({
+        scheduleName: initialData.title,
+        departureTime: initialData.departureTime,
+        targetMealTimes: initialData.mealSlots.map((ms: any) => ({
+          type: ms.mealType === 'MEAL' ? '식사' : '간식',
+          time: ms.scheduledTime,
+          radius: ms.radius / 1000, // m -> km
+        })),
+      });
+      setOptionalData({
+        userRequirements: initialData.userNote,
+        travelPurpose: initialData.purpose,
+        companions: initialData.companions,
+      });
+    }
+  }, [initialData]);
 
   const handleLocationNext = (data: any) => {
     setLocationData(data)
@@ -26,30 +54,38 @@ export default function ScheduleCreateScreen() {
     setCurrentStep("optional")
   }
 
-  const handleOptionalComplete = async (optionalData: any) => {
+  const handleOptionalComplete = async (finalOptionalData: any) => {
     try {
       const scheduleData = {
+        userId: "test-user-123", // TODO: 실제 사용자 ID로 교체
         title: requiredData.scheduleName,
-        departure: locationData.departure,
-        destination: locationData.destination,
-        waypoints: locationData.waypoints,
         departureTime: requiredData.departureTime,
-        arrivalTime: requiredData.arrivalTime,
-        hasMeal: requiredData.targetMealTimes.length > 0,
-        companions: optionalData.companions,
-        purpose: optionalData.travelPurpose,
-        tags: [],
-        userRequirements: optionalData.userRequirements,
-        mealRadius: requiredData.mealRadius,
-        targetMealTimes: requiredData.targetMealTimes,
-      }
+        arrivalTime: initialData?.arrivalTime || "",
+        mealSlots: requiredData.targetMealTimes.map((mt: any) => ({
+          mealType: mt.type === '식사' ? 'MEAL' : 'SNACK',
+          scheduledTime: mt.time,
+          radius: (parseFloat(mt.radius) || 1) * 1000, // km -> m
+        })),
+        departure: locationData.departure,
+        waypoints: locationData.waypoints,
+        destination: locationData.destination,
+        userNote: finalOptionalData.userRequirements,
+        purpose: finalOptionalData.travelPurpose,
+        companions: finalOptionalData.companions,
+      };
 
-      await createSchedule(scheduleData)
-      router.push("/schedule")
+      if (isEdit && initialData?.id) {
+        await updateSchedule({ ...scheduleData, id: initialData.id });
+      } else {
+        await createSchedule(scheduleData);
+      }
+      
+      router.push("/schedule");
     } catch (error) {
-      console.error("스케줄 생성 실패:", error)
+      console.error(isEdit ? "스케줄 수정 실패:" : "스케줄 생성 실패:", error);
+      alert(isEdit ? "스케줄 수정에 실패했습니다." : "스케줄 생성에 실패했습니다.");
     }
-  }
+  };
 
   const handleBack = () => {
     if (currentStep === "required") {
@@ -68,8 +104,13 @@ export default function ScheduleCreateScreen() {
         <ScheduleCreateRequiredScreen onNext={handleRequiredNext} onBack={handleBack} initialData={requiredData} />
       )}
       {currentStep === "optional" && (
-        <ScheduleCreateOptionalScreen onComplete={handleOptionalComplete} onBack={handleBack} />
+        <ScheduleCreateOptionalScreen
+          onComplete={handleOptionalComplete}
+          onBack={handleBack}
+          initialData={optionalData}
+          isEdit={isEdit} // isEdit prop 전달
+        />
       )}
     </>
-  )
+  );
 }

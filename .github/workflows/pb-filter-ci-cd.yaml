@@ -20,7 +20,9 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -40,9 +42,17 @@ jobs:
       - name: Extract changed server names
         id: servers
         run: |
-          BASE_SHA=${{ github.event.before || 'HEAD~1' }}
+          BASE_SHA="${{ github.event.before }}"
+          if [ -z "$BASE_SHA" ]; then
+            BASE_SHA="HEAD~1"
+          fi
+
+          echo "🔍 BASE_SHA: $BASE_SHA"
+          echo "🔍 CURRENT_SHA: ${{ github.sha }}"
+
           SERVER_NAMES=$(git diff --name-only $BASE_SHA ${{ github.sha }} | grep '_proto.pb' | awk -F '/' '{print $2}' | sort -u | xargs)
           echo "changed_services=$SERVER_NAMES" >> $GITHUB_OUTPUT
+          echo "🔧 Changed services: $SERVER_NAMES"
 
       - name: Copy all .pb files
         run: |
