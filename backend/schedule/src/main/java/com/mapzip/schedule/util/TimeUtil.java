@@ -54,4 +54,5 @@ public class TimeUtil {
     public static LocalDateTime now() {
         return LocalDateTime.now(SEOUL_ZONE_ID);
     }
+    
 }
