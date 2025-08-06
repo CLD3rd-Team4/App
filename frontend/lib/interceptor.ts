@@ -41,8 +41,9 @@ api.interceptors.response.use(
         } = error
 
         const originalRequest = config
-        console.error("API Error Status:", status)
-        console.error("API Error Message:", data?.error)
+        // 디버깅용 출력
+        // console.error("API Error Status:", status)
+        // console.error("API Error Message:", data?.error)
         if (status === 401 && data?.error === "TOKEN_EXPIRED") {
         if (!isRefreshing) {
             isRefreshing = true
