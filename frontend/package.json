@@ -59,7 +59,8 @@
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.6",
     "zod": "^3.24.1",
-    "react-toastify": "^10.0.5"
+    "axios": "^1.7.7",
+    "react-toastify": "^10.0.6"
   },
   "devDependencies": {
     "@types/node": "^22",

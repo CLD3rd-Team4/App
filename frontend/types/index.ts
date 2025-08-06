@@ -124,3 +124,4 @@ export interface LocationData {
   destination: LocationInfo | null;
   waypoints: (LocationInfo | null)[];
 }
+

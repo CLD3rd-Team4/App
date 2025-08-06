@@ -8,6 +8,7 @@ import { scheduleApi } from "@/services/api"
 import BottomNavigation from "@/components/common/BottomNavigation"
 import { Plus } from "lucide-react"
 import type { Schedule } from "@/types"
+import api from "@/lib/interceptor" 
 
 export default function ScheduleListScreen() {
   const router = useRouter()
@@ -25,6 +26,7 @@ export default function ScheduleListScreen() {
       loadScheduleList()
     }
   }, [isClient])
+
 
   const loadScheduleList = async () => {
     try {

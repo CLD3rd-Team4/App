@@ -21,7 +21,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: "*"
+        include: "health,info"  # 필요한 엔드포인트만 노출
   endpoint:
     health:
       show-details: always
@@ -79,3 +79,4 @@ kafka:
     value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
     group-id: ${spring.application.name}
     auto-offset-reset: earliest
+

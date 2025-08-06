@@ -7,22 +7,20 @@ spring:
     config:
       enabled: true
     gateway:
-      server:
-        webflux:
-          globalcors:
-            cors-configurations:
-              '[/**]':
-                allowed-origins: 
-                  - "https://www.mapzip.shop"
-                allowed-methods:
-                  - GET
-                  - POST
-                  - PUT
-                  - DELETE
-                  - OPTIONS
-                allowed-headers: "*"
-                allow-credentials: true
-                max-age: 3600
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: 
+              - "https://www.mapzip.shop"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
 
 management:
   endpoints:
@@ -59,7 +57,7 @@ logging:
 
 jwt:
   secret: '{cipher}b356ec0ec47d0edbdd8697a765f3d79102c36736d159d067d5b3cb3cbed63346269f3e8af80154ec3e7ae41c53822a2e153f144b1523dfce4e50c1cf074a146a'
-  expiration: 86400000
 
 server:
   port: 8080
+

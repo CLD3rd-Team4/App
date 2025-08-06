@@ -6,44 +6,31 @@ spring:
     name: auth
 
   datasource:
-    url: "{cipher}569c1c314da35d12120495ae86e04d2b7b668f18b0f3747e26687ed19d7c0e9875d5c81e113db1148c64521ab8a22f2980fbb0d71012ec823930dd12b880baf9fc937984ef4382cb3bcf38f734e33e589f01479e303eef6189492fe08cb3068436befc18b5090db00d0d0b62d3f847b6b3ab4dcb237b862399fce68501857c20"
-    username: "{cipher}995dfde6ea6ecd8bbd5a0ee2910a702e005be23ab5892cf6d95f4fca0d1b11ab"
-    password: "{cipher}9bd7424c08e3de951c830c47941f93c33ae97a808789991e1df5bd5d062d8774"
+    url: "{cipher}da0b4a60517ad7080fa0e371bab0211efb3887a249aadc45a5f7776c2373239f5106ed0b15c00a2e1bdabc63529cb58f8f20708557040969de251fe579d8b62414511e3e7569065a0c7360949c84916e0542e4b28d5e390cbf91a6f846d03ca6bda7070e6f25097a880a61f0f4f95450f08740e7b83c71508d2e1b61cdfad828"
+    username: "{cipher}8fe5ea8cbe4b0df0e727b44fa8c26685ce7f3da4582b182f819d6227b39bcfc3"
+    password: "{cipher}0d2c58800d8867c9281668fcd5f0314eda2fbfe5d3a5518273bff4ba163d2054"
     driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: true
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
-
-  security:
-    oauth2:
-      authorizationserver:
-        client:
-          mapzip-client:
-            registration:
-              client-id: "mapzip-client"
-              client-secret: "{cipher}e12398d0e53e0cfc0b02b86dfc9eb5c2c118b8ebb82196be473afcf3645128d860659d41fcef7c7e67eb34658d12bd3e"
-              client-authentication-methods:
-                - client_secret_basic
-                - client_secret_post
-              authorization-grant-types:
-                - authorization_code
-                - refresh_token
-              redirect-uris:
-                - http://gateway.service-platform.svc.cluster.local:8080/login/oauth2/code/mapzip-client
-              scopes:
-                - read
-                - write
-              require-authorization-consent: true
 
   cloud:
     kubernetes:
       discovery:
         enabled: true
+
+  data:
+    valkey:
+      host: "{cipher}5abc4096fb7187ec0e3f0588bb1885d7de95d9bbd25e7bf27a36e1112849a6820de2888ba68fafc90919e8d8070c5be885e9f7f4fec82a9c8098bc5e34bf343c282ae9bd7712f3588bac4a73418a4945"
+      port: 6379
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
 
 management:
   endpoints:
@@ -62,5 +49,11 @@ management:
       enabled: true
 
 jwt:
-  secret: "{cipher}7b6b9294d39c3d8255fc378565a0565742c5c044cbd4dccb61fcfde909bc4563a7a6af6e424f8d36a9a3c72164ca1ecb13d11fc82f95c8d242a0acab103e1155"
+  secret: "{cipher}e6748d8b7f4ecf1019e4ff7508e1aec7c8086d4b1c63317d844bf6265438abf0619aa20d71617c5be93aae71f0ff4ad67bafcea41389f55c51715ebf6bf4d972"
   expiration: 86400000
+
+kakao:
+  client-id: "{cipher}bc8e41dba8164049b6d862068538a8e25ba5f21ff910d2383b480663f4c6e9b16c4e5d4c434a86761563e16a6ff26ace4e8d0a37adaf0b5df82c7ba77a0211ac"
+  client-secret: "{cipher}c51298cd954fd32343af0d27f802bf64ef42631f156b7b4bdaf88c732c6f52cae41682e6a66f83fc77b19f9594447d1743f8b7412004c8dc2f82b1ff43f93c7b"
+  redirect-uri: "http://localhost:3000/login/callback"
+

@@ -1,5 +1,4 @@
 import axios from "axios"
-import { toast } from "react-toastify"
 
 const api = axios.create({
     baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || "",
@@ -7,103 +6,89 @@ const api = axios.create({
 })
 
 let isRefreshing = false
-let refreshSubscribers: ((token: string) => void)[] = []
 
-// 토큰 재요청 기다리는 요청들 처리
-function subscribeTokenRefresh(cb: (token: string) => void) {
-    refreshSubscribers.push(cb)
+type Subscriber = {
+    resolve: (value?: any) => void
+    reject: (error?: any) => void
 }
 
-function onTokenRefreshed(newToken: string) {
-    refreshSubscribers.forEach((cb) => cb(newToken))
+let refreshSubscribers: Subscriber[] = []
+
+function subscribeTokenRefresh(
+    resolve: (value?: any) => void,
+    reject: (error?: any) => void
+) {
+    refreshSubscribers.push({ resolve, reject })
+}
+
+function onTokenRefreshed() {
+    refreshSubscribers.forEach(({ resolve }) => resolve())
     refreshSubscribers = []
 }
 
-// 요청 인터셉터
-api.interceptors.request.use((config) => {
-    const token = localStorage.getItem("accessToken")
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-})
+function onRefreshFailed(error: any) {
+    refreshSubscribers.forEach(({ reject }) => reject(error))
+    refreshSubscribers = []
+}
 
 // 응답 인터셉터
 api.interceptors.response.use(
     (res) => res,
     async (error) => {
         const {
-            config,
-            response: { status, data },
+        config,
+        response: { status, data },
         } = error
 
         const originalRequest = config
+        // 디버깅용 출력
+        // console.error("API Error Status:", status)
+        // console.error("API Error Message:", data?.error)
+        if (status === 401 && data?.error === "TOKEN_EXPIRED") {
+        if (!isRefreshing) {
+            isRefreshing = true
 
-        // ===== JWT 관련 처리 =====
-        if (status === 401 && data?.code === "TOKEN_EXPIRED") {
-            if (!isRefreshing) {
-                isRefreshing = true
+            try {
+            // 리프레시 토큰으로 액세스 토큰 갱신
+            await axios.post(
+                `${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/token/refresh`,
+                {},
+                { withCredentials: true }
+            )
 
-                try {
-                    const refreshToken = localStorage.getItem("refreshToken")
-                    const res = await axios.post(
-                        `${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/refresh`,
-                        {},
-                        {
-                            headers: {
-                                Authorization: `Bearer ${refreshToken}`,
-                            },
-                        }
-                    )
+            isRefreshing = false
+            onTokenRefreshed()
 
-                    const newAccessToken = res.data.accessToken
-                    localStorage.setItem("accessToken", newAccessToken)
-
-                    onTokenRefreshed(newAccessToken)
-                    isRefreshing = false
-
-                    // 실패한 요청 재시도
-                    return new Promise((resolve) => {
-                        subscribeTokenRefresh((token) => {
-                            originalRequest.headers.Authorization = `Bearer ${token}`
-                            resolve(api(originalRequest))
-                        })
-                    })
-                } catch (e) {
-                    // 리프레시 토큰 만료 시
-                    toast.warn("세션이 만료되었습니다. 다시 로그인해주세요.")
-                    localStorage.removeItem("accessToken")
-                    localStorage.removeItem("refreshToken")
-                    window.location.href = "/login"
-                    return
-                }
+            // 원래 요청 재시도
+            return api(originalRequest)
+            } catch (e) {
+            isRefreshing = false
+            onRefreshFailed(e)
+            alert("세션이 만료되었습니다. 다시 로그인해주세요.")
+            window.location.href = "/login.html"
+            return Promise.reject(e)
             }
-
-            // 이미 리프레시 중인 경우 대기
-            return new Promise((resolve) => {
-                subscribeTokenRefresh((token) => {
-                    originalRequest.headers.Authorization = `Bearer ${token}`
-                    resolve(api(originalRequest))
-                })
-            })
         }
 
-        if (status === 401 && data?.code === "TOKEN_INVALID") {
-            toast.warn("인증되지 않은 사용자입니다. 다시 로그인해주세요.")
-            localStorage.removeItem("accessToken")
-            localStorage.removeItem("refreshToken")
-            window.location.href = "/login"
-            return
+        // 이미 리프레시 중인 경우 대기
+        return new Promise((resolve, reject) => {
+            subscribeTokenRefresh(
+            () => resolve(api(originalRequest)),
+            (err) => reject(err)
+            )
+        })
         }
 
-        // ===== 일반 에러 처리 =====
-        if ([403, 404, 500, 503].includes(status)) {
-            toast.error(data?.message || "문제가 발생했습니다. 홈으로 이동합니다.")
-            window.location.href = "/"
-            return
+        if (status === 401 && data?.error === "TOKEN_INVALID") {
+            alert("인증되지 않은 사용자입니다. 로그인해주세요.")
+            window.location.href = "/login.html"
+            return Promise.reject(error)
         }
 
+        alert("문제가 발생했습니다. 홈으로 이동합니다.")
+        window.location.href = "/"
         return Promise.reject(error)
+
     }
 )
 

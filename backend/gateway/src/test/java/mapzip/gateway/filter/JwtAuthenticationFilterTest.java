@@ -2,6 +2,7 @@ package mapzip.gateway.filter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import mapzip.gateway.util.JwtUtil;
+import mapzip.gateway.util.TokenValidationResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -16,9 +17,12 @@ import org.springframework.mock.web.server.MockServerWebExchange;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
-
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+
+import java.nio.charset.StandardCharsets;
 
 class JwtAuthenticationFilterTest {
 
@@ -61,7 +65,7 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    void shouldReturn401WhenNoJwtCookie() {
+    void shouldReturn401WithTokenInvalidWhenNoJwtCookie() {
         // Given
         MockServerHttpRequest request = MockServerHttpRequest
                 .get("/auth/profile")
@@ -76,26 +80,29 @@ class JwtAuthenticationFilterTest {
         StepVerifier.create(result)
                 .verifyComplete();
         
-        assert exchange.getResponse().getStatusCode() == HttpStatus.UNAUTHORIZED;
+        assertEquals(HttpStatus.UNAUTHORIZED, exchange.getResponse().getStatusCode());
+        assertTrue(exchange.getResponse().getHeaders().getFirst("Content-Type").contains("application/json"));
+        
+        // 응답 바디에 TOKEN_INVALID가 포함되어 있는지 확인
+        String responseBody = exchange.getResponse().getBodyAsString().block();
+        assertTrue(responseBody.contains("TOKEN_INVALID"));
+        
         verifyNoInteractions(filterChain);
     }
 
     @Test
-    void shouldReturn401WhenInvalidToken() {
+    void shouldReturn401WithTokenInvalidWhenInvalidToken() {
         // Given
         String tokenValue = "invalid-token";
-        HttpCookie cookie = ResponseCookie.from("accessToken", tokenValue)
-                .path("/")
-                .httpOnly(true)
-                .build();
+        HttpCookie cookie = new HttpCookie("accessToken", tokenValue);
 
         MockServerHttpRequest request = MockServerHttpRequest
                 .get("/auth/profile")
-                .cookie(cookie)  // 여기 HttpCookie 객체 넣기
+                .cookie(cookie)
                 .build();
         MockServerWebExchange exchange = MockServerWebExchange.from(request);
         
-        when(jwtUtil.validateToken("invalid-token")).thenReturn(false);
+        when(jwtUtil.validateTokenWithResult("invalid-token")).thenReturn(TokenValidationResult.INVALID);
         
         // When
         GatewayFilter filter = jwtAuthenticationFilter.apply(new JwtAuthenticationFilter.Config());
@@ -105,8 +112,45 @@ class JwtAuthenticationFilterTest {
         StepVerifier.create(result)
                 .verifyComplete();
         
-        assert exchange.getResponse().getStatusCode() == HttpStatus.UNAUTHORIZED;
-        verify(jwtUtil).validateToken("invalid-token");
+        assertEquals(HttpStatus.UNAUTHORIZED, exchange.getResponse().getStatusCode());
+        
+        // 응답 바디에 TOKEN_INVALID가 포함되어 있는지 확인
+        String responseBody = exchange.getResponse().getBodyAsString().block();
+        assertTrue(responseBody.contains("TOKEN_INVALID"));
+        
+        verify(jwtUtil).validateTokenWithResult("invalid-token");
+        verifyNoInteractions(filterChain);
+    }
+
+    @Test
+    void shouldReturn401WithTokenExpiredWhenExpiredToken() {
+        // Given
+        String tokenValue = "expired-token";
+        HttpCookie cookie = new HttpCookie("accessToken", tokenValue);
+
+        MockServerHttpRequest request = MockServerHttpRequest
+                .get("/auth/profile")
+                .cookie(cookie)
+                .build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+        
+        when(jwtUtil.validateTokenWithResult("expired-token")).thenReturn(TokenValidationResult.EXPIRED);
+        
+        // When
+        GatewayFilter filter = jwtAuthenticationFilter.apply(new JwtAuthenticationFilter.Config());
+        Mono<Void> result = filter.filter(exchange, filterChain);
+        
+        // Then
+        StepVerifier.create(result)
+                .verifyComplete();
+        
+        assertEquals(HttpStatus.UNAUTHORIZED, exchange.getResponse().getStatusCode());
+        
+        // 응답 바디에 TOKEN_EXPIRED가 포함되어 있는지 확인
+        String responseBody = exchange.getResponse().getBodyAsString().block();
+        assertTrue(responseBody.contains("TOKEN_EXPIRED"));
+        
+        verify(jwtUtil).validateTokenWithResult("expired-token");
         verifyNoInteractions(filterChain);
     }
 
@@ -114,7 +158,7 @@ class JwtAuthenticationFilterTest {
     void shouldPassThroughWhenValidToken() {
         // Given
         String userId = "testuser";
-        String validToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0dXNlciIsImlhdCI6MTc1MzUxNjA5MywiZXhwIjo4NjQwMDAwMH0.W8hA0tLOLGN6YfDJnyNIrb0iGVKVH909zyP7-o613vI";
+        String validToken = "valid-token";
         HttpCookie cookie = new HttpCookie("accessToken", validToken);
 
         MockServerHttpRequest request = MockServerHttpRequest
@@ -123,7 +167,7 @@ class JwtAuthenticationFilterTest {
                 .build();
         MockServerWebExchange exchange = MockServerWebExchange.from(request);
         
-        when(jwtUtil.validateToken(validToken)).thenReturn(true);
+        when(jwtUtil.validateTokenWithResult(validToken)).thenReturn(TokenValidationResult.VALID);
         when(jwtUtil.extractUserId(validToken)).thenReturn(userId);
         when(filterChain.filter(any())).thenReturn(Mono.empty());
         
@@ -135,7 +179,7 @@ class JwtAuthenticationFilterTest {
         StepVerifier.create(result)
                 .verifyComplete();
         
-        verify(jwtUtil).validateToken(validToken);
+        verify(jwtUtil).validateTokenWithResult(validToken);
         verify(jwtUtil).extractUserId(validToken);
         verify(filterChain).filter(any());
     }
