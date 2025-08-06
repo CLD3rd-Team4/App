@@ -63,7 +63,12 @@ api.interceptors.response.use(
             } catch (e) {
             isRefreshing = false
             onRefreshFailed(e)
-            toast.warn("세션이 만료되었습니다. 다시 로그인해주세요.")
+            
+            const event = new CustomEvent("showToast", {
+                detail: { message: "세션이 만료되었습니다. 다시 로그인해주세요.", type: "warn" },
+            })
+            window.dispatchEvent(event)
+
             setTimeout(() => {
                 window.location.href = "/login.html"
             }, 2000)
@@ -81,7 +86,11 @@ api.interceptors.response.use(
         }
 
         if (status === 401 && data?.error === "TOKEN_INVALID") {
-            toast.warn("인증되지 않은 사용자입니다. 다시 로그인해주세요.")
+            const event = new CustomEvent("showToast", {
+                detail: { message: "인증되지 않은 사용자입니다. 다시 로그인해주세요.", type: "warn" },
+            })
+            window.dispatchEvent(event)
+
             setTimeout(() => {
                 window.location.href = "/login.html"
             }, 2000)
@@ -89,7 +98,11 @@ api.interceptors.response.use(
         }
 
 
-        toast.error("문제가 발생했습니다. 홈으로 이동합니다.")
+        const event = new CustomEvent("showToast", {
+            detail: { message: "문제가 발생했습니다. 홈으로 이동합니다.", type: "error" },
+        })
+        window.dispatchEvent(event)
+        
         setTimeout(() => {
             window.location.href = "/"
         }, 2000)

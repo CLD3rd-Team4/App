@@ -8,7 +8,7 @@ import PWAInstaller from "@/components/PWAInstaller"
 import { useAuth } from "@/hooks/useAuth"
 import { useSchedule } from "@/hooks/useSchedule"
 import { useRouter } from "next/navigation"
-import { ToastContainer } from "react-toastify"
+import { ToastContainer,toast } from "react-toastify"
 import "react-toastify/dist/ReactToastify.css"
 
 export default function HomePage() {
@@ -35,6 +35,36 @@ export default function HomePage() {
     // 앱 초기화
     setIsLoading(false)
   }, [isClient, router])
+
+    // 이벤트 리스너 등록 (토스트용)
+  useEffect(() => {
+    if (!isClient) return
+
+    function handleToastEvent(event: CustomEvent<{ type: string; message: string }>) {
+      const { type, message } = event.detail
+      switch (type) {
+        case "success":
+          toast.success(message)
+          break
+        case "warn":
+          toast.warn(message)
+          break
+        case "error":
+          toast.error(message)
+          break
+        default:
+          toast(message)
+          break
+      }
+    }
+
+    window.addEventListener("showToast", handleToastEvent as EventListener)
+
+    return () => {
+      window.removeEventListener("showToast", handleToastEvent as EventListener)
+    }
+  }, [isClient])
+
 
   if (!isClient || isLoading) {
     return (
