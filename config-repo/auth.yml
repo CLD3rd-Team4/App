@@ -56,3 +56,4 @@ kakao:
   client-id: "{cipher}bc8e41dba8164049b6d862068538a8e25ba5f21ff910d2383b480663f4c6e9b16c4e5d4c434a86761563e16a6ff26ace4e8d0a37adaf0b5df82c7ba77a0211ac"
   client-secret: "{cipher}c51298cd954fd32343af0d27f802bf64ef42631f156b7b4bdaf88c732c6f52cae41682e6a66f83fc77b19f9594447d1743f8b7412004c8dc2f82b1ff43f93c7b"
   redirect-uri: "http://localhost:8080/oauth2/login"
+

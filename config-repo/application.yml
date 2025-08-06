@@ -83,3 +83,4 @@ kafka:
     value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
     group-id: ${spring.application.name}
     auto-offset-reset: earliest
+
