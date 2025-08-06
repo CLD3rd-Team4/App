@@ -1,10 +1,10 @@
-package com.mapzip.schedule.service;
+package com.mapzip.recommend.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mapzip.schedule.dto.Feature;
-import com.mapzip.schedule.dto.TmapRouteResponse;
-import com.mapzip.schedule.util.TimeUtil;
+import com.mapzip.recommend.dto.Feature;
+import com.mapzip.recommend.dto.TmapRouteResponse;
+import com.mapzip.recommend.util.TimeUtil;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;

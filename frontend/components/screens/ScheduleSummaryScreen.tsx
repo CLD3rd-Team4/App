@@ -258,4 +258,5 @@ export default function ScheduleSummaryScreen() {
       {showRecommendationPopup && <RecommendationReadyPopup onConfirm={handleRecommendationConfirm} />}
     </>
   )
+  
 }

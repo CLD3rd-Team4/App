@@ -1,0 +1,332 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>3.5.3</version>
+		<relativePath/> <!-- lookup parent from repository -->
+	</parent>
+	<groupId>com.mapzip</groupId>
+	<artifactId>recommend</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<name>recommend</name>
+	<description>Demo project for Spring Boot</description>
+	<url/>
+	<licenses>
+		<license/>
+	</licenses>
+	<developers>
+		<developer/>
+	</developers>
+	<scm>
+		<connection/>
+		<developerConnection/>
+		<tag/>
+		<url/>
+	</scm>
+	<properties>
+		<java.version>17</java.version>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<protobuf.version>3.25.3</protobuf.version>
+		<grpc.version>1.62.2</grpc.version>
+		<grpc-spring-boot.version>3.1.0.RELEASE</grpc-spring-boot.version>
+		<aws.version>2.20.26</aws.version>
+		<spring-cloud.version>2025.0.0</spring-cloud.version>
+	</properties>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>io.grpc</groupId>
+				<artifactId>grpc-bom</artifactId>
+				<version>${grpc.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+			<!-- AWS SDK BOM -->
+			<dependency>
+				<groupId>software.amazon.awssdk</groupId>
+				<artifactId>bom</artifactId>
+				<version>${aws.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+			<!-- Spring Cloud BOM -->
+			<dependency>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-dependencies</artifactId>
+				<version>${spring-cloud.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
+	<dependencies>
+		<!-- Spring Boot Core Dependencies -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+		
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+		
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webflux</artifactId>
+		</dependency>
+
+		<!-- Spring Data Redis -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-redis</artifactId>
+		</dependency><!-- Spring Cloud Bootstrap - Config 지원을 위해 필요 -->
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-bootstrap</artifactId>
+		</dependency>
+
+		<!-- Spring Cloud Config Client -->
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-config</artifactId>
+		</dependency>
+
+		<!-- Database -->
+		<dependency>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
+		</dependency>
+
+		<!-- AWS SDK Dependencies -->
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>rds</artifactId>
+		</dependency>
+		
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>auth</artifactId>
+		</dependency>
+		
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>secretsmanager</artifactId>
+		</dependency>
+
+		<!-- gRPC Dependencies - Spring Boot 3.x 호환 버전 -->
+		<dependency>
+			<groupId>net.devh</groupId>
+			<artifactId>grpc-server-spring-boot-starter</artifactId>
+			<version>${grpc-spring-boot.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>net.devh</groupId>
+			<artifactId>grpc-client-spring-boot-starter</artifactId>
+			<version>${grpc-spring-boot.version}</version>
+		</dependency>
+
+		<!-- Protobuf -->
+		<dependency>
+			<groupId>com.google.protobuf</groupId>
+			<artifactId>protobuf-java</artifactId>
+			<version>${protobuf.version}</version>
+		</dependency>
+		
+		<dependency>
+			<groupId>com.google.protobuf</groupId>
+			<artifactId>protobuf-java-util</artifactId>
+			<version>${protobuf.version}</version>
+		</dependency>
+
+		<!-- gRPC Core (BOM에서 버전 관리됨) -->
+		<dependency>
+			<groupId>io.grpc</groupId>
+			<artifactId>grpc-stub</artifactId>
+		</dependency>
+		
+		<dependency>
+			<groupId>io.grpc</groupId>
+			<artifactId>grpc-protobuf</artifactId>
+		</dependency>
+
+		<!-- Google Common Protos for gRPC HTTP annotations -->
+		<dependency>
+			<groupId>com.google.api.grpc</groupId>
+			<artifactId>proto-google-common-protos</artifactId>
+			<version>2.25.0</version>
+		</dependency>
+
+		<!-- Annotation APIs - Protobuf 호환성을 위해 javax와 jakarta 모두 필요 -->
+		<dependency>
+			<groupId>jakarta.annotation</groupId>
+			<artifactId>jakarta.annotation-api</artifactId>
+		</dependency>
+		
+		<!-- javax.annotation API - Protobuf 생성 코드 호환성을 위해 필요 -->
+		<dependency>
+			<groupId>javax.annotation</groupId>
+			<artifactId>javax.annotation-api</artifactId>
+			<version>1.3.2</version>
+		</dependency>
+
+		<!-- JSON Processing -->
+		<dependency>
+			<groupId>com.google.code.gson</groupId>
+			<artifactId>gson</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+		</dependency>
+
+		<!-- Development Tools -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-devtools</artifactId>
+			<scope>runtime</scope>
+			<optional>true</optional>
+		</dependency>
+		
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<optional>true</optional>
+		</dependency>
+
+		<!-- Test Dependencies -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<extensions>
+			<extension>
+				<groupId>kr.motd.maven</groupId>
+				<artifactId>os-maven-plugin</artifactId>
+				<version>1.7.1</version>
+			</extension>
+		</extensions>
+		<plugins>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<excludes>
+						<exclude>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+						</exclude>
+					</excludes>
+				</configuration>
+			</plugin>
+
+			<!-- Protobuf Maven Plugin -->
+			<plugin>
+				<groupId>io.github.ascopes</groupId>
+				<artifactId>protobuf-maven-plugin</artifactId>
+				<version>3.6.0</version>
+				<configuration>
+					<protocVersion>${protobuf.version}</protocVersion>
+					<sourceDirectories>
+						<sourceDirectory>src/main/proto</sourceDirectory>
+					</sourceDirectories>
+					<binaryMavenPlugins>
+						<binaryMavenPlugin>
+							<groupId>io.grpc</groupId>
+							<artifactId>protoc-gen-grpc-java</artifactId>
+							<version>${grpc.version}</version>
+						</binaryMavenPlugin>
+					</binaryMavenPlugins>
+					<!-- javax.annotation 호환성을 위한 옵션 추가 -->
+					<jvmArguments>
+						<jvmArgument>-Dfile.encoding=UTF-8</jvmArgument>
+					</jvmArguments>
+				</configuration>
+				<executions>
+					<execution>
+						<goals>
+							<goal>generate</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
+			<!-- Proto Dependencies Unpacker -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-dependency-plugin</artifactId>
+				<version>3.6.1</version>
+				<executions>
+					<execution>
+						<id>unpack-proto-dependencies</id>
+						<phase>generate-sources</phase>
+						<goals>
+							<goal>unpack</goal>
+						</goals>
+						<configuration>
+							<artifactItems>
+								<artifactItem>
+									<groupId>com.google.api.grpc</groupId>
+									<artifactId>proto-google-common-protos</artifactId>
+									<version>2.25.0</version>
+									<type>jar</type>
+									<overWrite>true</overWrite>
+									<outputDirectory>${project.build.directory}/proto-dependencies</outputDirectory>
+								</artifactItem>
+							</artifactItems>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+
+			<!-- Compiler Plugin -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<annotationProcessorPaths>
+						<path>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+							<version>${lombok.version}</version>
+						</path>
+					</annotationProcessorPaths>
+				</configuration>
+			</plugin>
+
+			<!-- Build Helper Plugin -->
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>build-helper-maven-plugin</artifactId>
+				<version>3.6.0</version>
+				<executions>
+					<execution>
+						<id>add-source</id>
+						<phase>generate-sources</phase>
+						<goals>
+							<goal>add-source</goal>
+						</goals>
+						<configuration>
+							<sources>
+								<source>${project.build.directory}/generated-sources/protobuf/java</source>
+								<source>${project.build.directory}/generated-sources/protobuf/grpc-java</source>
+							</sources>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
+
+</project>

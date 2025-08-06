@@ -1,4 +1,4 @@
-package com.mapzip.schedule.util;
+package com.mapzip.recommend.util;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
