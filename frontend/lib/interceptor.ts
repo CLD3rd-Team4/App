@@ -66,7 +66,7 @@ api.interceptors.response.use(
             toast.warn("세션이 만료되었습니다. 다시 로그인해주세요.")
             setTimeout(() => {
                 window.location.href = "/login.html"
-            }, 1500)
+            }, 2000)
             return Promise.reject(e)
             }
         }
@@ -84,7 +84,7 @@ api.interceptors.response.use(
             toast.warn("인증되지 않은 사용자입니다. 다시 로그인해주세요.")
             setTimeout(() => {
                 window.location.href = "/login.html"
-            }, 1500)
+            }, 2000)
             return Promise.reject(error)
         }
 
@@ -92,7 +92,7 @@ api.interceptors.response.use(
         toast.error("문제가 발생했습니다. 홈으로 이동합니다.")
         setTimeout(() => {
             window.location.href = "/"
-        }, 1500)
+        }, 2000)
         return Promise.reject(error)
 
     }

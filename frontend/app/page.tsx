@@ -52,7 +52,7 @@ export default function HomePage() {
       {!isAuthenticated ? <LoginScreen /> : selectedSchedule ? <ScheduleSummaryScreen /> : <HomeScreen />}
       <PWAInstaller />
 
-      {/* <ToastContainer
+      <ToastContainer
         position="top-right"
         autoClose={3000}
         hideProgressBar={false}
@@ -61,7 +61,7 @@ export default function HomePage() {
         pauseOnHover
         draggable
         pauseOnFocusLoss
-      /> */}
+      />
     </>
   )
 }
