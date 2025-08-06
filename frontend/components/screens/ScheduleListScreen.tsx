@@ -31,7 +31,7 @@ export default function ScheduleListScreen() {
     // 테스트용 함수 직접 추가
   async function testApiInterceptor() {
     try {
-      const res = await api.get("/review/resource")
+      const res = await api.get("/demo/hello")
       console.log("테스트 요청 성공:", res.data)
     } catch (error: any) {
       console.error("테스트 요청 에러:", error.response?.data || error.message)
