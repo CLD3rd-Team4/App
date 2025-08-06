@@ -1,4 +1,4 @@
-package com.mapzip.schedule.dto;
+package com.mapzip.recommend.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

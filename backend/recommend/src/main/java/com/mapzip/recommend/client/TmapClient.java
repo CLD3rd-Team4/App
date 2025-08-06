@@ -1,9 +1,9 @@
-package com.mapzip.schedule.client;
+package com.mapzip.recommend.client;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mapzip.schedule.dto.TmapRouteRequest;
-import com.mapzip.schedule.dto.TmapRouteResponse;
+import com.mapzip.recommend.dto.TmapRouteRequest;
+import com.mapzip.recommend.dto.TmapRouteResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -61,4 +61,3 @@ public class TmapClient {
                 });
     }
 }
-
