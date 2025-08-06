@@ -47,9 +47,6 @@ management:
       enabled: true
     liveness-state:
       enabled: true
-  # Health Check 엔드포인트는 인증 없이 접근 허용
-  security:
-    enabled: false
 
 jwt:
   secret: "{cipher}e6748d8b7f4ecf1019e4ff7508e1aec7c8086d4b1c63317d844bf6265438abf0619aa20d71617c5be93aae71f0ff4ad67bafcea41389f55c51715ebf6bf4d972"
