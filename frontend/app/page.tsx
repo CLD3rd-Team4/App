@@ -8,6 +8,8 @@ import PWAInstaller from "@/components/PWAInstaller"
 import { useAuth } from "@/hooks/useAuth"
 import { useSchedule } from "@/hooks/useSchedule"
 import { useRouter } from "next/navigation"
+import { ToastContainer } from "react-toastify"
+import "react-toastify/dist/ReactToastify.css"
 
 export default function HomePage() {
   const { isAuthenticated, user } = useAuth()
@@ -49,6 +51,17 @@ export default function HomePage() {
     <>
       {!isAuthenticated ? <LoginScreen /> : selectedSchedule ? <ScheduleSummaryScreen /> : <HomeScreen />}
       <PWAInstaller />
+
+        <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        pauseOnHover
+        draggable
+        pauseOnFocusLoss
+      />
     </>
   )
 }
