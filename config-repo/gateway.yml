@@ -60,3 +60,4 @@ jwt:
 
 server:
   port: 8080
+
