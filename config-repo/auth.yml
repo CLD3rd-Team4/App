@@ -1,4 +1,4 @@
-server:
+erver:
   port: 8080
 
 spring:

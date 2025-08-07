@@ -2,20 +2,22 @@ package com.mapzip.auth.auth_service.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mapzip.auth.auth_service.dto.KakaoUserInfo;
 import com.mapzip.auth.auth_service.dto.TokenResponseDto;
 import com.mapzip.auth.auth_service.entity.AppUser;
 import com.mapzip.auth.auth_service.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 @Service
@@ -24,10 +26,11 @@ import java.util.UUID;
 public class KakaoOAuthService {
 
     private final UserRepository userRepository;
-    private final JwtEncoder jwtEncoder;
     private final RefreshTokenService refreshTokenService;
-    private final ObjectMapper objectMapper = new ObjectMapper();
     private final WebClient webClient;
+    private final JwtEncoder jwtEncoder;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${kakao.client-id}")
     private String clientId;
@@ -35,37 +38,65 @@ public class KakaoOAuthService {
     @Value("${kakao.redirect-uri}")
     private String redirectUri;
 
-    @Value("${jwt.expiration}")
-    private long jwtExpirationMs;
+    @Value("${kakao.client-secret:}")
+    private String clientSecret;
 
     public TokenResponseDto loginWithKakao(String code) {
+        System.out.println("loginWithKakao service 진입");
         String kakaoAccessToken = getKakaoAccessToken(code);
-        Long kakaoId = getKakaoUserId(kakaoAccessToken);
+        KakaoUserInfo kakaoUserInfo = getKakaoUserInfo(kakaoAccessToken);
 
-        AppUser user = userRepository.findByKakaoId(kakaoId)
+        AppUser user = userRepository.findByKakaoId(kakaoUserInfo.kakaoId())
                 .orElseGet(() -> userRepository.save(AppUser.builder()
-                        .kakaoId(kakaoId)
-                        .nickname(null)
+                        .kakaoId(kakaoUserInfo.kakaoId())
+                        .nickname(kakaoUserInfo.nickname())
                         .build()));
 
-        // 신규 회원인지 여부 판단
-        boolean isNew = (user.getNickname() == null);
+        // JWT access token 생성
+        Instant now = Instant.now();
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .subject(kakaoUserInfo.kakaoId().toString())
+                .issuedAt(now)
+                .expiresAt(now.plus(1, ChronoUnit.HOURS))
+                .claim("nickname", kakaoUserInfo.nickname())
+                .build();
 
-        String accessToken = generateAccessToken(kakaoId.toString());
-        String refreshToken = generateAndStoreRefreshToken(kakaoId.toString());
+        String accessToken = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
+        String refreshToken = UUID.randomUUID().toString();
 
-        return new TokenResponseDto(accessToken, refreshToken, isNew);
+        System.out.println("accessToken & refreshToken 생성");
+
+        refreshTokenService.save(refreshToken, kakaoUserInfo.kakaoId().toString());
+
+        return new TokenResponseDto(accessToken, refreshToken);
     }
 
     private String getKakaoAccessToken(String code) {
+        System.out.println("getKakaoAccessToken");
+        System.out.println("client_id: " + clientId);
+        System.out.println("redirect_uri: " + redirectUri);
+        System.out.println("code: " + code);
+        System.out.println("client_secret: " + clientSecret); // 있으면 출력
+
+
+        String requestBody = "grant_type=authorization_code" +
+                "&client_id=" + clientId +
+                "&redirect_uri=" + redirectUri +
+                "&code=" + code +
+                "&client_secret=" + clientSecret;
+
         String response = webClient.post()
                 .uri("https://kauth.kakao.com/oauth/token")
                 .header("Content-Type", "application/x-www-form-urlencoded")
-                .bodyValue("grant_type=authorization_code" +
-                        "&client_id=" + clientId +
-                        "&redirect_uri=" + redirectUri +
-                        "&code=" + code)
+                .bodyValue(requestBody)
                 .retrieve()
+                .onStatus(
+                        status -> status.isError(),
+                        clientResponse -> clientResponse.bodyToMono(String.class).map(body -> {
+                            System.out.println("카카오 응답 에러: " + body);
+                            return new RuntimeException("카카오 응답 오류: " + body);
+                        })
+                )
                 .bodyToMono(String.class)
                 .block();
 
@@ -73,11 +104,12 @@ public class KakaoOAuthService {
             JsonNode jsonNode = objectMapper.readTree(response);
             return jsonNode.get("access_token").asText();
         } catch (Exception e) {
-            throw new RuntimeException("카카오 access token 파싱 실패", e);
+            throw new IllegalArgumentException("카카오 access token 파싱 실패", e);
         }
     }
 
-    private Long getKakaoUserId(String accessToken) {
+
+    private KakaoUserInfo getKakaoUserInfo(String accessToken) {
         String response = webClient.get()
                 .uri("https://kapi.kakao.com/v2/user/me")
                 .header("Authorization", "Bearer " + accessToken)
@@ -87,37 +119,33 @@ public class KakaoOAuthService {
 
         try {
             JsonNode jsonNode = objectMapper.readTree(response);
-            return jsonNode.get("id").asLong();  // ex) 12345678
+            Long kakaoId = jsonNode.get("id").asLong();
+            String nickname = jsonNode.path("properties").path("nickname").asText(null);
+
+            return new KakaoUserInfo(kakaoId, nickname);
         } catch (Exception e) {
-            throw new RuntimeException("카카오 사용자 정보 파싱 실패", e);
+            throw new IllegalArgumentException("카카오 사용자 정보 파싱 실패", e);
         }
-    }
-
-    private String generateAccessToken(String kakaoId) {
-        Instant now = Instant.now();
-        JwtClaimsSet claims = JwtClaimsSet.builder()
-                .subject(kakaoId)
-                .claim("scope", "read write")
-                .issuedAt(now)
-                .expiresAt(now.plusMillis(jwtExpirationMs))
-                .build();
-
-        return jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
-    }
-
-    private String generateAndStoreRefreshToken(String kakaoId) {
-        String refreshToken = UUID.randomUUID().toString();
-        refreshTokenService.save(refreshToken, kakaoId); // 예: 메모리 or Redis
-        return refreshToken;
     }
 
     public TokenResponseDto reissueAccessToken(String refreshToken) {
         String kakaoId = refreshTokenService.getUserIdFromRefreshToken(refreshToken)
-                .orElseThrow(() -> new RuntimeException("유효하지 않은 refresh token"));
+                .orElseThrow(() -> new IllegalArgumentException("유효하지 않은 refresh token"));
 
-        String newAccessToken = generateAccessToken(kakaoId);
+        // JWT 재발급 시 nickname 포함
+        AppUser user = userRepository.findByKakaoId(Long.valueOf(kakaoId))
+                .orElseThrow(() -> new IllegalArgumentException("사용자 정보 없음"));
 
-        return new TokenResponseDto(newAccessToken, refreshToken, false);
+        Instant now = Instant.now();
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .subject(kakaoId)
+                .issuedAt(now)
+                .expiresAt(now.plus(1, ChronoUnit.HOURS))
+                .claim("nickname", user.getNickname())
+                .build();
+
+        String newAccessToken = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
+        return new TokenResponseDto(newAccessToken, refreshToken);
     }
 
     public void logout(String refreshToken) {
