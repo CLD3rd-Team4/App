@@ -1,5 +1,6 @@
 package com.mapzip.schedule.service;
 
+import com.mapzip.schedule.config.GrpcInterceptorConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mapzip.schedule.entity.MealTimeSlot;
 import com.mapzip.schedule.entity.Schedule;
@@ -79,7 +80,8 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
             Schedule schedule = scheduleRepository.findById(request.getScheduleId())
                     .orElseThrow(() -> Status.NOT_FOUND.withDescription("수정할 스케줄을 찾을 수 없습니다: " + request.getScheduleId()).asRuntimeException());
 
-            if (!schedule.getUserId().equals(request.getUserId())) {
+            String userId = GrpcInterceptorConfig.USER_ID_CONTEXT_KEY.get();
+            if (!schedule.getUserId().equals(userId)) {
                 throw Status.PERMISSION_DENIED.withDescription("이 스케줄을 수정할 권한이 없습니다.").asRuntimeException();
             }
 
@@ -143,7 +145,8 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
             Schedule schedule = scheduleRepository.findById(request.getScheduleId())
                     .orElseThrow(() -> new IllegalArgumentException("스케줄을 찾을 수 없습니다."));
 
-            if (!schedule.getUserId().equals(request.getUserId())) {
+            String userId = GrpcInterceptorConfig.USER_ID_CONTEXT_KEY.get();
+            if (!schedule.getUserId().equals(userId)) {
                 responseObserver.onError(io.grpc.Status.PERMISSION_DENIED
                         .withDescription("해당 스케줄에 접근할 권한이 없습니다.")
                         .asRuntimeException());
@@ -178,7 +181,8 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
             Schedule schedule = scheduleRepository.findById(request.getScheduleId())
                     .orElseThrow(() -> Status.NOT_FOUND.withDescription("스케줄을 찾을 수 없습니다: " + request.getScheduleId()).asRuntimeException());
 
-            if (!schedule.getUserId().equals(request.getUserId())) {
+            String userId = GrpcInterceptorConfig.USER_ID_CONTEXT_KEY.get();
+            if (!schedule.getUserId().equals(userId)) {
                 throw Status.PERMISSION_DENIED.withDescription("이 스케줄을 삭제할 권한이 없습니다.").asRuntimeException();
             }
 

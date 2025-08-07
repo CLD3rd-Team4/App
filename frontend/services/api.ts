@@ -3,7 +3,8 @@
 const API_BASE_URL = "https://api.mapzip.shop";
 
 // 타입 임포트 추가
-import type { OCRResult, CreateReviewRequest, CreateReviewResponse, User, LocationData } from "@/types";
+import type { OCRResult, CreateReviewRequest, CreateReviewResponse, User, LocationData, Schedule } from "@/types";
+import api from '@/lib/interceptor';
 
 // 커스텀 에러 클래스
 export class APIError extends Error {
@@ -53,155 +54,50 @@ export const authApi = {
 
 export const scheduleApi = {
   getSchedules: async (userId: string) => {
-    try {
-      // 로그인 구현 전까지는 userId를 쿼리 파라미터로 사용
-      const response = await fetch(`${API_BASE_URL}/schedule?userId=${userId}`, {
-        method: 'GET',
-        headers: getCommonHeaders(),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new APIError(
-          errorData.message || '스케줄 목록을 가져오는데 실패했습니다',
-          response.status,
-          errorData
-        );
-      }
-      
-      const data = await response.json();
-      // scheduleId를 id로 매핑하는 기존 로직 유지
-      return data.schedules ? data.schedules.map((s: any) => ({ ...s, id: s.scheduleId })) : [];
-
-    } catch (error) {
-      if (error instanceof APIError) throw error;
-      throw new APIError('네트워크 오류가 발생했습니다', 0, { originalError: error });
-    }
+    // userId는 인터셉터에서 헤더로 전달하므로 파라미터는 사용하지 않음
+    const response = await api.get('/schedule');
+    const data = response.data;
+    // gRPC 응답에 맞게, scheduleId를 id로 매핑
+    return data.schedules ? data.schedules.map((s: any) => ({ ...s, id: s.scheduleId })) : [];
   },
 
-  createSchedule: async (scheduleData: any) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/schedule`, {
-        method: 'POST',
-        headers: getCommonHeaders(),
-        body: JSON.stringify(scheduleData),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new APIError(
-          errorData.message || '스케줄 생성에 실패했습니다',
-          response.status,
-          errorData
-        );
-      }
-      
-      const result = await response.json();
-      // 반환된 scheduleId를 id로 매핑하는 기존 로직 유지
-      return { ...result, id: result.scheduleId };
-
-    } catch (error) {
-      if (error instanceof APIError) throw error;
-      throw new APIError('네트워크 오류가 발생했습니다', 0, { originalError: error });
-    }
+  createSchedule: async (scheduleData: Omit<Schedule, 'id'>) => {
+    const response = await api.post('/schedule', scheduleData);
+    const result = response.data;
+    // gRPC 응답에 맞게, scheduleId를 id로 매핑
+    return { ...result, id: result.scheduleId };
   },
 
-  updateSchedule: async (scheduleData: any) => {
-    try {
-      const { id, ...rest } = scheduleData;
-      const requestBody = {
-        ...rest,
-        scheduleId: id,
-        userId: scheduleData.userId || 'test-user-123', // 임시 userId 유지
-      };
-      
-      const response = await fetch(`${API_BASE_URL}/schedule/${id}`, {
-        method: 'PUT',
-        headers: getCommonHeaders(),
-        body: JSON.stringify(requestBody),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new APIError(
-          errorData.message || '스케줄 수정에 실패했습니다',
-          response.status,
-          errorData
-        );
-      }
-      
-      return response.json();
-
-    } catch (error) {
-      if (error instanceof APIError) throw error;
-      throw new APIError('네트워크 오류가 발생했습니다', 0, { originalError: error });
-    }
+  updateSchedule: async (scheduleData: Schedule) => {
+    const { id, ...rest } = scheduleData;
+    const requestBody = {
+      ...rest,
+      scheduleId: id, // gRPC 요청 본문에 scheduleId 포함
+    };
+    // HTTP REST API의 관례에 따라 URL에 id를 포함
+    const response = await api.put(`/schedule/${id}`, requestBody);
+    return response.data;
   },
 
   deleteSchedule: async (scheduleId: string, userId: string) => {
-    try {
-      // 로그인 구현 전까지는 userId를 쿼리 파라미터로 사용
-      const response = await fetch(`${API_BASE_URL}/schedule/${scheduleId}?userId=${userId}`, {
-        method: 'DELETE',
-        headers: getCommonHeaders(),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new APIError(
-          errorData.message || '스케줄 삭제에 실패했습니다',
-          response.status,
-          errorData
-        );
-      }
-      
-      return response.json();
-
-    } catch (error) {
-      if (error instanceof APIError) throw error;
-      throw new APIError('네트워크 오류가 발생했습니다', 0, { originalError: error });
-    }
+    // userId는 인터셉터에서 헤더로 전달하므로 파라미터는 사용하지 않음
+    const response = await api.delete(`/schedule/${scheduleId}`);
+    return response.data;
   },
 
   processSchedule: async (scheduleId: string, data: any) => {
-    try {
-      const requestBody = {
-        ...data,
-        userId: 'test-user-123', // TODO: 실제 사용자 ID로 교체
-      };
-      const response = await fetch(`${API_BASE_URL}/schedule/${scheduleId}`, {
-        method: 'POST',
-        headers: getCommonHeaders(),
-        body: JSON.stringify(requestBody),
-      });
-      if (!response.ok) {
-        throw new Error('Failed to process schedule');
-      }
-      return response.json();
-    } catch (error) {
-      if (error instanceof APIError) throw error;
-      throw new APIError('네트워크 오류가 발생했습니다', 0, { originalError: error });
-    }
+    const response = await api.post(`/schedule/${scheduleId}`, data);
+    return response.data;
   },
 
   getScheduleDetail: async (scheduleId: string, userId: string) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/schedule/${scheduleId}?userId=${userId}`, { 
-        cache: 'no-store',
-        headers: getCommonHeaders(),
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch schedule detail');
-      }
-      const data = await response.json();
-      if (data.schedule) {
-        data.schedule.id = scheduleId;
-      }
-      return data;
-    } catch (error) {
-      if (error instanceof APIError) throw error;
-      throw new APIError('네트워크 오류가 발생했습니다', 0, { originalError: error });
+    // userId는 인터셉터에서 헤더로 전달하므로 파라미터는 사용하지 않음
+    const response = await api.get(`/schedule/${scheduleId}`);
+    const data = response.data;
+    if (data.schedule) {
+      data.schedule.id = scheduleId;
     }
+    return data;
   },
 };
 
