@@ -99,7 +99,7 @@ jobs:
           SERVICES: ${{ needs.build-pb-image.outputs.changed_services }}
         run: |
           for srv in $SERVICES; do
-            YAML_FILE="argocd/$srv/$srv.yaml"
+            YAML_FILE="argocd/service-$srv/$srv.yaml"
             if [ -f "$YAML_FILE" ]; then
               echo "🔧 패치 중: $YAML_FILE"
 
