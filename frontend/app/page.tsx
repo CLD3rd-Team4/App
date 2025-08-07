@@ -57,7 +57,6 @@ export default function HomePage() {
       // 캐시가 없거나 만료되었으면, 더 이상 선택된 스케줄이 없는 것으로 간주하고 추가 요청 없음
       setIsLoading(false)
     }
-    }
 
     checkLoginAndLoadSchedule();
 
