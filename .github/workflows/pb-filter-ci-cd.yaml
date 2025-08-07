@@ -110,22 +110,22 @@ jobs:
                 if has("initContainers") then
                   .initContainers[] |= (
                     select(.name == "copy-pb") |= (
-                      .image = "'"$IMAGE"'"
+                      .image = env(IMAGE)
                     )
                   )
                 else
                   .initContainers = [{
                     name: "copy-pb",
-                    image: "'"$IMAGE"'",
+                    image: env(IMAGE),
                     command: ["/bin/sh", "-c"],
-                    args: ["cp /data/'"$PB_FILE"' /shared/"],
+                    args: ["cp /data/" + env(PB_FILE) + " /shared/"],
                     volumeMounts: [{
                       name: "pb-volume",
                       mountPath: "/shared"
                     }]
                   }]
                 end
-              ' -i "$YAML_FILE"
+              ' -i "$YAML_FILE" --arg IMAGE "$IMAGE" --arg PB_FILE "$PB_FILE"
             else
               echo "⚠️ 파일 없음: $YAML_FILE"
             fi
