@@ -122,7 +122,7 @@ public class MetricsConfig {
         return Counter.builder("dynamodb_reads_total")
                 .description("Total number of DynamoDB read operations")
                 .tag("service", "review")
-                .tag("table", "reviews")
+                .tag("table", "review")
                 .register(meterRegistry);
     }
 
@@ -131,7 +131,7 @@ public class MetricsConfig {
         return Counter.builder("dynamodb_writes_total")
                 .description("Total number of DynamoDB write operations")
                 .tag("service", "review") 
-                .tag("table", "reviews")
+                .tag("table", "review")
                 .register(meterRegistry);
     }
 

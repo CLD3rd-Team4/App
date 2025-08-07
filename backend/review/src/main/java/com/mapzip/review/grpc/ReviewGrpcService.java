@@ -461,7 +461,10 @@ public class ReviewGrpcService extends ReviewServiceGrpc.ReviewServiceImplBase {
     
     private String getCurrentUserId() {
         // HeaderInterceptor에서 설정한 사용자 ID를 가져오는 로직
-        // 실제 구현에서는 gRPC Context나 ThreadLocal을 사용
-        return "user123"; // 임시 구현
+        String userId = HeaderInterceptor.USER_ID_CONTEXT_KEY.get();
+        if (userId == null || userId.isEmpty()) {
+            throw new SecurityException("사용자 인증이 필요합니다.");
+        }
+        return userId;
     }
 }

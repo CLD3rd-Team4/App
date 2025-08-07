@@ -19,9 +19,9 @@ spring:
       discovery:
         enabled: true
         
-  # Redis 캐싱 설정 (ElastiCache 운영 환경)
+  # Valkey 캐싱 설정 (ElastiCache 운영 환경)
   data:
-    redis:
+    valkey:
       host: ${REDIS_HOST:mapzip-dev-review-cache.2iapp0.ng.0001.apn2.cache.amazonaws.com}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}  # AUTH 비활성화됨
@@ -37,8 +37,8 @@ spring:
           
   # 캐시 설정
   cache:
-    type: redis
-    redis:
+    type: valkey
+    valkey:
       time-to-live: ${CACHE_DEFAULT_TTL:1800000}  # 기본 30분 TTL (밀리초)
       cache-null-values: false
       
@@ -59,7 +59,7 @@ aws:
   
   # DynamoDB 연결 (IRSA 사용으로 자격증명 불필요)
   dynamodb:
-    table-name: ${DYNAMODB_TABLE_NAME:${TERRAFORM_WORKSPACE:dev}-mapzip-reviews}
+    table-name: ${DYNAMODB_TABLE_NAME:mapzip-${TERRAFORM_WORKSPACE:dev}-review}
     endpoint: ${DYNAMODB_ENDPOINT:}
     region: ${AWS_REGION:ap-northeast-2}
     

@@ -6,8 +6,8 @@ spring:
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
 
-# ElastiCache Redis 운영 설정
-redis:
+# ElastiCache Valkey 운영 설정
+valkey:
   host: ${REDIS_HOST}
   port: ${REDIS_PORT:6379}
   password: ${REDIS_PASSWORD:}
@@ -27,7 +27,7 @@ aws:
   
   # DynamoDB 설정 (운영 환경)
   dynamodb:
-    table-name: ${DYNAMODB_TABLE_NAME:mapzip-dev-reviews}
+    table-name: ${DYNAMODB_TABLE_NAME:mapzip-dev-review}
     endpoint: ${DYNAMODB_ENDPOINT:}  # 운영환경에서는 비워둠 (AWS 기본 엔드포인트 사용)
     region: ${AWS_REGION:ap-northeast-2}
   
@@ -82,7 +82,7 @@ management:
       enabled: true
     readinessstate:
       enabled: true
-    redis:
+    valkey:
       enabled: true
 
 # 로깅 설정
@@ -90,5 +90,5 @@ logging:
   level:
     com.mapzip.review: ${LOG_LEVEL:INFO}
     org.springframework.cache: ${LOG_LEVEL:INFO}
-    org.springframework.data.redis: ${LOG_LEVEL:INFO}
+    org.springframework.data.valkey: ${LOG_LEVEL:INFO}
     root: INFO

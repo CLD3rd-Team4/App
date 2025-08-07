@@ -21,7 +21,7 @@ public class PendingReviewRepository {
     private final DynamoDbEnhancedClient enhancedClient;
     
     public PendingReviewRepository(DynamoDbEnhancedClient enhancedClient,
-                                  @Value("${aws.dynamodb.pending-table-name:${aws.dynamodb.table-name:mapzip-dev-reviews}-pending}") String tableName) {
+                                  @Value("${aws.dynamodb.pending-table-name:${aws.dynamodb.table-name:mapzip-dev-review}-pending}") String tableName) {
         this.enhancedClient = enhancedClient;
         this.pendingReviewTable = enhancedClient.table(tableName, 
                 TableSchema.fromBean(PendingReviewEntity.class));
