@@ -1,13 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
-import { useSchedule } from "@/hooks/useSchedule"
 import BottomNavigation from "@/components/common/BottomNavigation"
 import { RefreshCw, Star } from "lucide-react"
-import { scheduleApi } from "@/services/api"
-import type { Restaurant } from "@/types";
+import { recommendApi, scheduleApi } from "@/services/api"
+import type { Restaurant, Schedule } from "@/types";
 
 // 타임라인 아이템 타입을 명시적으로 정의
 type TimelineItem = {
@@ -42,9 +41,41 @@ function RecommendationReadyPopup({ onConfirm }: { onConfirm: () => void }) {
 
 export default function ScheduleSummaryScreen() {
   const router = useRouter()
-  const { selectedSchedule } = useSchedule()
+  const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null)
+  const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false)
   const [showRecommendationPopup, setShowRecommendationPopup] = useState(false)
+
+  useEffect(() => {
+    const fetchSummary = async () => {
+      try {
+        setIsLoading(true);
+        // 서버(recommend 서비스)에 현재 활성화된 스케줄 요약 정보를 직접 요청
+        const response = await recommendApi.getActiveScheduleSummary();
+        if (response && response.schedule && typeof response.schedule === 'object') {
+          const parsedSchedule = response.schedule as any; // Type assertion to avoid type errors
+          const scheduleWithParsedJson = {
+            ...parsedSchedule,
+            departure: typeof parsedSchedule.departure === 'string' ? JSON.parse(parsedSchedule.departure) : parsedSchedule.departure,
+            destination: typeof parsedSchedule.destination === 'string' ? JSON.parse(parsedSchedule.destination) : parsedSchedule.destination,
+            waypoints: typeof parsedSchedule.waypoints === 'string' ? JSON.parse(parsedSchedule.waypoints) : parsedSchedule.waypoints,
+          };
+          setSelectedSchedule(scheduleWithParsedJson as Schedule);
+        } else {
+          // 요약 정보가 없으면 (만료되었거나, 선택한 적이 없으면) 선택 해제 처리
+          handleDeselectSchedule();
+        }
+      } catch (error) {
+        console.error("Failed to fetch active schedule summary", error);
+        // 에러 발생 시에도 안전하게 선택 해제
+        handleDeselectSchedule();
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSummary();
+  }, []);
 
   const handleUpdate = () => {
     if (!selectedSchedule || !selectedSchedule.id) return;
@@ -74,6 +105,14 @@ export default function ScheduleSummaryScreen() {
         setIsUpdating(false);
       }
     );
+  };
+
+  // 사용자가 다른 스케줄을 선택하거나, 요약 정보가 만료되었을 때를 위한 함수
+  const handleDeselectSchedule = () => {
+    localStorage.removeItem('scheduleSelected');
+    // 홈으로 이동하여 HomeScreen 또는 다른 화면을 보여주도록 함
+    router.push('/');
+    router.refresh(); // 페이지를 새로고침하여 상태를 확실히 반영
   };
 
   const handleRecommendationConfirm = () => {
@@ -114,7 +153,7 @@ export default function ScheduleSummaryScreen() {
       if (waypoint) {
         items.push({
           type: "waypoint",
-          time: waypoint.arrivalTime || "", // 수정된 부분
+          time: waypoint.arrivalTime || "",
           title: waypoint.name,
           icon: "경유",
           color: "blue",
@@ -149,7 +188,6 @@ export default function ScheduleSummaryScreen() {
     return items
       .sort((a, b) => {
         if (!a.time || !b.time) return 0
-        // 시간 문자열을 비교 가능한 형태로 변환 (예: "오후 1:30" -> 1330)
         const toComparable = (timeStr: string) => {
             const match = timeStr.match(/(오전|오후)\s*(\d{1,2}):(\d{2})/);
             if (!match) return 0;
@@ -164,6 +202,17 @@ export default function ScheduleSummaryScreen() {
   }
 
   const timelineItems = createTimelineItems()
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">선택한 스케줄을 불러오는 중...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <>
@@ -189,7 +238,7 @@ export default function ScheduleSummaryScreen() {
             <div className="bg-white rounded-lg p-4 shadow-sm">
               {timelineItems.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-gray-600 mb-4">스케줄 정보가 없습니다.</p>
+                  <p className="text-gray-600 mb-4">스케줄 정보가 없습니다. 다시 선택해주세요.</p>
                   <Button
                     onClick={() => router.push("/schedule/")}
                     className="bg-blue-500 hover:bg-blue-600 text-white"
@@ -205,7 +254,7 @@ export default function ScheduleSummaryScreen() {
                       className={`flex items-center gap-3 ${item.type === "restaurant" ? "bg-orange-50 rounded-lg p-3 -mx-3" : ""}`}
                     >
                       <div
-                        className={`w-8 h-8 ${
+                        className={`w-8 h-8 ${ 
                           item.color === "red"
                             ? "bg-red-100"
                             : item.color === "blue"
@@ -216,7 +265,7 @@ export default function ScheduleSummaryScreen() {
                         } rounded-full flex items-center justify-center`}
                       >
                         <span
-                          className={`text-sm font-medium ${
+                          className={`text-sm font-medium ${ 
                             item.color === "orange"
                               ? "text-white"
                               : item.color === "red"
@@ -258,5 +307,4 @@ export default function ScheduleSummaryScreen() {
       {showRecommendationPopup && <RecommendationReadyPopup onConfirm={handleRecommendationConfirm} />}
     </>
   )
-  
 }
