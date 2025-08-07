@@ -53,14 +53,32 @@ export default function ScheduleSummaryScreen() {
         // 서버(recommend 서비스)에 현재 활성화된 스케줄 요약 정보를 직접 요청
         const response = await recommendApi.getActiveScheduleSummary();
         if (response && response.schedule && typeof response.schedule === 'object') {
-          const parsedSchedule = response.schedule as any; // Type assertion to avoid type errors
+          const parsedSchedule = response.schedule as any;
+
+          // 안전하게 JSON 파싱을 시도하는 함수
+          const safeJsonParse = (data: any) => {
+            if (typeof data !== 'string') return data; // 이미 객체이면 그대로 반환
+            try {
+              return JSON.parse(data);
+            } catch (e) {
+              console.error("Failed to parse JSON string:", data, e);
+              return null; // 파싱 실패 시 null 반환
+            }
+          };
+
           const scheduleWithParsedJson = {
             ...parsedSchedule,
-            departure: typeof parsedSchedule.departure === 'string' ? JSON.parse(parsedSchedule.departure) : parsedSchedule.departure,
-            destination: typeof parsedSchedule.destination === 'string' ? JSON.parse(parsedSchedule.destination) : parsedSchedule.destination,
-            waypoints: typeof parsedSchedule.waypoints === 'string' ? JSON.parse(parsedSchedule.waypoints) : parsedSchedule.waypoints,
+            departure: safeJsonParse(parsedSchedule.departure),
+            destination: safeJsonParse(parsedSchedule.destination),
+            waypoints: safeJsonParse(parsedSchedule.waypoints),
           };
-          setSelectedSchedule(scheduleWithParsedJson as Schedule);
+
+          // 파싱 실패로 주요 데이터가 null이 되면 유효하지 않은 데이터로 처리
+          if (!scheduleWithParsedJson.departure || !scheduleWithParsedJson.destination) {
+            handleDeselectSchedule();
+          } else {
+            setSelectedSchedule(scheduleWithParsedJson as Schedule);
+          }
         } else {
           // 요약 정보가 없으면 (만료되었거나, 선택한 적이 없으면) 선택 해제 처리
           handleDeselectSchedule();
