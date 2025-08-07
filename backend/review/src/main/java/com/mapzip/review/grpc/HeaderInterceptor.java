@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory;
 public class HeaderInterceptor implements ServerInterceptor {
 
     private static final Logger logger = LoggerFactory.getLogger(HeaderInterceptor.class);
-    public static final Context.Key<String> USER_ID_CONTEXT_KEY = Context.key("X-User-Id");
+    public static final Context.Key<String> USER_ID_CONTEXT_KEY = Context.key("x-user-id");
 
     @Override
     public <ReqT, RespT> ServerCall.Listener<ReqT> interceptCall(
@@ -18,7 +18,7 @@ public class HeaderInterceptor implements ServerInterceptor {
         String userId = headers.get(Metadata.Key.of("x-user-id", Metadata.ASCII_STRING_MARSHALLER));
         
         if (userId == null || userId.isEmpty()) {
-            logger.warn("No X-User-Id header found in gRPC request. Method: {}", call.getMethodDescriptor().getFullMethodName());
+            logger.warn("No x-user-id header found in gRPC request. Method: {}", call.getMethodDescriptor().getFullMethodName());
         } else {
             logger.debug("Extracted User-Id from header: {} for method: {}", userId, call.getMethodDescriptor().getFullMethodName());
         }

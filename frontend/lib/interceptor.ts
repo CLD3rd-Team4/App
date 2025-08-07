@@ -22,6 +22,21 @@ function subscribeTokenRefresh(
     refreshSubscribers.push({ resolve, reject })
 }
 
+// 요청 인터셉터 - x-user-id 헤더 자동 주입
+api.interceptors.request.use(
+    (config) => {
+        // JWT 토큰에서 사용자 ID 추출 (실제 구현 시 JWT 디코딩 로직으로 교체)
+        const userId = localStorage.getItem('userId') || 'user123'; // 임시 하드코딩
+        
+        if (userId && !config.headers['x-user-id']) {
+            config.headers['x-user-id'] = userId;
+        }
+        
+        return config;
+    },
+    (error) => Promise.reject(error)
+);
+
 function onTokenRefreshed() {
     refreshSubscribers.forEach(({ resolve }) => resolve())
     refreshSubscribers = []
