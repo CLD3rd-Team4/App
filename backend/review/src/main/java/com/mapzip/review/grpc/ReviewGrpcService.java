@@ -3,6 +3,7 @@ package com.mapzip.review.grpc;
 import com.google.protobuf.ByteString;
 import com.mapzip.review.dto.OcrResultDto;
 import com.mapzip.review.entity.ReviewEntity;
+import com.mapzip.review.entity.PendingReviewEntity;
 import com.mapzip.review.service.ReviewService;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -57,7 +58,8 @@ public class ReviewGrpcService extends ReviewServiceGrpc.ReviewServiceImplBase {
                     request.getRating(),
                     request.getContent(),
                     receiptImages,
-                    reviewImages
+                    reviewImages,
+                    request.getVisitDate()
             );
             
             // 응답 생성
@@ -336,5 +338,133 @@ public class ReviewGrpcService extends ReviewServiceGrpc.ReviewServiceImplBase {
             logger.error("Error getting reviews for recommendation", e);
             responseObserver.onError(e);
         }
+    }
+
+    @Override
+    public void storePlacesForReview(ReviewProto.StorePlacesForReviewRequest request,
+                                   StreamObserver<ReviewProto.StorePlacesForReviewResponse> responseObserver) {
+        try {
+            logger.info("Storing places for review - User ID: {}, Places count: {}", 
+                       request.getUserId(), request.getPlacesCount());
+            
+            // ReviewService에서 미작성 리뷰로 저장
+            boolean success = reviewService.savePendingReviews(request.getUserId(), request.getPlacesList());
+            
+            if (success) {
+                ReviewProto.StorePlacesForReviewResponse response = 
+                        ReviewProto.StorePlacesForReviewResponse.newBuilder()
+                                .setStatus("SUCCESS")
+                                .setMessage("Places stored successfully as pending reviews")
+                                .setSuccess(true)
+                                .build();
+                
+                responseObserver.onNext(response);
+                responseObserver.onCompleted();
+            } else {
+                ReviewProto.StorePlacesForReviewResponse errorResponse = 
+                        ReviewProto.StorePlacesForReviewResponse.newBuilder()
+                                .setStatus("ERROR")
+                                .setMessage("Failed to store places as pending reviews")
+                                .setSuccess(false)
+                                .build();
+                
+                responseObserver.onNext(errorResponse);
+                responseObserver.onCompleted();
+            }
+            
+        } catch (Exception e) {
+            logger.error("Error storing places for review", e);
+            
+            ReviewProto.StorePlacesForReviewResponse errorResponse = 
+                    ReviewProto.StorePlacesForReviewResponse.newBuilder()
+                            .setStatus("ERROR")
+                            .setMessage("Failed to store places: " + e.getMessage())
+                            .setSuccess(false)
+                            .build();
+            
+            responseObserver.onNext(errorResponse);
+            responseObserver.onCompleted();
+        }
+    }
+
+    @Override
+    public void getPlacesForReview(ReviewProto.GetPlacesForReviewRequest request,
+                                 StreamObserver<ReviewProto.GetPlacesForReviewResponse> responseObserver) {
+        try {
+            // 헤더에서 사용자 ID 추출 (HeaderInterceptor 구현 필요)
+            String userId = getCurrentUserId();
+            
+            logger.info("Getting places for review - User ID: {}", userId);
+            
+            // ReviewService에서 미작성 리뷰 목록 조회
+            List<PendingReviewEntity> pendingReviews = reviewService.getPendingReviewsByUserId(userId);
+            
+            // PendingReviewEntity를 ReviewPlaceInfo로 변환
+            List<ReviewProto.ReviewPlaceInfo> places = pendingReviews.stream()
+                    .map(pending -> ReviewProto.ReviewPlaceInfo.newBuilder()
+                            .setId(pending.getRestaurantId())
+                            .setPlaceName(pending.getPlaceName())
+                            .setAddressName(pending.getAddressName())
+                            .setPlaceUrl(pending.getPlaceUrl() != null ? pending.getPlaceUrl() : "")
+                            .setScheduledTime(pending.getScheduledTime())
+                            .build())
+                    .collect(Collectors.toList());
+            
+            ReviewProto.GetPlacesForReviewResponse response = 
+                    ReviewProto.GetPlacesForReviewResponse.newBuilder()
+                            .addAllPlaces(places)
+                            .setStatus("SUCCESS")
+                            .setMessage("Pending reviews retrieved successfully")
+                            .build();
+            
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+            
+        } catch (Exception e) {
+            logger.error("Error getting places for review", e);
+            
+            ReviewProto.GetPlacesForReviewResponse errorResponse = 
+                    ReviewProto.GetPlacesForReviewResponse.newBuilder()
+                            .setStatus("ERROR")
+                            .setMessage("Failed to get places: " + e.getMessage())
+                            .build();
+            
+            responseObserver.onNext(errorResponse);
+            responseObserver.onCompleted();
+        }
+    }
+
+    @Override
+    public void getReviewSummaryForRecommendation(ReviewProto.GetReviewSummaryRequest request,
+                                                StreamObserver<ReviewProto.GetReviewSummaryResponse> responseObserver) {
+        try {
+            logger.info("Getting review summary for recommendation - Restaurant IDs: {}", 
+                       request.getRestaurantIdsList());
+            
+            // ReviewService에서 리뷰 요약 데이터 조회
+            List<ReviewProto.RestaurantReviewSummary> summaries = 
+                    reviewService.getReviewSummaryForRecommendation(request.getRestaurantIdsList());
+            
+            ReviewProto.GetReviewSummaryResponse response = 
+                    ReviewProto.GetReviewSummaryResponse.newBuilder()
+                            .addAllSummaries(summaries)
+                            .build();
+            
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+            
+        } catch (Exception e) {
+            logger.error("Error getting review summary for recommendation", e);
+            responseObserver.onError(e);
+        }
+    }
+    
+    private String getCurrentUserId() {
+        // HeaderInterceptor에서 설정한 사용자 ID를 가져오는 로직
+        String userId = HeaderInterceptor.USER_ID_CONTEXT_KEY.get();
+        if (userId == null || userId.isEmpty()) {
+            throw new SecurityException("사용자 인증이 필요합니다.");
+        }
+        return userId;
     }
 }

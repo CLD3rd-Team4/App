@@ -5,6 +5,7 @@ const api = axios.create({
     withCredentials: true,
 })
 
+
 let isRefreshing = false
 
 type Subscriber = {
@@ -82,6 +83,11 @@ api.interceptors.response.use(
         if (status === 401 && data?.error === "TOKEN_INVALID") {
             alert("인증되지 않은 사용자입니다. 로그인해주세요.")
             window.location.href = "/login.html"
+            return Promise.reject(error)
+        }
+
+        // Review 서버 관련 에러는 컴포넌트에서 처리하도록 그대로 전달
+        if (config.url?.includes('/review/')) {
             return Promise.reject(error)
         }
 

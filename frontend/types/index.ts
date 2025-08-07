@@ -53,12 +53,20 @@ export interface Restaurant {
 
 export interface VisitedRestaurant {
   id: string
+  restaurantId: string       // 백엔드 PendingReviewEntity에 맞춤
   name: string
-  address?: string           // 누락된 필드 추가
-  visitDate: string
+  placeName: string          // 백엔드에서 사용하는 필드명
+  address?: string
+  addressName?: string       // 백엔드에서 사용하는 필드명
+  visitDate?: string
+  scheduledTime?: string     // 미작성 리뷰 시간
   rating?: number
   review?: string
   image?: string
+  placeUrl?: string          // 백엔드에서 사용하는 필드
+  isCompleted?: boolean      // 작성 완료 여부
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface OCRResult {
@@ -81,6 +89,8 @@ export interface CreateReviewRequest {
   receiptImages?: string[]   // Data URL 형태
   reviewImages?: string[]    // Data URL 형태
   ocrData?: OCRResult
+  scheduledTime?: string     // 미작성 리뷰 완료 처리용
+  visitDate?: string         // 방문 날짜 (OCR 날짜 검증용)
 }
 
 export interface CreateReviewResponse {

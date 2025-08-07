@@ -1,7 +1,9 @@
 package com.mapzip.review.controller;
 
 import com.mapzip.review.dto.OcrResultDto;
+import com.mapzip.review.entity.PendingReviewEntity;
 import com.mapzip.review.service.ReviewService;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,17 +18,19 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/reviews")
+@RequestMapping("/review")
 @CrossOrigin(origins = {"https://www.mapzip.shop", "https://mapzip.shop"})
 public class ReviewController {
     
     private static final Logger logger = LoggerFactory.getLogger(ReviewController.class);
     
     private final ReviewService reviewService;
+    private final RedisTemplate<String, Object> redisTemplate;
     
     @Autowired
-    public ReviewController(ReviewService reviewService) {
+    public ReviewController(ReviewService reviewService, RedisTemplate<String, Object> redisTemplate) {
         this.reviewService = reviewService;
+        this.redisTemplate = redisTemplate;
     }
     
     /**
@@ -79,7 +83,9 @@ public class ReviewController {
             @RequestParam("rating") int rating,
             @RequestParam("content") String content,
             @RequestParam(value = "receiptImages", required = false) List<MultipartFile> receiptImages,
-            @RequestParam(value = "reviewImages", required = false) List<MultipartFile> reviewImages) {
+            @RequestParam(value = "reviewImages", required = false) List<MultipartFile> reviewImages,
+            @RequestParam(value = "scheduledTime", required = false) String scheduledTime,
+            @RequestParam(value = "visitDate", required = false) String visitDate) {
         
         try {
             logger.info("Creating review for user: {}, restaurant: {}", userId, restaurantId);
@@ -104,10 +110,20 @@ public class ReviewController {
                 }
             }
             
-            // 리뷰 생성
+            // 리뷰 생성 (방문 날짜 포함)
             ReviewService.ReviewCreateResult result = reviewService.createReview(
                 userId, restaurantId, restaurantName, restaurantAddress, 
-                rating, content, receiptImageBytes, reviewImageBytes);
+                rating, content, receiptImageBytes, reviewImageBytes, visitDate);
+            
+            // 리뷰 작성 성공 시 관련 미작성 리뷰를 완료 처리
+            if (result.isSuccess() && scheduledTime != null) {
+                try {
+                    reviewService.markPendingReviewAsCompleted(userId, restaurantId, scheduledTime);
+                    logger.info("Marked pending review as completed for user: {}, restaurant: {}", userId, restaurantId);
+                } catch (Exception e) {
+                    logger.warn("Failed to mark pending review as completed, but review was created successfully", e);
+                }
+            }
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", result.isSuccess());
@@ -124,11 +140,126 @@ public class ReviewController {
         }
     }
     
+    // === 미작성 리뷰 관리 API ===
+    
     /**
-     * 헬스 체크 API
+     * 사용자의 미작성 리뷰 목록 조회
+     */
+    @GetMapping("/pending")
+    public ResponseEntity<Map<String, Object>> getPendingReviews(
+            @RequestHeader("x-user-id") String userId) {
+        try {
+            logger.info("Getting pending reviews for user: {}", userId);
+            
+            List<PendingReviewEntity> pendingReviews = reviewService.getPendingReviewsByUserId(userId);
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "data", pendingReviews,
+                "count", pendingReviews.size()
+            ));
+            
+        } catch (Exception e) {
+            logger.error("Error getting pending reviews for user: {}", userId, e);
+            return ResponseEntity.internalServerError()
+                .body(Map.of("success", false, "message", "미작성 리뷰 목록 조회 실패"));
+        }
+    }
+    
+    /**
+     * 미작성 리뷰 삭제 (사용자가 안간 경우)
+     */
+    @DeleteMapping("/pending/{restaurantId}")
+    public ResponseEntity<Map<String, Object>> deletePendingReview(
+            @RequestHeader("x-user-id") String userId,
+            @PathVariable String restaurantId,
+            @RequestParam String scheduledTime) {
+        try {
+            logger.info("Deleting pending review for user: {}, restaurant: {}", userId, restaurantId);
+            
+            boolean success = reviewService.deletePendingReview(userId, scheduledTime, restaurantId);
+            
+            if (success) {
+                return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "미작성 리뷰가 삭제되었습니다."
+                ));
+            } else {
+                return ResponseEntity.notFound().build();
+            }
+            
+        } catch (Exception e) {
+            logger.error("Error deleting pending review", e);
+            return ResponseEntity.internalServerError()
+                .body(Map.of("success", false, "message", "미작성 리뷰 삭제 실패"));
+        }
+    }
+    
+    /**
+     * 특정 미작성 리뷰 상세 조회
+     */
+    @GetMapping("/pending/{restaurantId}")
+    public ResponseEntity<Map<String, Object>> getPendingReviewDetail(
+            @RequestHeader("x-user-id") String userId,
+            @PathVariable String restaurantId,
+            @RequestParam String scheduledTime) {
+        try {
+            logger.info("Getting pending review detail for user: {}, restaurant: {}", userId, restaurantId);
+            
+            var pendingReview = reviewService.getPendingReviewDetail(userId, scheduledTime, restaurantId);
+            
+            if (pendingReview.isPresent()) {
+                return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "data", pendingReview.get()
+                ));
+            } else {
+                return ResponseEntity.notFound().build();
+            }
+            
+        } catch (Exception e) {
+            logger.error("Error getting pending review detail", e);
+            return ResponseEntity.internalServerError()
+                .body(Map.of("success", false, "message", "미작성 리뷰 조회 실패"));
+        }
+    }
+    
+    /**
+     * 헬스 체크 API (서비스 및 레디스 상태 확인)
      */
     @GetMapping("/health")
-    public ResponseEntity<Map<String, String>> health() {
-        return ResponseEntity.ok(Map.of("status", "UP", "service", "review-service"));
+    public ResponseEntity<Map<String, Object>> health() {
+        Map<String, Object> health = new HashMap<>();
+        health.put("service", "review-service");
+        health.put("timestamp", System.currentTimeMillis());
+        
+        // Redis 연결 상태 확인
+        try {
+            redisTemplate.opsForValue().set("health-check", "OK", java.time.Duration.ofSeconds(10));
+            String result = (String) redisTemplate.opsForValue().get("health-check");
+            
+            if ("OK".equals(result)) {
+                health.put("status", "UP");
+                health.put("redis", Map.of(
+                    "status", "UP", 
+                    "connection", "ElastiCache connected successfully"
+                ));
+            } else {
+                health.put("status", "PARTIAL");
+                health.put("redis", Map.of(
+                    "status", "DOWN", 
+                    "connection", "Redis read/write test failed"
+                ));
+            }
+        } catch (Exception e) {
+            logger.error("레디스 연결 확인 실패", e);
+            health.put("status", "PARTIAL");
+            health.put("redis", Map.of(
+                "status", "DOWN", 
+                "connection", "Redis connection failed: " + e.getMessage()
+            ));
+        }
+        
+        return ResponseEntity.ok(health);
     }
 }

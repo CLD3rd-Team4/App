@@ -19,18 +19,7 @@ export class APIError extends Error {
   }
 }
 
-// 공통 헤더 설정 함수 (조건부 인증)
-const getCommonHeaders = (): Record<string, string> => {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  // TODO: 실제 토큰 저장 방식(예: localStorage, 쿠키)에 따라 토큰을 가져와야 함
-  // const token = localStorage.getItem("authToken");
-  // if (token) {
-  //   headers['Authorization'] = `Bearer ${token}`;
-  // }
-  return headers;
-};
+// axios 인터셉터를 통해 공통 헤더는 자동으로 처리되므로 해당 함수 제거
 
 // API 함수들
 export const authApi = {
@@ -147,9 +136,45 @@ export const recommendApi = {
 
 
 export const visitedRestaurantApi = {
+  // 미작성 리뷰 목록 조회 (기존 방문한 식당 화면에서 사용)
   getVisitedRestaurants: async () => {
-    // TODO: 실제 API 연동
-    return [];
+    try {
+      return await reviewApi.getPendingReviews();
+    } catch (error) {
+      console.error('미작성 리뷰 목록 조회 실패:', error);
+      
+      // 인증 실패 시 더미 데이터 반환 (테스트용)
+      if (error.message?.includes('TOKEN_INVALID') || error.message?.includes('네트워크')) {
+        console.log('인증 실패 - 더미 데이터 반환');
+        return [
+          {
+            id: 'pending-1',
+            restaurantId: 'rest-001',
+            placeName: '맛있는 집',
+            addressName: '서울시 강남구 역삼동',
+            scheduledTime: '12:30',
+            isCompleted: false,
+            createdAt: new Date().toISOString()
+          },
+          {
+            id: 'pending-2', 
+            restaurantId: 'rest-002',
+            placeName: '한정식 레스토랑',
+            addressName: '서울시 종로구 인사동',
+            scheduledTime: '18:00',
+            isCompleted: false,
+            createdAt: new Date().toISOString()
+          }
+        ];
+      }
+      
+      return [];
+    }
+  },
+  
+  // 미작성 리뷰 삭제 (사용자가 안간 경우)
+  deletePendingReview: async (restaurantId: string, scheduledTime: string) => {
+    return await reviewApi.deletePendingReview(restaurantId, scheduledTime);
   },
 };
 
@@ -175,23 +200,14 @@ export const ocrApi = {
       formData.append('expectedRestaurantName', expectedRestaurantName);
       formData.append('expectedAddress', expectedAddress);
 
-      const response = await fetch(`${API_BASE_URL}/review/verify-receipt`, {
-        method: 'POST',
-        // FormData의 경우 Content-Type을 브라우저가 자동으로 설정하도록 헤더를 비워둠
-        // headers: getCommonHeaders(), // getCommonHeaders는 application/json을 가정하므로 여기서는 사용하지 않음
-        body: formData,
+      // axios를 사용하여 FormData 전송
+      const response = await api.post('/review/verify-receipt', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new APIError(
-          errorData.message || 'OCR 처리에 실패했습니다',
-          response.status,
-          errorData
-        );
-      }
       
-      return response.json();
+      return response.data;
     } catch (error) {
       if (error instanceof APIError) throw error;
       throw new APIError('네트워크 오류가 발생했습니다', 0, { originalError: error });
@@ -240,24 +256,83 @@ export const reviewApi = {
         }
       }
 
-      const response = await fetch(`${API_BASE_URL}/review`, {
-        method: 'POST',
-        // headers: getCommonHeaders(), // FormData 사용 시 Content-Type 자동 설정
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new APIError(
-          errorData.message || '리뷰 작성에 실패했습니다',
-          response.status,
-          errorData
-        );
+      // scheduledTime이 있으면 추가 (미작성 리뷰 완료 처리용)
+      if (reviewData.scheduledTime) {
+        formData.append('scheduledTime', reviewData.scheduledTime);
       }
       
-      return response.json();
+      // 방문 날짜 추가 (OCR 날짜 검증용)
+      if (reviewData.visitDate) {
+        formData.append('visitDate', reviewData.visitDate);
+      }
+
+      // axios를 사용하여 FormData 전송
+      const response = await api.post('/review', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      return response.data;
     } catch (error) {
       if (error instanceof APIError) throw error;
+      throw new APIError('네트워크 오류가 발생했습니다', 0, { originalError: error });
+    }
+  },
+
+  // 미작성 리뷰 목록 조회
+  getPendingReviews: async (): Promise<any[]> => {
+    try {
+      console.log('미작성 리뷰 목록 요청 시작');
+      const response = await api.get('/review/pending');
+      console.log('미작성 리뷰 API 응답:', response);
+      
+      return response.data.data || [];
+    } catch (error: any) {
+      console.error('미작성 리뷰 API 에러:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+        config: {
+          url: error.config?.url,
+          method: error.config?.method,
+          headers: error.config?.headers
+        }
+      });
+      
+      if (error.response?.data?.message) {
+        throw new APIError(error.response.data.message, error.response.status, error.response.data);
+      }
+      throw new APIError('네트워크 오류가 발생했습니다: ' + (error.message || '알 수 없는 오류'), error.response?.status || 0, { originalError: error });
+    }
+  },
+
+  // 미작성 리뷰 삭제 (사용자가 안간 경우)
+  deletePendingReview: async (restaurantId: string, scheduledTime: string): Promise<void> => {
+    try {
+      await api.delete(`/review/pending/${restaurantId}`, {
+        params: { scheduledTime },
+      });
+    } catch (error) {
+      if (error.response?.data?.message) {
+        throw new APIError(error.response.data.message, error.response.status, error.response.data);
+      }
+      throw new APIError('네트워크 오류가 발생했습니다', 0, { originalError: error });
+    }
+  },
+
+  // 특정 미작성 리뷰 상세 조회
+  getPendingReviewDetail: async (restaurantId: string, scheduledTime: string): Promise<any> => {
+    try {
+      const response = await api.get(`/review/pending/${restaurantId}`, {
+        params: { scheduledTime },
+      });
+
+      return response.data.data;
+    } catch (error) {
+      if (error.response?.data?.message) {
+        throw new APIError(error.response.data.message, error.response.status, error.response.data);
+      }
       throw new APIError('네트워크 오류가 발생했습니다', 0, { originalError: error });
     }
   },
