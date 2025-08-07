@@ -6,15 +6,12 @@ import HomeScreen from "@/components/screens/HomeScreen"
 import ScheduleSummaryScreen from "@/components/screens/ScheduleSummaryScreen"
 import PWAInstaller from "@/components/PWAInstaller"
 import { useAuth } from "@/hooks/useAuth"
-import { useSchedule } from "@/hooks/useSchedule"
-import { useRouter } from "next/navigation"
 
 export default function HomePage() {
-  const { isAuthenticated, user } = useAuth()
-  const { selectedSchedule } = useSchedule()
+  const { isAuthenticated } = useAuth()
   const [isLoading, setIsLoading] = useState(true)
   const [isClient, setIsClient] = useState(false)
-  const router = useRouter()
+  const [scheduleSelected, setScheduleSelected] = useState(false)
 
   useEffect(() => {
     setIsClient(true)
@@ -23,16 +20,20 @@ export default function HomePage() {
   useEffect(() => {
     if (!isClient) return
 
-    // 로그인 상태 체크
-    const isLoggedIn = localStorage.getItem("isLoggedIn")
-    if (!isLoggedIn) {
-      router.push("/login/")
-      return
+    const checkLoginAndSchedule = () => {
+      const isLoggedIn = localStorage.getItem("isLoggedIn")
+      if (!isLoggedIn) {
+        setIsLoading(false)
+        return
+      }
+
+      const isSelected = localStorage.getItem('scheduleSelected') === 'true';
+      setScheduleSelected(isSelected);
+      setIsLoading(false)
     }
 
-    // 앱 초기화
-    setIsLoading(false)
-  }, [isClient, router])
+    checkLoginAndSchedule()
+  }, [isClient, isAuthenticated])
 
   if (!isClient || isLoading) {
     return (
@@ -47,10 +48,14 @@ export default function HomePage() {
 
   return (
     <>
-      {!isAuthenticated ? <LoginScreen /> : selectedSchedule ? <ScheduleSummaryScreen /> : <HomeScreen />}
+      {!isAuthenticated ? (
+        <LoginScreen />
+      ) : scheduleSelected ? (
+        <ScheduleSummaryScreen />
+      ) : (
+        <HomeScreen />
+      )}
       <PWAInstaller />
-
-      
     </>
   )
 }

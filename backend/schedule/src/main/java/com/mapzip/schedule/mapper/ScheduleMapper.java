@@ -48,7 +48,7 @@ public class ScheduleMapper {
         schedule.setUserId(request.getUserId());
         schedule.setTitle(request.getTitle());
         schedule.setDepartureTime(request.getDepartureTime());
-        schedule.setUserNote(request.getUserNote());
+        
         schedule.setPurpose(request.getPurpose());
 
         schedule.setDepartureLocation(gson.toJson(request.getDeparture()));
@@ -66,7 +66,7 @@ public class ScheduleMapper {
     public void updateEntity(Schedule schedule, UpdateScheduleRequest request) throws JsonProcessingException {
         schedule.setTitle(request.getTitle());
         schedule.setDepartureTime(request.getDepartureTime());
-        schedule.setUserNote(request.getUserNote());
+        
         schedule.setPurpose(request.getPurpose());
 
         schedule.setDepartureLocation(gson.toJson(request.getDeparture()));
@@ -122,13 +122,10 @@ public class ScheduleMapper {
         GetScheduleDetailResponse.ScheduleDetail.Builder builder = GetScheduleDetailResponse.ScheduleDetail.newBuilder()
                 .setTitle(schedule.getTitle())
                 .setDepartureTime(schedule.getDepartureTime())
-                .setCalculatedArrivalTime(schedule.getCalculatedArrivalTime() != null ? schedule.getCalculatedArrivalTime() : "")
                 .setDeparture(departure)
                 .setDestination(destination)
                 .addAllWaypoints(waypoints)
                 .addAllMealSlots(mealTimeSlots)
-                
-                .setUserNote(schedule.getUserNote() != null ? schedule.getUserNote() : "")
                 .setPurpose(schedule.getPurpose() != null ? schedule.getPurpose() : "");
 
         if (companions != null) {

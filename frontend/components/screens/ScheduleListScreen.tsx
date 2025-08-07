@@ -3,19 +3,17 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
-import { useSchedule } from "@/hooks/useSchedule"
-import { scheduleApi } from "@/services/api"
+import { scheduleApi, recommendApi } from "@/services/api"
 import BottomNavigation from "@/components/common/BottomNavigation"
 import { Plus } from "lucide-react"
 import type { Schedule } from "@/types"
-import api from "@/lib/interceptor" 
 
 export default function ScheduleListScreen() {
   const router = useRouter()
-  const { schedules, selectSchedule, loadSchedules, deleteSchedule } = useSchedule()
+  const [schedules, setSchedules] = useState<Schedule[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isClient, setIsClient] = useState(false)
-  const [isProcessing, setIsProcessing] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState<string | null>(null)
 
   useEffect(() => {
     setIsClient(true)
@@ -27,11 +25,11 @@ export default function ScheduleListScreen() {
     }
   }, [isClient])
 
-
   const loadScheduleList = async () => {
     try {
       setIsLoading(true)
-      await loadSchedules("test-user-123")
+      const data = await scheduleApi.getSchedules("test-user-123")
+      setSchedules(data)
     } catch (error) {
       console.error("스케줄 목록 로드 실패:", error)
     } finally {
@@ -41,54 +39,44 @@ export default function ScheduleListScreen() {
 
   const handleScheduleSelect = async (schedule: Schedule) => {
     if (!schedule || !schedule.id) {
-      console.error("Invalid schedule or schedule ID");
-      alert("유효하지 않은 스케줄입니다.");
-      return;
+      console.error("Invalid schedule or schedule ID")
+      alert("유효하지 않은 스케줄입니다.")
+      return
     }
     
-    setIsProcessing(schedule.id);
+    setIsProcessing(schedule.id)
 
     try {
-      const response = await scheduleApi.processSchedule(schedule.id, { type: 'SELECT' });
-
-      if (response && response.schedule) {
-        // 백엔드에서 받은 상세 스케줄 정보에 프론트엔드에서 사용하는 id를 추가합니다.
-        const updatedSchedule = {
-          ...response.schedule,
-          id: schedule.id, 
-        };
-        
-        selectSchedule(updatedSchedule as Schedule);
-        router.push('/');
-      } else {
-        throw new Error("서버에서 스케줄 정보를 받아오지 못했습니다.");
-      }
-
+      await recommendApi.selectAndGetSummary(schedule.id)
+      localStorage.setItem('scheduleSelected', 'true');
+      router.push('/')
     } catch (error) {
-      console.error("스케줄 처리 실패:", error);
-      alert('스케줄 처리에 실패했습니다. 잠시 후 다시 시도해주세요.');
+      console.error("스케줄 처리 실패:", error)
+      alert('스케줄 처리에 실패했습니다. 잠시 후 다시 시도해주세요.')
     } finally {
-      setIsProcessing(null);
+      setIsProcessing(null)
     }
-  };
+  }
 
   const handleScheduleEdit = (schedule: Schedule) => {
     if (!schedule || !schedule.id) {
-      console.error("Invalid schedule or schedule ID");
-      alert("유효하지 않은 스케줄입니다.");
-      return;
+      console.error("Invalid schedule or schedule ID")
+      alert("유효하지 않은 스케줄입니다.")
+      return
     }
+    localStorage.setItem('editingSchedule', JSON.stringify(schedule));
     router.push(`/schedule/edit?id=${schedule.id}`)
   }
 
   const handleScheduleDelete = async (scheduleId: string) => {
     if (!scheduleId) {
-      console.error("Invalid schedule ID");
-      alert("유효하지 않은 스케줄 ID입니다.");
-      return;
+      console.error("Invalid schedule ID")
+      alert("유효하지 않은 스케줄 ID입니다.")
+      return
     }
     try {
-      await deleteSchedule(scheduleId, "test-user-123")
+      await scheduleApi.deleteSchedule(scheduleId, "test-user-123")
+      setSchedules(schedules.filter((schedule) => schedule.id !== scheduleId))
     } catch (error) {
       console.error("스케줄 삭제 실패:", error)
     }
