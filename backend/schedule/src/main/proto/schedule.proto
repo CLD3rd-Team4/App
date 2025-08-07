@@ -97,9 +97,8 @@ message CreateScheduleRequest {
   Location departure = 5;
   repeated Waypoint waypoints = 6;
   Location destination = 7;
-  string userNote = 8;
-  string purpose = 9;
-  repeated string companions = 10;
+  string purpose = 8;
+  repeated string companions = 9;
 }
 
 message CreateScheduleResponse {
@@ -136,14 +135,12 @@ message GetScheduleDetailResponse {
     string userId = 12;     // userId 추가
     string title = 1;
     string departureTime = 2;
-    string calculatedArrivalTime = 3; // recommend-service가 계산 후 채워줄 필드
     repeated MealTimeSlot mealSlots = 4;
     Location departure = 5;
     repeated Waypoint waypoints = 6;
     Location destination = 7;
-    string userNote = 8;
-    string purpose = 9;
-    repeated string companions = 10;
+    string purpose = 8;
+    repeated string companions = 9;
   }
   ScheduleDetail schedule = 1;
 }
@@ -158,9 +155,8 @@ message UpdateScheduleRequest {
   Location departure = 6;
   repeated Waypoint waypoints = 7;
   Location destination = 8;
-  string userNote = 9;
-  string purpose = 10;
-  repeated string companions = 11;
+  string purpose = 9;
+  repeated string companions = 10;
 }
 
 // 3.5 스케줄 삭제
