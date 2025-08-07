@@ -58,7 +58,8 @@ public class ReviewGrpcService extends ReviewServiceGrpc.ReviewServiceImplBase {
                     request.getRating(),
                     request.getContent(),
                     receiptImages,
-                    reviewImages
+                    reviewImages,
+                    request.getVisitDate()
             );
             
             // 응답 생성

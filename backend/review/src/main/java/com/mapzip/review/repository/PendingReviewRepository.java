@@ -3,6 +3,7 @@ package com.mapzip.review.repository;
 import com.mapzip.review.entity.PendingReviewEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 import software.amazon.awssdk.enhanced.dynamodb.*;
 import software.amazon.awssdk.enhanced.dynamodb.model.*;
@@ -19,10 +20,12 @@ public class PendingReviewRepository {
     private final DynamoDbTable<PendingReviewEntity> pendingReviewTable;
     private final DynamoDbEnhancedClient enhancedClient;
     
-    public PendingReviewRepository(DynamoDbEnhancedClient enhancedClient) {
+    public PendingReviewRepository(DynamoDbEnhancedClient enhancedClient,
+                                  @Value("${aws.dynamodb.pending-table-name:${aws.dynamodb.table-name:mapzip-dev-reviews}-pending}") String tableName) {
         this.enhancedClient = enhancedClient;
-        this.pendingReviewTable = enhancedClient.table("PendingReviews", 
+        this.pendingReviewTable = enhancedClient.table(tableName, 
                 TableSchema.fromBean(PendingReviewEntity.class));
+        logger.info("PendingReviewRepository initialized with table: {}", tableName);
     }
     
     /**

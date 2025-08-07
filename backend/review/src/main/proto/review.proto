@@ -114,6 +114,7 @@ message CreateReviewRequest {
     string content = 5;
     repeated bytes receipt_images = 6; // OCR용 영수증 이미지
     repeated bytes review_images = 7; // 리뷰 이미지 (최대 3개)
+    string visit_date = 8; // 방문 날짜 (yyyy-MM-dd format)
 }
 
 message CreateReviewResponse {

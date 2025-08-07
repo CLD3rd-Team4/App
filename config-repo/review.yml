@@ -65,10 +65,10 @@ aws:
     
   # S3 설정 (IRSA 사용으로 자격증명 불필요)
   s3:
-    bucket-name: mapzip-${TERRAFORM_WORKSPACE:dev}-image
+    bucket-name: ${S3_BUCKET_NAME:mapzip-${TERRAFORM_WORKSPACE:dev}-image}  # 실제 S3 버킷 이름 (terraform main.tf 참조)
     region: ${AWS_REGION:ap-northeast-2}
     presign-duration: ${S3_PRESIGN_DURATION:PT1H}  # Pre-signed URL 유효시간 (1시간)
-    cloudfront-domain: ${CLOUDFRONT_IMAGE_DOMAIN:https://img.mapzip.shop}  # CloudFront 이미지 도메인
+    cloudfront-domain: ${CLOUDFRONT_IMAGE_DOMAIN:https://img.mapzip.shop}  # CloudFront 배포 도메인 (terraform main.tf line 213 참조)
     
   # MSK Kafka 설정 (main 클러스터) - 환경변수 필수
   kafka:

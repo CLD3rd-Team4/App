@@ -21,6 +21,23 @@ redis:
       max-idle: ${REDIS_POOL_MAX_IDLE:16}
       min-idle: ${REDIS_POOL_MIN_IDLE:4}
 
+# AWS 서비스 운영 설정
+aws:
+  region: ${AWS_REGION:ap-northeast-2}
+  
+  # DynamoDB 설정 (운영 환경)
+  dynamodb:
+    table-name: ${DYNAMODB_TABLE_NAME:mapzip-dev-reviews}
+    endpoint: ${DYNAMODB_ENDPOINT:}  # 운영환경에서는 비워둠 (AWS 기본 엔드포인트 사용)
+    region: ${AWS_REGION:ap-northeast-2}
+  
+  # S3 설정 (운영 환경)
+  s3:
+    bucket-name: ${S3_BUCKET_NAME:mapzip-dev-image}  # terraform으로 생성되는 실제 버킷명
+    region: ${AWS_REGION:ap-northeast-2}
+    cloudfront-domain: ${CLOUDFRONT_IMAGE_DOMAIN:https://img.mapzip.shop}  # terraform에서 설정된 CloudFront 도메인
+    presign-duration: ${S3_PRESIGN_DURATION:PT1H}
+
 # 리뷰 서비스 캐시 TTL 설정
 review:
   cache:
@@ -29,6 +46,14 @@ review:
     review-stats-ttl: ${CACHE_REVIEW_STATS_TTL:43200}
     ocr-results-ttl: ${CACHE_OCR_RESULTS_TTL:172800}
     recommendation-ttl: ${CACHE_RECOMMENDATION_TTL:21600}
+
+# gRPC 서버 설정
+grpc:
+  server:
+    port: ${GRPC_SERVER_PORT:50051}
+  client:
+    GLOBAL:
+      negotiation-type: plaintext
 
 # Actuator 설정 (헬스체크 + 모니터링)
 management:
