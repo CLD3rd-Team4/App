@@ -7,7 +7,9 @@ import ScheduleSummaryScreen from "@/components/screens/ScheduleSummaryScreen"
 import PWAInstaller from "@/components/PWAInstaller"
 import { useAuth } from "@/hooks/useAuth"
 import { useSchedule } from "@/hooks/useSchedule"
+import { recommendApi } from "@/services/api";
 import { useRouter } from "next/navigation"
+import type { Schedule } from "@/types"
 
 export default function HomePage() {
   const { isAuthenticated, user } = useAuth()
@@ -31,23 +33,31 @@ export default function HomePage() {
         return
       }
 
-      // 로컬 스토리지에서 선택된 스케줄 확인
-      const storedSchedule = localStorage.getItem('selectedSchedule');
-      if (storedSchedule) {
-        const { id, expiresAt } = JSON.parse(storedSchedule);
+      // 1. 로컬 스토리지에서 캐시 확인
+      const cachedData = localStorage.getItem('selectedSchedule');
+      if (cachedData) {
+        const { schedule, expiresAt } = JSON.parse(cachedData);
         if (new Date().getTime() < expiresAt) {
-          // 만료되지 않았다면, 전체 스케줄 목록을 로드하고 해당 스케줄을 선택 상태로 설정
-          if (schedules.length === 0) {
-            await loadSchedules("test-user-123"); // 사용자 ID는 임시값 사용
-          }
-          const scheduleToSelect = schedules.find(s => s.id === id);
-          if (scheduleToSelect) {
-            selectSchedule(scheduleToSelect);
-          }
-        } else {
-          // 만료되었다면 로컬 스토리지에서 삭제
-          localStorage.removeItem('selectedSchedule');
+          // 캐시가 유효하면 바로 사용
+          selectSchedule(schedule as Schedule);
+          setIsLoading(false);
+          return;
         }
+      }
+
+      // 2. 캐시가 없거나 만료되었으면 DB에서 조회
+      try {
+        const response = await recommendApi.getActiveScheduleSummary();
+        if (response && response.schedule) {
+          const schedule = response.schedule as Schedule;
+          selectSchedule(schedule);
+          // DB에서 가져온 정보를 다시 캐시
+          const expiryTime = new Date().getTime() + 24 * 60 * 60 * 1000;
+          localStorage.setItem('selectedSchedule', JSON.stringify({ schedule, expiresAt: expiryTime }));
+        }
+      } catch (error) {
+        console.error("활성화된 스케줄 요약 정보 로드 실패:", error);
+        localStorage.removeItem('selectedSchedule'); // 오류 발생 시 캐시 제거
       }
       
       setIsLoading(false)

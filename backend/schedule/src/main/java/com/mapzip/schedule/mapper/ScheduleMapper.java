@@ -122,7 +122,6 @@ public class ScheduleMapper {
         GetScheduleDetailResponse.ScheduleDetail.Builder builder = GetScheduleDetailResponse.ScheduleDetail.newBuilder()
                 .setTitle(schedule.getTitle())
                 .setDepartureTime(schedule.getDepartureTime())
-                .setCalculatedArrivalTime(schedule.getCalculatedArrivalTime() != null ? schedule.getCalculatedArrivalTime() : "")
                 .setDeparture(departure)
                 .setDestination(destination)
                 .addAllWaypoints(waypoints)

@@ -139,10 +139,11 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public void getScheduleDetail(GetScheduleDetailRequest request, StreamObserver<GetScheduleDetailResponse> responseObserver) {
         try {
-            Schedule schedule = scheduleRepository.findById(request.getScheduleId())
+            String scheduleId = request.getScheduleId();
+            Schedule schedule = scheduleRepository.findById(scheduleId)
                     .orElseThrow(() -> new IllegalArgumentException("스케줄을 찾을 수 없습니다."));
 
             String userId = GrpcInterceptorConfig.USER_ID_CONTEXT_KEY.get();
@@ -152,6 +153,13 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
                         .asRuntimeException());
                 return;
             }
+
+            // 1. 이 사용자의 다른 모든 스케줄을 '선택 안됨'으로 변경
+            scheduleRepository.updateIsSelectedByUserId(userId, false);
+
+            // 2. 현재 스케줄만 '선택됨'으로 변경
+            schedule.setSelected(true);
+            scheduleRepository.save(schedule);
 
             GetScheduleDetailResponse.ScheduleDetail detail = scheduleMapper.toDetail(schedule);
             GetScheduleDetailResponse response = GetScheduleDetailResponse.newBuilder()
@@ -165,7 +173,7 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
                     .asRuntimeException());
         } catch (Exception e) {
             responseObserver.onError(io.grpc.Status.INTERNAL
-                    .withDescription("스케줄 상세 정보 조회 중 오류가 발생했습니다: " + e.getMessage())
+                    .withDescription("스케줄 상세 정보 조회 및 선택 중 오류가 발생했습니다: " + e.getMessage())
                     .asRuntimeException());
         }
     }
@@ -202,5 +210,7 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
                     .asRuntimeException());
         }
     }
+
+    
     
 }

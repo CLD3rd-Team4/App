@@ -106,6 +106,12 @@ public class Schedule {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /**
+     * 사용자에 의해 현재 선택된 스케줄인지 여부
+     */
+    @Column(name = "is_selected", nullable = false, columnDefinition = "boolean default false")
+    private boolean isSelected = false;
+
     @OneToMany(mappedBy = "schedule", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private java.util.List<MealTimeSlot> mealTimeSlots = new java.util.ArrayList<>();
 

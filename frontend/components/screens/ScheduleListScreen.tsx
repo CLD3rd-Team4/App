@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import { useSchedule } from "@/hooks/useSchedule"
-import { scheduleApi } from "@/services/api"
+import { scheduleApi, recommendApi } from "@/services/api"
 import BottomNavigation from "@/components/common/BottomNavigation"
 import { Plus } from "lucide-react"
 import type { Schedule } from "@/types"
@@ -49,36 +49,25 @@ export default function ScheduleListScreen() {
     setIsProcessing(schedule.id);
 
     try {
-      // 24시간 후의 만료 시간을 계산합니다.
-      const expiryTime = new Date().getTime() + 24 * 60 * 60 * 1000;
-      const scheduleToStore = {
-        id: schedule.id,
-        expiresAt: expiryTime,
-      };
+      // '선택' 시에는 recommendApi를 호출하여 요약 정보를 받아옵니다.
+      const response = await recommendApi.selectAndGetSummary(schedule.id);
 
-      // 로컬 스토리지에 선택된 스케줄 정보 저장
-      localStorage.setItem('selectedSchedule', JSON.stringify(scheduleToStore));
-      
-      // Zustand 스토어에도 스케줄을 직접 선택 처리합니다.
-      // recommend 서비스가 아직 없으므로 API 호출 대신 즉시 상태를 업데이트합니다.
-      selectSchedule(schedule);
-      router.push('/');
-
-      // 기존 API 호출 로직은 주석 처리합니다.
-      // const response = await scheduleApi.processSchedule(schedule.id, { type: 'SELECT' });
-
-      // if (response && response.schedule) {
-      //   // 백엔드에서 받은 상세 스케줄 정보에 프론트엔드에서 사용하는 id를 추가합니다.
-      //   const updatedSchedule = {
-      //     ...response.schedule,
-      //     id: schedule.id, 
-      //   };
+      if (response && response.schedule) {
+        const updatedSchedule = {
+          ...response.schedule,
+          id: schedule.id, 
+        };
         
-      //   selectSchedule(updatedSchedule as Schedule);
-      //   router.push('/');
-      // } else {
-      //   throw new Error("서버에서 스케줄 정보를 받아오지 못했습니다.");
-      // }
+        // API 호출 성공 시, 로컬 스토리지에 캐시 저장
+        const expiryTime = new Date().getTime() + 24 * 60 * 60 * 1000; // 24시간 후 만료
+        localStorage.setItem('selectedSchedule', JSON.stringify({ schedule: updatedSchedule, expiresAt: expiryTime }));
+
+        // Zustand 스토어에 요약 정보 저장 및 화면 전환
+        selectSchedule(updatedSchedule as Schedule);
+        router.push('/');
+      } else {
+        throw new Error("서버에서 스케줄 요약 정보를 받아오지 못했습니다.");
+      }
 
     } catch (error) {
       console.error("스케줄 처리 실패:", error);
