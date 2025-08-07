@@ -5,3 +5,65 @@ spring:
     import: optional:configserver:http://config.service-platform.svc.cluster.local:8888
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
+
+# ElastiCache Redis 운영 설정
+redis:
+  host: ${REDIS_HOST}
+  port: ${REDIS_PORT:6379}
+  password: ${REDIS_PASSWORD:}
+  database: ${REDIS_DATABASE:0}
+  timeout: ${REDIS_TIMEOUT:3000}ms
+  ssl: false
+  lettuce:
+    pool:
+      max-active: ${REDIS_POOL_MAX_ACTIVE:16}
+      max-wait: ${REDIS_POOL_MAX_WAIT:3000}ms
+      max-idle: ${REDIS_POOL_MAX_IDLE:16}
+      min-idle: ${REDIS_POOL_MIN_IDLE:4}
+
+# 리뷰 서비스 캐시 TTL 설정
+review:
+  cache:
+    user-reviews-ttl: ${CACHE_USER_REVIEWS_TTL:7200}
+    restaurant-reviews-ttl: ${CACHE_RESTAURANT_REVIEWS_TTL:14400}
+    review-stats-ttl: ${CACHE_REVIEW_STATS_TTL:43200}
+    ocr-results-ttl: ${CACHE_OCR_RESULTS_TTL:172800}
+    recommendation-ttl: ${CACHE_RECOMMENDATION_TTL:21600}
+
+# Actuator 설정 (헬스체크 + 모니터링)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+    prometheus:
+      enabled: true
+    metrics:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      service: review
+      environment: ${spring.profiles.active:dev}
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+    redis:
+      enabled: true
+
+# 로깅 설정
+logging:
+  level:
+    com.mapzip.review: ${LOG_LEVEL:INFO}
+    org.springframework.cache: ${LOG_LEVEL:INFO}
+    org.springframework.data.redis: ${LOG_LEVEL:INFO}
+    root: INFO

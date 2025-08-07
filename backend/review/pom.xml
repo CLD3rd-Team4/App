@@ -178,7 +178,7 @@
                 </executions>
             </plugin>
 
-            <!-- Exec plugin for generating proto descriptor -->
+            <!-- Protocol Buffers descriptor generation -->
             <!--
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
@@ -187,15 +187,24 @@
                 <executions>
                     <execution>
                         <id>generate-proto-descriptor</id>
-                        <phase>generate-sources</phase>
+                        <phase>process-sources</phase>
                         <goals>
                             <goal>exec</goal>
                         </goals>
                         <configuration>
-                            <executable>bash</executable>
+                            <executable>java</executable>
                             <arguments>
-                                <argument>${project.basedir}/scripts/generate-proto-descriptor.sh</argument>
+                                <argument>-cp</argument>
+                                <argument>${settings.localRepository}/com/google/protobuf/protoc/${protobuf.version}/protoc-${protobuf.version}-${os.detected.classifier}.exe</argument>
+                                <argument>com.google.protobuf.compiler.ProtocolBufferCompiler</argument>
+                                <argument>-I${project.basedir}/googleapis</argument>
+                                <argument>-I${project.basedir}/src/main/proto</argument>
+                                <argument>-include_imports</argument>
+                                <argument>-include_source_info</argument>
+                                <argument>-descriptor_set_out=${project.basedir}/review_proto.pb</argument>
+                                <argument>${project.basedir}/src/main/proto/review.proto</argument>
                             </arguments>
+                            <workingDirectory>${project.basedir}</workingDirectory>
                         </configuration>
                     </execution>
                 </executions>

@@ -19,20 +19,21 @@ spring:
       discovery:
         enabled: true
         
-  # Redis 캐싱 설정 (ElastiCache 연결)
+  # Redis 캐싱 설정 (ElastiCache 운영 환경)
   data:
     redis:
-      host: ${REDIS_HOST:elasticache-review.service-platform.svc.cluster.local}
+      host: ${REDIS_HOST:mapzip-dev-review-cache.2iapp0.ng.0001.apn2.cache.amazonaws.com}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
+      password: ${REDIS_PASSWORD:}  # AUTH 비활성화됨
       database: ${REDIS_DATABASE:0}
-      timeout: ${REDIS_TIMEOUT:2000ms}
+      timeout: ${REDIS_TIMEOUT:3000ms}
+      ssl: false
       lettuce:
         pool:
-          max-active: ${REDIS_POOL_MAX_ACTIVE:8}
-          max-idle: ${REDIS_POOL_MAX_IDLE:8}
-          min-idle: ${REDIS_POOL_MIN_IDLE:0}
-          max-wait: ${REDIS_POOL_MAX_WAIT:-1ms}
+          max-active: ${REDIS_POOL_MAX_ACTIVE:16}
+          max-idle: ${REDIS_POOL_MAX_IDLE:16}
+          min-idle: ${REDIS_POOL_MIN_IDLE:4}
+          max-wait: ${REDIS_POOL_MAX_WAIT:3000ms}
           
   # 캐시 설정
   cache:
@@ -150,8 +151,8 @@ review:
     default-size: ${PAGINATION_DEFAULT_SIZE:20}
     max-size: ${PAGINATION_MAX_SIZE:100}
   cache:
-    user-reviews-ttl: ${CACHE_USER_REVIEWS_TTL:3600}      # 1시간 (초)
-    restaurant-reviews-ttl: ${CACHE_RESTAURANT_REVIEWS_TTL:7200}  # 2시간 (초)
-    review-stats-ttl: ${CACHE_REVIEW_STATS_TTL:21600}     # 6시간 (초)
-    ocr-results-ttl: ${CACHE_OCR_RESULTS_TTL:86400}       # 24시간 (초)
-    recommendation-ttl: ${CACHE_RECOMMENDATION_TTL:14400}  # 4시간 (초)
+    user-reviews-ttl: ${CACHE_USER_REVIEWS_TTL:7200}       # 2시간 (운영환경 증가)
+    restaurant-reviews-ttl: ${CACHE_RESTAURANT_REVIEWS_TTL:14400}  # 4시간
+    review-stats-ttl: ${CACHE_REVIEW_STATS_TTL:43200}      # 12시간
+    ocr-results-ttl: ${CACHE_OCR_RESULTS_TTL:172800}       # 48시간 (운영환경 증가)
+    recommendation-ttl: ${CACHE_RECOMMENDATION_TTL:21600}   # 6시간

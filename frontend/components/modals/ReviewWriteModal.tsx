@@ -97,14 +97,16 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
       setError(null)
       
       const reviewData: CreateReviewRequest = {
-        restaurantId: restaurant.id || '',
-        restaurantName: restaurant.name,
-        restaurantAddress: restaurant.address || '',
+        restaurantId: restaurant.restaurantId || restaurant.id || '',
+        restaurantName: restaurant.placeName || restaurant.name,
+        restaurantAddress: restaurant.addressName || restaurant.address || '',
         rating,
         content: reviewText,
         receiptImages: capturedImage ? [capturedImage] : [],
         reviewImages: reviewImages,
         ocrData: ocrResult || undefined,
+        scheduledTime: restaurant.scheduledTime, // 미작성 리뷰 완료 처리용
+        visitDate: visitDate, // OCR 날짜 검증용
       }
 
       const result = await reviewApi.createReview(reviewData)
@@ -141,8 +143,11 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
             </div>
 
             <div className="mb-4">
-              <p className="text-sm text-gray-600 mb-2">식당명: {restaurant.name}</p>
-              <p className="text-sm text-gray-600">주소: {restaurant.address || "주소 정보"}</p>
+              <p className="text-sm text-gray-600 mb-2">식당명: {restaurant.placeName || restaurant.name}</p>
+              <p className="text-sm text-gray-600 mb-2">주소: {restaurant.addressName || restaurant.address || "주소 정보"}</p>
+              {restaurant.scheduledTime && (
+                <p className="text-sm text-blue-600">예정 시간: {restaurant.scheduledTime}</p>
+              )}
             </div>
 
             {/* 에러 메시지 표시 */}
@@ -155,6 +160,18 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
                 >
                   확인
                 </button>
+              </div>
+            )}
+            
+            {/* OCR 결과 날짜 검증 메시지 */}
+            {step === 3 && ocrResult && ocrResult.visitDate && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>OCR 추출 날짜:</strong> {ocrResult.visitDate}
+                </p>
+                <p className="text-xs text-blue-600 mt-1">
+                  방문 날짜와 일치하는지 확인해주세요.
+                </p>
               </div>
             )}
 

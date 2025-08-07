@@ -13,6 +13,7 @@ export default function VisitedRestaurantsScreen() {
   const router = useRouter()
   const [visitedRestaurants, setVisitedRestaurants] = useState<VisitedRestaurant[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [showReviewModal, setShowReviewModal] = useState(false)
   const [selectedRestaurant, setSelectedRestaurant] = useState<any>(null)
 
@@ -23,19 +24,27 @@ export default function VisitedRestaurantsScreen() {
   const loadVisitedRestaurants = async () => {
     try {
       setIsLoading(true)
-      // TODO: REST API 연동 - 방문한 식당 목록 가져오기
+      setError(null)
       const data = await visitedRestaurantApi.getVisitedRestaurants()
+      console.log('미작성 리뷰 데이터:', data) // 디버깅용
       setVisitedRestaurants(data)
-    } catch (error) {
-      console.error("방문한 식당 목록 로드 실패:", error)
+    } catch (error: any) {
+      console.error("미작성 리뷰 목록 로드 실패:", error)
+      setError(error.message || '데이터를 불러오는 데 실패했습니다.')
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleDeleteUnwritten = async (restaurantId: string) => {
-    // 미작성 리뷰 삭제 로직
-    setVisitedRestaurants((prev) => prev.filter((r) => r.id !== restaurantId))
+  const handleDeleteUnwritten = async (restaurantId: string, scheduledTime: string) => {
+    try {
+      await visitedRestaurantApi.deletePendingReview(restaurantId, scheduledTime)
+      setVisitedRestaurants((prev) => prev.filter((r) => r.id !== restaurantId))
+      console.log('미작성 리뷰가 삭제되었습니다.')
+    } catch (error) {
+      console.error('미작성 리뷰 삭제 실패:', error)
+      alert('삭제에 실패했습니다. 다시 시도해주세요.')
+    }
   }
 
   const handleWriteReview = (restaurant: any) => {
@@ -69,9 +78,19 @@ export default function VisitedRestaurantsScreen() {
               <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
               <p className="text-gray-600">로딩 중...</p>
             </div>
+          ) : error ? (
+            <div className="text-center py-8">
+              <p className="text-red-600 mb-4">에러: {error}</p>
+              <Button
+                onClick={loadVisitedRestaurants}
+                className="bg-blue-500 hover:bg-blue-600 text-white"
+              >
+                다시 시도
+              </Button>
+            </div>
           ) : visitedRestaurants.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-gray-600 mb-4">방문한 식당이 없습니다.</p>
+              <p className="text-gray-600 mb-4">미작성 리뷰가 없습니다.</p>
               <p className="text-sm text-gray-500 mb-4">최근 방문하신 식당? 후기를 남겨보세요.</p>
               <Button
                 onClick={() => handleWriteReview({ name: "새 식당", address: "주소 정보" })}
@@ -97,8 +116,11 @@ export default function VisitedRestaurantsScreen() {
                         className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
                       />
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-medium mb-1">{restaurant.name}</h3>
-                        {/* 방문일자와 한줄 제거 */}
+                        <h3 className="font-medium mb-1">{restaurant.placeName || restaurant.name}</h3>
+                        <p className="text-sm text-gray-500 mb-2">{restaurant.addressName || restaurant.address}</p>
+                        {restaurant.scheduledTime && (
+                          <p className="text-xs text-blue-600 mb-2">예정 시간: {restaurant.scheduledTime}</p>
+                        )}
                         {restaurant.rating && (
                           <div className="flex items-center mb-2">
                             <Star className="w-4 h-4 text-yellow-400 fill-current" />
@@ -108,7 +130,7 @@ export default function VisitedRestaurantsScreen() {
                         {restaurant.review && <p className="text-sm text-gray-700 mb-2">{restaurant.review}</p>}
                         <div className="flex gap-2">
                           <Button
-                            onClick={() => handleDeleteUnwritten(restaurant.id)}
+                            onClick={() => handleDeleteUnwritten(restaurant.restaurantId || restaurant.id, restaurant.scheduledTime || '12:00')}
                             size="sm"
                             variant="outline"
                             className="text-red-600 border-red-200"
