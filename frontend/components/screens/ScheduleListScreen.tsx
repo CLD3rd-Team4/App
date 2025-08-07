@@ -58,9 +58,9 @@ export default function ScheduleListScreen() {
           id: schedule.id, 
         };
         
-        // API 호출 성공 시, 로컬 스토리지에 캐시 저장
+        // API 호출 성공 시, 로컬 스토리지에 스케줄 ID만 캐시
         const expiryTime = new Date().getTime() + 24 * 60 * 60 * 1000; // 24시간 후 만료
-        localStorage.setItem('selectedSchedule', JSON.stringify({ schedule: updatedSchedule, expiresAt: expiryTime }));
+        localStorage.setItem('selectedScheduleId', JSON.stringify({ id: schedule.id, expiresAt: expiryTime }));
 
         // Zustand 스토어에 요약 정보 저장 및 화면 전환
         selectSchedule(updatedSchedule as Schedule);

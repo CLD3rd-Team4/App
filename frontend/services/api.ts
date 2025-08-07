@@ -133,6 +133,15 @@ export const recommendApi = {
     // 개발 단계에서는 임시로 비어있는 응답을 반환합니다.
     return Promise.resolve({ schedule: null });
   },
+
+  // 특정 스케줄 ID에 대한 요약 정보를 가져오는 API (가상)
+  getSummaryById: async (scheduleId: string) => {
+    console.log(`[가상 API] recommend 서비스에 ${scheduleId} 요약 정보 요청`);
+    // 실제로는 GET /recommend/summary/{scheduleId} 와 같은 API를 호출하게 됩니다.
+    // 임시로 scheduleApi.getScheduleDetail을 호출하여 목 데이터를 반환합니다.
+    const response = await scheduleApi.getScheduleDetail(scheduleId, "test-user-123");
+    return response;
+  },
 };
 
 

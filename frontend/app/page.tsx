@@ -34,33 +34,29 @@ export default function HomePage() {
       }
 
       // 1. 로컬 스토리지에서 캐시 확인
-      const cachedData = localStorage.getItem('selectedSchedule');
+      const cachedData = localStorage.getItem('selectedScheduleId');
       if (cachedData) {
-        const { schedule, expiresAt } = JSON.parse(cachedData);
+        const { id, expiresAt } = JSON.parse(cachedData);
         if (new Date().getTime() < expiresAt) {
-          // 캐시가 유효하면 바로 사용
-          selectSchedule(schedule as Schedule);
-          setIsLoading(false);
-          return;
+          // 캐시가 유효하면 해당 ID로 요약 정보 요청
+          try {
+            const response = await recommendApi.getSummaryById(id);
+            if (response && response.schedule) {
+              selectSchedule(response.schedule as Schedule);
+            }
+          } catch (error) {
+            console.error("캐시된 스케줄 요약 정보 로드 실패:", error);
+            localStorage.removeItem('selectedScheduleId'); // 오류 발생 시 캐시 제거
+          }
+        } else {
+          // 캐시가 만료되었으면 제거
+          localStorage.removeItem('selectedScheduleId');
         }
-      }
-
-      // 2. 캐시가 없거나 만료되었으면 DB에서 조회
-      try {
-        const response = await recommendApi.getActiveScheduleSummary();
-        if (response && response.schedule) {
-          const schedule = response.schedule as Schedule;
-          selectSchedule(schedule);
-          // DB에서 가져온 정보를 다시 캐시
-          const expiryTime = new Date().getTime() + 24 * 60 * 60 * 1000;
-          localStorage.setItem('selectedSchedule', JSON.stringify({ schedule, expiresAt: expiryTime }));
-        }
-      } catch (error) {
-        console.error("활성화된 스케줄 요약 정보 로드 실패:", error);
-        localStorage.removeItem('selectedSchedule'); // 오류 발생 시 캐시 제거
       }
       
+      // 캐시가 없거나 만료되었으면, 더 이상 선택된 스케줄이 없는 것으로 간주하고 추가 요청 없음
       setIsLoading(false)
+    }
     }
 
     checkLoginAndLoadSchedule();
