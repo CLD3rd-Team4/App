@@ -45,11 +45,7 @@ public class Schedule {
     @Column(name = "departure_time", nullable = false, length = 20)
     private String departureTime;
 
-    /**
-     * Tmap API를 통해 계산된 예상 도착 시간
-     */
-    @Column(name = "calculated_arrival_time", length = 20)
-    private String calculatedArrivalTime;
+    
 
     /**
      * 출발지 정보 (JSON 형태로 저장)
