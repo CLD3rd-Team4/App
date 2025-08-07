@@ -15,7 +15,8 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         return http
             .authorizeHttpRequests(auth -> auth
-                .anyRequest().permitAll()  // 임시로 모든 경로 허용
+                .requestMatchers("/actuator/**").permitAll()
+                .anyRequest().authenticated()
             )
             .csrf(AbstractHttpConfigurer::disable)
             .httpBasic(AbstractHttpConfigurer::disable)
