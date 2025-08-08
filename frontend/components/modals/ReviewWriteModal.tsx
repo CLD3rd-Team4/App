@@ -163,17 +163,7 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
               </div>
             )}
             
-            {/* OCR 결과 날짜 검증 메시지 */}
-            {step === 3 && ocrResult && ocrResult.visitDate && (
-              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  <strong>OCR 추출 날짜:</strong> {ocrResult.visitDate}
-                </p>
-                <p className="text-xs text-blue-600 mt-1">
-                  방문 날짜와 일치하는지 확인해주세요.
-                </p>
-              </div>
-            )}
+            
 
             {!capturedImage ? (
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center mb-4">
@@ -301,6 +291,18 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
             </div>
 
             <div className="space-y-4">
+              {/* OCR 결과 날짜 검증 메시지 */}
+              {ocrResult && ocrResult.visitDate && (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    <strong>OCR 추출 날짜:</strong> {ocrResult.visitDate}
+                  </p>
+                  <p className="text-xs text-blue-600 mt-1">
+                    방문 날짜와 일치하는지 확인해주세요.
+                  </p>
+                </div>
+              )}
+
               {/* 방문일 */}
               <div>
                 <Label htmlFor="visitDate" className="text-sm font-medium">

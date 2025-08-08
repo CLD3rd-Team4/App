@@ -3,59 +3,35 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
-import { scheduleApi, recommendApi } from "@/services/api"
+import useSchedule from "@/hooks/useSchedule" // useSchedule 훅 임포트
 import BottomNavigation from "@/components/common/BottomNavigation"
 import { Plus } from "lucide-react"
 import type { Schedule } from "@/types"
 
 export default function ScheduleListScreen() {
   const router = useRouter()
-  const [schedules, setSchedules] = useState<Schedule[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const {
+    schedules,
+    isLoading,
+    isProcessing,
+    selectSchedule,
+    deleteSchedule,
+    loadSchedules,
+  } = useSchedule() // useSchedule 훅 사용
+
   const [isClient, setIsClient] = useState(false)
-  const [isProcessing, setIsProcessing] = useState<string | null>(null)
 
   useEffect(() => {
     setIsClient(true)
+    loadSchedules() // 스케줄 목록 로드
   }, [])
-
-  useEffect(() => {
-    if (isClient) {
-      loadScheduleList()
-    }
-  }, [isClient])
-
-  const loadScheduleList = async () => {
-    try {
-      setIsLoading(true)
-      const data = await scheduleApi.getSchedules()
-      setSchedules(data)
-    } catch (error) {
-      console.error("스케줄 목록 로드 실패:", error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   const handleScheduleSelect = async (schedule: Schedule) => {
     if (!schedule || !schedule.id) {
       console.error("Invalid schedule or schedule ID")
       alert("유효하지 않은 스케줄입니다.")
       return
     }
-    
-    setIsProcessing(schedule.id)
-
-    try {
-      await recommendApi.selectAndGetSummary(schedule.id)
-      localStorage.setItem('scheduleSelected', 'true');
-      router.push('/')
-    } catch (error) {
-      console.error("스케줄 처리 실패:", error)
-      alert('스케줄 처리에 실패했습니다. 잠시 후 다시 시도해주세요.')
-    } finally {
-      setIsProcessing(null)
-    }
+    await selectSchedule(schedule.id)
   }
 
   const handleScheduleEdit = (schedule: Schedule) => {
@@ -64,7 +40,7 @@ export default function ScheduleListScreen() {
       alert("유효하지 않은 스케줄입니다.")
       return
     }
-    localStorage.setItem('editingSchedule', JSON.stringify(schedule));
+    localStorage.setItem("editingSchedule", JSON.stringify(schedule))
     router.push(`/schedule/edit?id=${schedule.id}`)
   }
 
@@ -74,12 +50,7 @@ export default function ScheduleListScreen() {
       alert("유효하지 않은 스케줄 ID입니다.")
       return
     }
-    try {
-      await scheduleApi.deleteSchedule(scheduleId)
-      setSchedules(schedules.filter((schedule) => schedule.id !== scheduleId))
-    } catch (error) {
-      console.error("스케줄 삭제 실패:", error)
-    }
+    await deleteSchedule(scheduleId)
   }
 
   if (!isClient) {
@@ -124,11 +95,14 @@ export default function ScheduleListScreen() {
                   <div className="flex gap-2">
                     <Button
                       onClick={(e) => {
-                        e.stopPropagation();
+                        e.stopPropagation()
                         if (!schedule.id) {
-                          console.error("Delete Error: Invalid schedule ID", schedule);
-                          alert("유효하지 않은 스케줄 ID입니다.");
-                          return;
+                          console.error(
+                            "Delete Error: Invalid schedule ID",
+                            schedule
+                          )
+                          alert("유효하지 않은 스케줄 ID입니다.")
+                          return
                         }
                         handleScheduleDelete(schedule.id)
                       }}
@@ -140,11 +114,14 @@ export default function ScheduleListScreen() {
                     </Button>
                     <Button
                       onClick={(e) => {
-                        e.stopPropagation();
+                        e.stopPropagation()
                         if (!schedule.id) {
-                          console.error("Edit Error: Invalid schedule ID", schedule);
-                          alert("유효하지 않은 스케줄 ID입니다.");
-                          return;
+                          console.error(
+                            "Edit Error: Invalid schedule ID",
+                            schedule
+                          )
+                          alert("유효하지 않은 스케줄 ID입니다.")
+                          return
                         }
                         handleScheduleEdit(schedule)
                       }}
@@ -156,14 +133,14 @@ export default function ScheduleListScreen() {
                     </Button>
                     <Button
                       onClick={async (e) => {
-                        e.stopPropagation();
+                        e.stopPropagation()
                         await handleScheduleSelect(schedule)
                       }}
                       size="sm"
                       className="flex-1 bg-blue-500 hover:bg-blue-600 text-white"
-                      disabled={isProcessing === schedule.id}
+                      disabled={isProcessing}
                     >
-                      {isProcessing === schedule.id ? '처리 중...' : '선택'}
+                      {isProcessing ? "처리 중..." : "선택"}
                     </Button>
                   </div>
                 </div>

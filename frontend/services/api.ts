@@ -50,47 +50,173 @@ const mapScheduleResponse = (scheduleData: any) => {
 
 export const scheduleApi = {
   getSchedules: async () => {
-    // userId는 JWT 토큰에서 자동으로 추출되므로 파라미터 불필요
-    const response = await api.get('/schedule');
-    const data = response.data;
-    return data.schedules ? data.schedules.map(mapScheduleResponse) : [];
+    try {
+      // userId는 JWT 토큰에서 자동으로 추출되므로 파라미터 불필요
+      const response = await api.get("/schedule");
+      const data = response.data;
+      return data.schedules ? data.schedules.map(mapScheduleResponse) : [];
+    } catch (error: any) {
+      console.error("스케줄 목록 조회 실패:", error);
+      if (error.response) {
+        throw new APIError(
+          error.response.data?.message || "스케줄 목록을 불러오지 못했습니다.",
+          error.response.status,
+          error.response.data
+        );
+      } else if (error.request) {
+        throw new APIError(
+          "서버에서 응답이 없습니다. 네트워크 연결을 확인해주세요.",
+          0
+        );
+      } else {
+        throw new APIError(
+          `요청 설정 중 오류가 발생했습니다: ${error.message}`,
+          -1
+        );
+      }
+    }
   },
 
-  createSchedule: async (scheduleData: Omit<Schedule, 'id'>) => {
-    const response = await api.post('/schedule', scheduleData);
-    return mapScheduleResponse(response.data);
+  createSchedule: async (scheduleData: Omit<Schedule, "id">) => {
+    try {
+      const response = await api.post("/schedule", scheduleData);
+      return mapScheduleResponse(response.data);
+    } catch (error: any) {
+      console.error("스케줄 생성 실패:", error);
+      if (error.response) {
+        throw new APIError(
+          error.response.data?.message || "스케줄을 생성하지 못했습니다.",
+          error.response.status,
+          error.response.data
+        );
+      } else if (error.request) {
+        throw new APIError(
+          "서버에서 응답이 없습니다. 네트워크 연결을 확인해주세요.",
+          0
+        );
+      } else {
+        throw new APIError(
+          `요청 설정 중 오류가 발생했습니다: ${error.message}`,
+          -1
+        );
+      }
+    }
   },
 
   updateSchedule: async (scheduleData: Schedule) => {
-    const { id, ...rest } = scheduleData;
-    const requestBody = {
-      ...rest,
-      scheduleId: id, // gRPC 요청 본문에 scheduleId 포함
-    };
-    // HTTP REST API의 관례에 따라 URL에 id를 포함
-    const response = await api.put(`/schedule/${id}`, requestBody);
-    return response.data;
+    try {
+      const { id, ...rest } = scheduleData;
+      const requestBody = {
+        ...rest,
+        scheduleId: id,
+      };
+      const response = await api.put(`/schedule/${id}`, requestBody);
+      return response.data;
+    } catch (error: any) {
+      console.error("스케줄 수정 실패:", error);
+      if (error.response) {
+        throw new APIError(
+          error.response.data?.message || "스케줄을 수정하지 못했습니다.",
+          error.response.status,
+          error.response.data
+        );
+      } else if (error.request) {
+        throw new APIError(
+          "서버에서 응답이 없습니다. 네트워크 연결을 확인해주세요.",
+          0
+        );
+      } else {
+        throw new APIError(
+          `요청 설정 중 오류가 발생했습니다: ${error.message}`,
+          -1
+        );
+      }
+    }
   },
 
   deleteSchedule: async (scheduleId: string) => {
-    // userId는 JWT 토큰에서 자동으로 추출되므로 파라미터 불필요
-    const response = await api.delete(`/schedule/${scheduleId}`);
-    return response.data;
+    try {
+      // userId는 JWT 토큰에서 자동으로 추출되므로 파라미터 불필요
+      const response = await api.delete(`/schedule/${scheduleId}`);
+      return response.data;
+    } catch (error: any) {
+      console.error("스케줄 삭제 실패:", error);
+      if (error.response) {
+        throw new APIError(
+          error.response.data?.message || "스케줄을 삭제하지 못했습니다.",
+          error.response.status,
+          error.response.data
+        );
+      } else if (error.request) {
+        throw new APIError(
+          "서버에서 응답이 없습니다. 네트워크 연결을 확인해주세요.",
+          0
+        );
+      } else {
+        throw new APIError(
+          `요청 설정 중 오류가 발생했습니다: ${error.message}`,
+          -1
+        );
+      }
+    }
   },
 
   processSchedule: async (scheduleId: string, data: any) => {
-    const response = await api.post(`/schedule/${scheduleId}`, data);
-    return response.data;
+    try {
+      const response = await api.post(`/schedule/${scheduleId}`, data);
+      return response.data;
+    } catch (error: any) {
+      console.error("스케줄 처리 실패:", error);
+      if (error.response) {
+        throw new APIError(
+          error.response.data?.message || "스케줄을 처리하지 못했습니다.",
+          error.response.status,
+          error.response.data
+        );
+      } else if (error.request) {
+        throw new APIError(
+          "서버에서 응답이 없습니다. 네트워크 연결을 확인해주세요.",
+          0
+        );
+      } else {
+        throw new APIError(
+          `요청 설정 중 오류가 발생했습니다: ${error.message}`,
+          -1
+        );
+      }
+    }
   },
 
   getScheduleDetail: async (scheduleId: string) => {
-    // userId는 JWT 토큰에서 자동으로 추출되므로 파라미터 불필요
-    const response = await api.get(`/schedule/${scheduleId}`);
-    const data = response.data;
-    if (data && data.schedule) {
-      return { ...data, schedule: mapScheduleResponse(data.schedule) };
+    try {
+      // userId는 JWT 토큰에서 자동으로 추출되므로 파라미터 불필요
+      const response = await api.get(`/schedule/${scheduleId}`);
+      const data = response.data;
+      if (data && data.schedule) {
+        return { ...data, schedule: mapScheduleResponse(data.schedule) };
+      }
+      return data;
+    } catch (error: any) {
+      console.error("스케줄 상세 정보 조회 실패:", error);
+      if (error.response) {
+        throw new APIError(
+          error.response.data?.message ||
+            "스케줄 상세 정보를 불러오지 못했습니다.",
+          error.response.status,
+          error.response.data
+        );
+      } else if (error.request) {
+        throw new APIError(
+          "서버에서 응답이 없습니다. 네트워크 연결을 확인해주세요.",
+          0
+        );
+      } else {
+        throw new APIError(
+          `요청 설정 중 오류가 발생했습니다: ${error.message}`,
+          -1
+        );
+      }
     }
-    return data;
   },
 };
 
@@ -144,7 +270,7 @@ export const visitedRestaurantApi = {
       console.error('미작성 리뷰 목록 조회 실패:', error);
       
       // 인증 실패 시 더미 데이터 반환 (테스트용)
-      if (error.message?.includes('TOKEN_INVALID') || error.message?.includes('네트워크')) {
+      if (error instanceof Error && (error.message?.includes('TOKEN_INVALID') || error.message?.includes('네트워크'))) {
         console.log('인증 실패 - 더미 데이터 반환');
         return [
           {
@@ -210,7 +336,10 @@ export const ocrApi = {
       return response.data;
     } catch (error) {
       if (error instanceof APIError) throw error;
-      throw new APIError('네트워크 오류가 발생했습니다', 0, { originalError: error });
+      if (error instanceof Error) {
+        throw new APIError('네트워크 오류가 발생했습니다: ' + error.message, 0, { originalError: error });
+      }
+      throw new APIError('알 수 없는 네트워크 오류가 발생했습니다', 0, { originalError: error });
     }
   },
 };
@@ -276,7 +405,10 @@ export const reviewApi = {
       return response.data;
     } catch (error) {
       if (error instanceof APIError) throw error;
-      throw new APIError('네트워크 오류가 발생했습니다', 0, { originalError: error });
+      if (error instanceof Error) {
+        throw new APIError('네트워크 오류가 발생했습니다: ' + error.message, 0, { originalError: error });
+      }
+      throw new APIError('알 수 없는 네트워크 오류가 발생했습니다', 0, { originalError: error });
     }
   },
 
@@ -300,10 +432,24 @@ export const reviewApi = {
         }
       });
       
-      if (error.response?.data?.message) {
-        throw new APIError(error.response.data.message, error.response.status, error.response.data);
+      // Axios 에러인 경우
+      if (error.response && error.response.data) {
+        const { message, status, data } = error.response;
+        // 서버에서 내려준 에러 메시지가 있으면 사용
+        if (data && data.message) {
+          throw new APIError(data.message, status, data);
+        }
+        // 그렇지 않으면 일반적인 네트워크 오류 메시지 사용
+        throw new APIError(`네트워크 오류: ${status}`, status, data);
+      } 
+      // 일반 자바스크립트 에러인 경우
+      else if (error instanceof Error) {
+        throw new APIError(`클라이언트 오류: ${error.message}`, 0, { originalError: error });
+      } 
+      // 그 외 알 수 없는 에러
+      else {
+        throw new APIError('알 수 없는 오류가 발생했습니다.', 0, { originalError: error });
       }
-      throw new APIError('네트워크 오류가 발생했습니다: ' + (error.message || '알 수 없는 오류'), error.response?.status || 0, { originalError: error });
     }
   },
 
@@ -314,10 +460,13 @@ export const reviewApi = {
         params: { scheduledTime },
       });
     } catch (error) {
-      if (error.response?.data?.message) {
-        throw new APIError(error.response.data.message, error.response.status, error.response.data);
+      if (error instanceof Error && error.message) {
+        if (error instanceof APIError) {
+            throw error; // APIError는 그대로 다시 던집니다.
+        }
+        throw new APIError(error.message, 0, { originalError: error });
       }
-      throw new APIError('네트워크 오류가 발생했습니다', 0, { originalError: error });
+      throw new APIError('알 수 없는 오류가 발생했습니다', 0, { originalError: error });
     }
   },
 
@@ -330,10 +479,13 @@ export const reviewApi = {
 
       return response.data.data;
     } catch (error) {
-      if (error.response?.data?.message) {
-        throw new APIError(error.response.data.message, error.response.status, error.response.data);
+      if (error instanceof Error && error.message) {
+        if (error instanceof APIError) {
+            throw error; // APIError는 그대로 다시 던집니다.
+        }
+        throw new APIError(error.message, 0, { originalError: error });
       }
-      throw new APIError('네트워크 오류가 발생했습니다', 0, { originalError: error });
+      throw new APIError('알 수 없는 오류가 발생했습니다', 0, { originalError: error });
     }
   },
 };
