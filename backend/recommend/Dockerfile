@@ -1,22 +1,4 @@
-# Multi-stage build for Recommend Service
-FROM maven:3.9-openjdk-17-slim AS build
-
-# Set working directory
-WORKDIR /app
-
-# Copy pom.xml first for better layer caching
-COPY pom.xml .
-
-# Download dependencies
-RUN mvn dependency:go-offline -B
-
-# Copy source code
-COPY src ./src
-
-# Build the application
-RUN mvn clean package -DskipTests
-
-# Runtime stage
+# Runtime stage - GitHub Actions에서 이미 빌드된 JAR 사용
 FROM openjdk:17-jre-slim
 
 # Add labels for better container management
@@ -31,8 +13,8 @@ RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 WORKDIR /app
 
-# Copy jar from build stage
-COPY --from=build /app/target/recommend-*.jar app.jar
+# Copy pre-built jar from GitHub Actions (target/app.jar)
+COPY target/app.jar app.jar
 
 # Change ownership to appuser
 RUN chown -R appuser:appuser /app
