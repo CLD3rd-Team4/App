@@ -40,11 +40,6 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content="map.zip" />
       </head>
       <body className={inter.className}>
-        {/* 카카오 지도 API 스크립트를 body 태그 하단으로 이동하고 Script 컴포언트 사용 */}
-        <Script 
-          type="text/javascript" 
-          src={`//dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_KEY}&libraries=services`}
-        />
         <div className="min-h-screen bg-gray-100">
           <div className="mobile-container">{children}</div>
         </div>
