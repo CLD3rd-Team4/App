@@ -19,7 +19,7 @@ spring:
   # Valkey(Redis) 연결 설정 (AWS ElastiCache Serverless)
   data:
     redis:
-      host: mapzip-dev-schedule-cache-serverless-2iapp0.serverless.apn2.cache.amazonaws.com
+      host: schedule-cache.mapzip.shop
       port: 6379
       ssl:
         enabled: true
