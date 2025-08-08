@@ -22,37 +22,10 @@ function subscribeTokenRefresh(
     refreshSubscribers.push({ resolve, reject })
 }
 
-// 요청 인터셉터 - x-user-id 헤더 자동 주입
-api.interceptors.request.use(
-    (config) => {
-        // JWT 토큰에서 사용자 ID 추출
-        const getAuthenticatedUserId = () => {
-            const token = localStorage.getItem('accessToken');
-            if (!token) return null;
-            
-            try {
-                const payload = JSON.parse(atob(token.split('.')[1]));
-                if (payload.exp * 1000 < Date.now()) {
-                    localStorage.removeItem('accessToken');
-                    return null;
-                }
-                return payload.userId;
-            } catch (error) {
-                console.error('JWT 토큰 파싱 실패:', error);
-                return null;
-            }
-        };
-        
-        const userId = getAuthenticatedUserId() || 'anonymous';
-        
-        if (userId && !config.headers['x-user-id']) {
-            config.headers['x-user-id'] = userId;
-        }
-        
-        return config;
-    },
-    (error) => Promise.reject(error)
-);
+// 요청 인터셉터 - Gateway에서 JWT 검증 후 x-user-id 헤더를 자동 주입하므로 제거
+        // Gateway에서 이미 JWT를 검증하고 x-user-id 헤더를 주입하므로 
+        // 프론트엔드에서는 별도 처리 불필요 쿠키에 포함
+
 
 function onTokenRefreshed() {
     refreshSubscribers.forEach(({ resolve }) => resolve())
@@ -63,6 +36,7 @@ function onRefreshFailed(error: any) {
     refreshSubscribers.forEach(({ reject }) => reject(error))
     refreshSubscribers = []
 }
+
 
 // 응답 인터셉터
 api.interceptors.response.use(
