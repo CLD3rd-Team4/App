@@ -140,6 +140,7 @@ public class KakaoOAuthService {
                 .subject(kakaoId)
                 .issuedAt(now)
                 .expiresAt(now.plus(1, ChronoUnit.HOURS))
+                .claim("kakaoId", kakaoId)
                 .claim("nickname", user.getNickname())
                 .build();
 
