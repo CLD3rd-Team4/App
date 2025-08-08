@@ -1,0 +1,22 @@
+// review.proto
+syntax = "proto3";
+
+package review;
+
+option java_multiple_files = true;
+option java_package = "com.mapzip.review.grpc";
+option java_outer_classname = "ReviewProto";
+
+service ReviewService {
+  // 평균 별점 + 대표 리뷰 가져오기
+  rpc GetRestaurantStatsForRecommendation (GetRestaurantStatsRequest) returns (GetRestaurantStatsResponse);
+}
+
+message GetRestaurantStatsRequest {
+  string restaurantId = 1;
+}
+
+message GetRestaurantStatsResponse {
+  double averageRating = 1;
+  string representativeReview = 2;
+}

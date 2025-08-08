@@ -27,7 +27,7 @@ public class KakaoApiService {
             try {
                 KakaoSearchResponse response = kakaoClient
                         .searchRestaurants(slot.getLat(), slot.getLon(), slot.getRadius())
-                        .block(); // Mono → blocking (나중에 비동기로 바꿀 수도 있음)
+                        .block(); //blocking (나중에 비동기로 바꿀 수도 있음)
 
                 if (response != null) {
                     resultMap.put(slot.getSlotId(), response);

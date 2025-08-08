@@ -1,13 +1,25 @@
 syntax = "proto3";
+import "google/api/annotations.proto";
+package com.mapzip.recommend.grpc;
 
 option java_multiple_files = true;
 option java_package = "com.mapzip.recommend.grpc";
 option java_outer_classname = "RecommendProto";
 
 service RecommendService {
+  rpc GetRecommendationResults(GetRecommendationResultsRequest) returns (GetRecommendationResultsResponse) {
+    option (google.api.http) = {
+      get: "/recommend/result"
+    };
+  }
+ 	
+  rpc SubmitSelectedPlace(SelectedPlaceRequest) returns (SubmitResponse) {
+    option (google.api.http) = {
+      post: "/recommend/submit"
+      body: "*"
+    };
+  }
   rpc SendRecommendRequest (RecommendRequest) returns (RecommendResponse);
-  rpc SubmitSelectedPlace (SelectedPlaceRequest) returns (SubmitResponse);
-  rpc GetRecommendationResults(GetRecommendationResultsRequest) returns (GetRecommendationResultsResponse);
   rpc GetSelectedPlaces(GetSelectedPlacesRequest) returns (GetSelectedPlacesResponse);
   rpc PlacesForReview(PlacesForReviewRequest) returns (PlacesForReviewResponse);
 }
