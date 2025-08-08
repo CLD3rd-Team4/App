@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mapzip.review.dto.OcrResultDto;
 import com.mapzip.review.entity.ReviewEntity;
 import com.mapzip.review.entity.PendingReviewEntity;
-import com.mapzip.review.grpc.HeaderInterceptor;
+import com.mapzip.review.grpc.GrpcHeaderInterceptor;
 import com.mapzip.review.grpc.ReviewProto;
 import com.mapzip.review.repository.ReviewRepository;
 import com.mapzip.review.repository.PendingReviewRepository;
@@ -386,7 +386,7 @@ public class ReviewService {
      * gRPC Context에서 받은 사용자 ID와 요청의 사용자 ID가 일치하는지 확인
      */
     private void validateUserAuthentication(String requestedUserId) {
-        String authenticatedUserId = HeaderInterceptor.USER_ID_CONTEXT_KEY.get();
+        String authenticatedUserId = GrpcHeaderInterceptor.USER_ID_CONTEXT_KEY.get();
         
         if (authenticatedUserId == null || authenticatedUserId.isEmpty()) {
             throw new SecurityException("인증되지 않은 사용자입니다.");
