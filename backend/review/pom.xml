@@ -167,6 +167,13 @@
                     <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
                     <pluginId>grpc-java</pluginId>
                     <pluginArtifact>io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
+                    <protoSourceRoot>${project.basedir}/src/main/proto</protoSourceRoot>
+                    <includes>
+                        <include>**/*.proto</include>
+                    </includes>
+                    <additionalProtoPathElements>
+                        <additionalProtoPathElement>${project.basedir}/googleapis</additionalProtoPathElement>
+                    </additionalProtoPathElements>
                 </configuration>
                 <executions>
                     <execution>
@@ -178,7 +185,7 @@
                 </executions>
             </plugin>
 
-            <!-- Protocol Buffers descriptor generation -->
+            <!-- Protocol Buffers descriptor generation (pb 파일 생성용 - 주석처리) -->
             <!--
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
@@ -187,22 +194,18 @@
                 <executions>
                     <execution>
                         <id>generate-proto-descriptor</id>
-                        <phase>process-sources</phase>
+                        <phase>generate-sources</phase>
                         <goals>
                             <goal>exec</goal>
                         </goals>
                         <configuration>
-                            <executable>java</executable>
+                            <executable>${settings.localRepository}/com/google/protobuf/protoc/${protobuf.version}/protoc-${protobuf.version}-${os.detected.classifier}.exe</executable>
                             <arguments>
-                                <argument>-cp</argument>
-                                <argument>${settings.localRepository}/com/google/protobuf/protoc/${protobuf.version}/protoc-${protobuf.version}-${os.detected.classifier}.exe</argument>
-                                <argument>com.google.protobuf.compiler.ProtocolBufferCompiler</argument>
-                                <argument>-I${project.basedir}/googleapis</argument>
                                 <argument>-I${project.basedir}/src/main/proto</argument>
+                                <argument>-descriptor_set_out=${project.basedir}/target/review_proto.pb</argument>
                                 <argument>-include_imports</argument>
                                 <argument>-include_source_info</argument>
-                                <argument>-descriptor_set_out=${project.basedir}/review_proto.pb</argument>
-                                <argument>${project.basedir}/src/main/proto/review.proto</argument>
+                                <argument>review.proto</argument>
                             </arguments>
                             <workingDirectory>${project.basedir}</workingDirectory>
                         </configuration>

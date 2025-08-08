@@ -18,8 +18,8 @@ function EditPageContent() {
       const fetchScheduleDetail = async () => {
         try {
           setIsLoading(true);
-          // TODO: 실제 userId로 교체 필요
-          const data = await scheduleApi.getScheduleDetail(id, 'test-user-123');
+          // userId는 JWT 토큰에서 자동으로 추출
+          const data = await scheduleApi.getScheduleDetail(id);
           setInitialData(data.schedule);
         } catch (err) {
           setError('스케줄 정보를 불러오는데 실패했습니다.');

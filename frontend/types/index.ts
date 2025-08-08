@@ -43,21 +43,24 @@ export interface Schedule {
 
 export interface Restaurant {
   id: string
-  name: string
+  placeName: string          // 통일된 필드명
+  name?: string              // 하위호환용
   description: string
   aiReason: string
   rating?: number
   distance?: string
   image?: string
+  addressName?: string       // 주소 정보
+  address?: string           // 하위호환용
 }
 
 export interface VisitedRestaurant {
   id: string
   restaurantId: string       // 백엔드 PendingReviewEntity에 맞춤
-  name: string
-  placeName: string          // 백엔드에서 사용하는 필드명
-  address?: string
-  addressName?: string       // 백엔드에서 사용하는 필드명
+  placeName: string          // 통일된 필드명
+  name?: string              // 하위호환용
+  addressName?: string       // 통일된 필드명
+  address?: string           // 하위호환용
   visitDate?: string
   scheduledTime?: string     // 미작성 리뷰 시간
   rating?: number

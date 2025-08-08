@@ -49,8 +49,8 @@ const mapScheduleResponse = (scheduleData: any) => {
 };
 
 export const scheduleApi = {
-  getSchedules: async (userId: string) => {
-    // userId는 인터셉터에서 헤더로 전달하므로 파라미터는 사용하지 않음
+  getSchedules: async () => {
+    // userId는 JWT 토큰에서 자동으로 추출되므로 파라미터 불필요
     const response = await api.get('/schedule');
     const data = response.data;
     return data.schedules ? data.schedules.map(mapScheduleResponse) : [];
@@ -72,8 +72,8 @@ export const scheduleApi = {
     return response.data;
   },
 
-  deleteSchedule: async (scheduleId: string, userId: string) => {
-    // userId는 인터셉터에서 헤더로 전달하므로 파라미터는 사용하지 않음
+  deleteSchedule: async (scheduleId: string) => {
+    // userId는 JWT 토큰에서 자동으로 추출되므로 파라미터 불필요
     const response = await api.delete(`/schedule/${scheduleId}`);
     return response.data;
   },
@@ -83,8 +83,8 @@ export const scheduleApi = {
     return response.data;
   },
 
-  getScheduleDetail: async (scheduleId: string, userId: string) => {
-    // userId는 인터셉터에서 헤더로 전달하므로 파라미터는 사용하지 않음
+  getScheduleDetail: async (scheduleId: string) => {
+    // userId는 JWT 토큰에서 자동으로 추출되므로 파라미터 불필요
     const response = await api.get(`/schedule/${scheduleId}`);
     const data = response.data;
     if (data && data.schedule) {
@@ -106,7 +106,7 @@ export const recommendApi = {
     console.log(`[가상 API] recommend 서비스에 ${scheduleId} 선택 및 요약 요청`);
     
     // 개발 단계에서는 recommend 서비스가 없으므로, 임시로 schedule 서비스의 상세 정보를 그대로 반환하는 것처럼 시뮬레이션합니다.
-    const response = await scheduleApi.getScheduleDetail(scheduleId, "test-user-123"); 
+    const response = await scheduleApi.getScheduleDetail(scheduleId); 
     return response;
   },
 
@@ -128,7 +128,7 @@ export const recommendApi = {
     console.log(`[가상 API] recommend 서비스에 ${scheduleId} 요약 정보 요청`);
     // 실제로는 GET /recommend/summary/{scheduleId} 와 같은 API를 호출하게 됩니다.
     // 임시로 scheduleApi.getScheduleDetail을 호출하여 목 데이터를 반환합니다.
-    const response = await scheduleApi.getScheduleDetail(scheduleId, "test-user-123");
+    const response = await scheduleApi.getScheduleDetail(scheduleId);
     return response;
   },
 };
