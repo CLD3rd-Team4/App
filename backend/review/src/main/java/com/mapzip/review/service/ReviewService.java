@@ -1,5 +1,7 @@
 package com.mapzip.review.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mapzip.review.dto.OcrResultDto;
 import com.mapzip.review.entity.ReviewEntity;
 import com.mapzip.review.entity.PendingReviewEntity;
@@ -34,18 +36,21 @@ public class ReviewService {
     private final OcrService ocrService;
     private final S3Service s3Service;
     private final RedisTemplate<String, Object> redisTemplate;
+    private final ObjectMapper objectMapper;
     
     @Autowired
     public ReviewService(ReviewRepository reviewRepository, 
                         PendingReviewRepository pendingReviewRepository,
                         OcrService ocrService, 
                         S3Service s3Service,
-                        RedisTemplate<String, Object> redisTemplate) {
+                        RedisTemplate<String, Object> redisTemplate,
+                        ObjectMapper objectMapper) {
         this.reviewRepository = reviewRepository;
         this.pendingReviewRepository = pendingReviewRepository;
         this.ocrService = ocrService;
         this.s3Service = s3Service;
         this.redisTemplate = redisTemplate;
+        this.objectMapper = objectMapper;
     }
     
     @Caching(evict = {

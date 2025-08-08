@@ -17,7 +17,8 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 
 # Copy the executable JAR from the CI/CD build context
 # The CI/CD pipeline should place the JAR file in the context directory
-COPY target/app.jar app.jar
+ARG JAR_FILE=target/*.jar
+COPY ${JAR_FILE} app.jar
 
 # Change ownership to the appuser
 RUN chown -R appuser:appuser /app
