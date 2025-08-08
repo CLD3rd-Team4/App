@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useSchedule } from "@/hooks/useSchedule"
+import useSchedule from "@/hooks/useSchedule"
 import ScheduleCreateLocationScreen from "./ScheduleCreateLocationScreen"
 import ScheduleCreateRequiredScreen from "./ScheduleCreateRequiredScreen"
 import ScheduleCreateOptionalScreen from "./ScheduleCreateOptionalScreen"
@@ -75,7 +75,7 @@ export default function ScheduleCreateScreen({ isEdit = false, initialData = nul
       };
 
       if (isEdit && initialData?.id) {
-        await updateSchedule({ ...scheduleData, id: initialData.id });
+        await updateSchedule(initialData.id);
       } else {
         await createSchedule(scheduleData);
       }

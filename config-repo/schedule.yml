@@ -2,6 +2,8 @@
 
 server:
   port: ${SERVER_PORT:8084}
+  shutdown: graceful
+  shutdown.grace-period: 30s
 
 spring:
   application:
@@ -9,10 +11,18 @@ spring:
     
   # Aurora PostgreSQL 연결 (schedule 클러스터)
   datasource:
-    url: jdbc:postgresql://mapzip-dev-schedule-db.cluster-c3qme6c6e7fj.ap-northeast-2.rds.amazonaws.com:5432/schedule_db
+    url: jdbc:postgresql://schedule-db.mapzip.shop:5432/schedule_db
     username: mapzip
     password: '{cipher}831b8fc2d97a893e91fbc1a6b04553fb81b73c4664a9a309210f8ea138c78f01'
     driver-class-name: org.postgresql.Driver
+  
+  # Valkey(Redis) 연결 설정 (AWS ElastiCache Serverless)
+  data:
+    redis:
+      host: schedule-cache.mapzip.shop
+      port: 6379
+      ssl:
+        enabled: true
     
   # JPA 설정 (운영 환경 기준)
   jpa:
@@ -55,8 +65,13 @@ management:
   endpoint:
     health:
       show-details: always
-    prometheus:
-      enabled: true
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db,grpc
+        liveness:
+          include: livenessState,db,grpc
   metrics:
     export:
       prometheus:
@@ -81,14 +96,7 @@ cloud:
     region:
       static: ${AWS_REGION:ap-northeast-2}
 
-# 외부 API 설정
-external:
-  api:
-    tmap:
-      url: https://apis.openapi.sk.com
-      key: '{cipher}b4164c17f59386ba11272ff9aaf04f9a184680c6e7362e0772830576667b0bc29b9bfe829ec5e4e4c9a585c861629e77a1c2db6594b9fdea2fc0c3dc4c2e1dc7'
-    
-
 # 개발 환경용 인증 설정
 auth:
   enabled: false
+

@@ -1,142 +1,134 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { scheduleApi } from "@/services/api"
+import { useRouter } from "next/navigation"
+import { scheduleApi, recommendApi, APIError } from "@/services/api"
 import type { Schedule } from "@/types"
 
-export function useSchedule() {
+export default function useSchedule() {
+  const router = useRouter()
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isProcessing, setIsProcessing] = useState(false)
 
-  const initFromLocalStorage = useCallback(() => {
-    setIsLoading(true);
+  const loadSchedules = useCallback(async () => {
     try {
-      const savedSchedule = localStorage.getItem("selectedSchedule");
-      if (savedSchedule) {
-        selectSchedule(JSON.parse(savedSchedule));
-      }
-      const savedSchedules = localStorage.getItem("schedules");
-      if (savedSchedules) {
-        setSchedules(JSON.parse(savedSchedules));
-      }
-    } catch (error) {
-      console.error("로컬 스토리지 파싱/접근 실패:", error);
-      // 문제가 있는 데이터는 지웁니다.
-      localStorage.removeItem("selectedSchedule");
-      localStorage.removeItem("schedules");
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    initFromLocalStorage();
-  }, [initFromLocalStorage]);
-
-  const saveSchedulesToStorage = (scheduleList: Schedule[]) => {
-    localStorage.setItem("schedules", JSON.stringify(scheduleList))
-    setSchedules(scheduleList)
-  }
-
-  const loadSchedules = async (userId: string) => {
-    try {
-      const data = await scheduleApi.getSchedules(userId)
-      saveSchedulesToStorage(data)
+      setIsLoading(true)
+      const data = await scheduleApi.getSchedules()
+      setSchedules(data)
     } catch (error) {
       console.error("스케줄 목록 로드 실패:", error)
-      throw error
+    } finally {
+      setIsLoading(false)
     }
+  }, [])
+
+  const loadSelectedSchedule = useCallback(async () => {
+    try {
+      setIsLoading(true)
+      const response = await recommendApi.getActiveScheduleSummary()
+      if (response && response.schedule) {
+        setSelectedSchedule(response.schedule)
+      } else {
+        setSelectedSchedule(null)
+        localStorage.removeItem("scheduleSelected")
+      }
+    } catch (error) {
+      console.error("선택된 스케줄 요약 로드 실패:", error)
+      setSelectedSchedule(null)
+      localStorage.removeItem("scheduleSelected")
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    const scheduleSelected = localStorage.getItem("scheduleSelected") === "true"
+    if (scheduleSelected) {
+      loadSelectedSchedule()
+    } else {
+      setIsLoading(false)
+    }
+  }, [loadSelectedSchedule])
+
+  const selectSchedule = async (scheduleId: string) => {
+    setIsProcessing(true)
+    try {
+      await recommendApi.selectAndGetSummary(scheduleId)
+      localStorage.setItem("scheduleSelected", "true")
+      router.push("/")
+    } catch (error) {
+      console.error("스케줄 선택 및 처리 실패:", error)
+      alert("스케줄 처리에 실패했습니다. 잠시 후 다시 시도해주세요.")
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const deselectSchedule = () => {
+    setSelectedSchedule(null)
+    localStorage.removeItem("scheduleSelected")
+    router.push("/")
+    router.refresh()
   }
 
   const createSchedule = async (scheduleData: Omit<Schedule, "id">) => {
+    setIsProcessing(true)
     try {
       const newSchedule = await scheduleApi.createSchedule(scheduleData)
-      const updatedSchedules = [...schedules, newSchedule]
-      setSchedules(updatedSchedules)
-      localStorage.setItem("schedules", JSON.stringify(updatedSchedules))
-      return newSchedule
+      setSchedules((prev) => [...prev, newSchedule])
+      router.push("/schedule")
     } catch (error) {
       console.error("스케줄 생성 실패:", error)
       throw error
+    } finally {
+      setIsProcessing(false)
     }
   }
 
-  const updateSchedule = async (scheduleData: Schedule) => {
-    if (!scheduleData.userId) {
-      console.error("업데이트를 위한 userId가 없습니다.");
-      return;
-    }
-
+  const updateSchedule = async (scheduleId: string) => {
+    setIsProcessing(true)
     try {
-      await scheduleApi.updateSchedule(scheduleData);
-      await loadSchedules(scheduleData.userId); 
-
-      if (selectedSchedule?.id === scheduleData.id) {
-        const updatedSelected = await scheduleApi.getScheduleDetail(scheduleData.id, scheduleData.userId);
-        if (updatedSelected.schedule) {
-          // selectSchedule을 호출하여 파싱 로직을 재사용합니다.
-          selectSchedule({ ...updatedSelected.schedule, id: updatedSelected.schedule.scheduleId || scheduleData.id });
-        }
-      }
+      // This is a placeholder for the actual update logic.
+      // You might need to fetch current location and pass it to the API.
+      await scheduleApi.processSchedule(scheduleId, { type: "UPDATE" })
+      alert("스케줄이 업데이트되었습니다.")
+      // Reload the summary
+      await loadSelectedSchedule()
     } catch (error) {
-      console.error("스케줄 수정 실패:", error);
-      throw error;
+      console.error("스케줄 업데이트 실패:", error)
+      alert("스케줄 업데이트에 실패했습니다.")
+    } finally {
+      setIsProcessing(false)
     }
-  };
+  }
 
-  const deleteSchedule = async (scheduleId: string, userId: string) => {
+  const deleteSchedule = async (scheduleId: string) => {
+    setIsProcessing(true)
     try {
-      await scheduleApi.deleteSchedule(scheduleId, userId)
-      const updatedSchedules = schedules.filter((schedule) => schedule.id !== scheduleId)
-      setSchedules(updatedSchedules)
-      localStorage.setItem("schedules", JSON.stringify(updatedSchedules))
-
+      await scheduleApi.deleteSchedule(scheduleId)
+      setSchedules((prev) => prev.filter((s) => s.id !== scheduleId))
       if (selectedSchedule?.id === scheduleId) {
-        setSelectedSchedule(null)
-        localStorage.removeItem("selectedSchedule")
+        deselectSchedule()
       }
     } catch (error) {
       console.error("스케줄 삭제 실패:", error)
-      throw error
+    } finally {
+      setIsProcessing(false)
     }
   }
-
-  const selectSchedule = (schedule: Schedule | null) => {
-    if (schedule) {
-      const parsedSchedule = {
-        ...schedule,
-        departure: typeof schedule.departure === 'string' ? JSON.parse(schedule.departure) : schedule.departure,
-        destination: typeof schedule.destination === 'string' ? JSON.parse(schedule.destination) : schedule.destination,
-        waypoints: typeof schedule.waypoints === 'string' ? JSON.parse(schedule.waypoints) : schedule.waypoints,
-      };
-
-      const scheduleWithMealTimes = {
-        ...parsedSchedule,
-        targetMealTimes: parsedSchedule.targetMealTimes || [
-          { type: "식사" as const, time: "12:00" },
-          { type: "간식" as const, time: "15:00" },
-          { type: "식사" as const, time: "18:00" },
-        ],
-      }
-      setSelectedSchedule(scheduleWithMealTimes)
-      localStorage.setItem("selectedSchedule", JSON.stringify(scheduleWithMealTimes))
-    } else {
-      setSelectedSchedule(null);
-      localStorage.removeItem("selectedSchedule");
-    }
-  }
-  
-  
 
   return {
     schedules,
     selectedSchedule,
     isLoading,
+    isProcessing,
     loadSchedules,
+    selectSchedule,
+    deselectSchedule,
     createSchedule,
     updateSchedule,
     deleteSchedule,
-    selectSchedule,
   }
 }
