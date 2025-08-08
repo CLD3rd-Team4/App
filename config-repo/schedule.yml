@@ -46,10 +46,10 @@ grpc:
   server:
     port: 9090
     reflection-service-enabled: true
-  client:
-    kakao-api-service:
-      address: static://localhost:9090
-      negotiation-type: plaintext
+  #  client:
+#    recommend-service: # kakao-api-service -> recommend-service 로 이름 변경
+#      address: static://recommend.service-recommend.svc.cluster.local:9090 # 실제 recommend 서비스 주소로 변경
+#      negotiation-type: plaintext
 
 # 로깅 설정
 logging:
