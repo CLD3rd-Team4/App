@@ -1,12 +1,11 @@
-package com.mapzip.schedule.dto;
+package com.mapzip.recommend.dto.tmap;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 @Getter
 @AllArgsConstructor
-public class TmapLocation {
-    private String name;
+public class TmapWaypoint {
     private String lon;
     private String lat;
 }

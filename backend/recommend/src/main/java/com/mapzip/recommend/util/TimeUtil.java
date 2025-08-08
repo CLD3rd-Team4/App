@@ -1,4 +1,4 @@
-package com.mapzip.schedule.util;
+package com.mapzip.recommend.util;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -54,4 +54,5 @@ public class TimeUtil {
     public static LocalDateTime now() {
         return LocalDateTime.now(SEOUL_ZONE_ID);
     }
+    
 }

@@ -10,7 +10,7 @@ import java.util.UUID;
 public class ReviewEntity {
 
     private String restaurantId;  
-    private String createdAtUserId;  // 복합키: "2024-01-01T12:00:00Z#user123"      
+    private String createdAtUserId;  // 복합키: "2024-01-01T12:00:00Z#{userId}"      
     private String userId;
     private String restaurantName;
     private String restaurantAddress;

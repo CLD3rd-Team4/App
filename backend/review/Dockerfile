@@ -45,7 +45,7 @@ EXPOSE 8080 50051
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:8080/api/reviews/health || exit 1
+  CMD curl -f http://localhost:8080/review/health || exit 1
 
 # Environment variables
 ENV SPRING_PROFILES_ACTIVE=prod

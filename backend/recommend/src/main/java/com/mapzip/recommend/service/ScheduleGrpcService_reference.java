@@ -1,24 +1,26 @@
-package com.mapzip.schedule.service;
+package com.mapzip.recommend.service;
 
-import com.mapzip.schedule.config.GrpcInterceptorConfig;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mapzip.schedule.dto.MealSlotData;
 import com.mapzip.schedule.entity.MealTimeSlot;
 import com.mapzip.schedule.entity.Schedule;
 import com.mapzip.schedule.grpc.*;
 import com.mapzip.schedule.mapper.ScheduleMapper;
 import com.mapzip.schedule.repository.MealTimeSlotRepository;
 import com.mapzip.schedule.repository.ScheduleRepository;
+
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
+import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import net.devh.boot.grpc.client.inject.GrpcClient;
 import net.devh.boot.grpc.server.service.GrpcService;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
@@ -28,12 +30,10 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
 
     private final ScheduleRepository scheduleRepository;
     private final MealTimeSlotRepository mealTimeSlotRepository;
+    
     private final ScheduleMapper scheduleMapper;
     private final ObjectMapper objectMapper;
-    private final RedisTemplate<String, String> redisTemplate;
-
-    // @GrpcClient("recommend-service")
-    // private RouteCalculatorServiceGrpc.RouteCalculatorServiceBlockingStub recommendClient;
+    private final TmapCalculationProcessor tmapCalculationProcessor;
 
     @Override
     @Transactional
@@ -74,7 +74,54 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
         }
     }
 
+    @Override
+    @Transactional
+    public void processSchedule(ProcessScheduleRequest request, StreamObserver<ProcessScheduleResponse> responseObserver) {
+        try {
+            Schedule schedule = scheduleRepository.findById(request.getScheduleId())
+                    .orElseThrow(() -> Status.NOT_FOUND.withDescription("스케줄을 찾을 수 없습니다: " + request.getScheduleId()).asRuntimeException());
 
+            schedule.setCalculatedArrivalTime(null);
+
+            Map<String, Object> jobData = new HashMap<>();
+            jobData.put("scheduleId", schedule.getId());
+            jobData.put("userId", schedule.getUserId());
+            jobData.put("type", request.getType().toString());
+            jobData.put("departureTime", schedule.getDepartureTime());
+
+            TypeReference<Map<String, Object>> mapTypeRef = new TypeReference<>() {};
+            TypeReference<List<Map<String, Object>>> listMapTypeRef = new TypeReference<>() {};
+            jobData.put("departure", objectMapper.readValue(schedule.getDepartureLocation(), mapTypeRef));
+            jobData.put("destination", objectMapper.readValue(schedule.getDestinationLocation(), mapTypeRef));
+            jobData.put("waypoints", objectMapper.readValue(schedule.getWaypoints(), listMapTypeRef));
+
+            List<MealSlotData> mealSlotDataList = schedule.getMealTimeSlots().stream()
+                    .map(slot -> new MealSlotData(slot.getId(), slot.getMealType(), slot.getScheduledTime(), slot.getRadius()))
+                    .collect(Collectors.toList());
+            jobData.put("mealSlots", mealSlotDataList);
+            jobData.put("createdAt", LocalDateTime.now().toString());
+
+            if (request.getType() == ProcessType.UPDATE) {
+                jobData.put("currentLat", request.getCurrentLat());
+                jobData.put("currentLng", request.getCurrentLng());
+                jobData.put("currentTime", request.getCurrentTime());
+            }
+
+            Schedule updatedSchedule = tmapCalculationProcessor.calculateAndSave(jobData);
+
+            GetScheduleDetailResponse.ScheduleDetail scheduleDetail = scheduleMapper.toDetail(updatedSchedule);
+
+            ProcessScheduleResponse response = ProcessScheduleResponse.newBuilder()
+                    .setSchedule(scheduleDetail)
+                    .build();
+
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+        } catch (Exception e) {
+            log.error("스케줄 처리 요청 중 오류 발생", e);
+            responseObserver.onError(Status.INTERNAL.withDescription("스케줄 처리 요청 중 오류: " + e.getMessage()).withCause(e).asRuntimeException());
+        }
+    }
 
     @Override
     @Transactional
@@ -83,8 +130,7 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
             Schedule schedule = scheduleRepository.findById(request.getScheduleId())
                     .orElseThrow(() -> Status.NOT_FOUND.withDescription("수정할 스케줄을 찾을 수 없습니다: " + request.getScheduleId()).asRuntimeException());
 
-            String userId = GrpcInterceptorConfig.USER_ID_CONTEXT_KEY.get();
-            if (!schedule.getUserId().equals(userId)) {
+            if (!schedule.getUserId().equals(request.getUserId())) {
                 throw Status.PERMISSION_DENIED.withDescription("이 스케줄을 수정할 권한이 없습니다.").asRuntimeException();
             }
 
@@ -145,32 +191,14 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
     @Transactional(readOnly = true)
     public void getScheduleDetail(GetScheduleDetailRequest request, StreamObserver<GetScheduleDetailResponse> responseObserver) {
         try {
-            String scheduleId = request.getScheduleId();
-            Schedule schedule = scheduleRepository.findById(scheduleId)
+            Schedule schedule = scheduleRepository.findById(request.getScheduleId())
                     .orElseThrow(() -> new IllegalArgumentException("스케줄을 찾을 수 없습니다."));
 
-            String userId = GrpcInterceptorConfig.USER_ID_CONTEXT_KEY.get();
-            if (userId == null || userId.isEmpty()) {
-                responseObserver.onError(io.grpc.Status.UNAUTHENTICATED
-                        .withDescription("사용자 ID를 확인할 수 없습니다.")
-                        .asRuntimeException());
-                return;
-            }
-            
-            if (!schedule.getUserId().equals(userId)) {
+            if (!schedule.getUserId().equals(request.getUserId())) {
                 responseObserver.onError(io.grpc.Status.PERMISSION_DENIED
                         .withDescription("해당 스케줄에 접근할 권한이 없습니다.")
                         .asRuntimeException());
                 return;
-            }
-
-            // 스케줄 조회 시, 해당 사용자의 선택 상태를 Valkey에 24시간 TTL로 저장
-            try {
-                redisTemplate.opsForValue().set("user:" + userId + ":selected", "true", 24, TimeUnit.HOURS);
-                log.info("사용자 '{}'의 스케줄 선택 상태를 저장했습니다.", userId);
-            } catch (Exception e) {
-                log.error("Valkey에 스케줄 선택 상태 저장 중 오류 발생", e);
-                // Valkey 오류가 핵심 기능에 영향을 주지 않도록 에러를 던지지 않고 로그만 남깁니다.
             }
 
             GetScheduleDetailResponse.ScheduleDetail detail = scheduleMapper.toDetail(schedule);
@@ -190,9 +218,12 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
         }
     }
 
+    
 
-
-
+    @Override
+    public void refreshSchedule(RefreshScheduleRequest request, StreamObserver<RefreshScheduleResponse> responseObserver) {
+        responseObserver.onError(Status.UNIMPLEMENTED.withDescription("Method not implemented").asRuntimeException());
+    }
 
     @Override
     @Transactional
@@ -201,8 +232,7 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
             Schedule schedule = scheduleRepository.findById(request.getScheduleId())
                     .orElseThrow(() -> Status.NOT_FOUND.withDescription("스케줄을 찾을 수 없습니다: " + request.getScheduleId()).asRuntimeException());
 
-            String userId = GrpcInterceptorConfig.USER_ID_CONTEXT_KEY.get();
-            if (!schedule.getUserId().equals(userId)) {
+            if (!schedule.getUserId().equals(request.getUserId())) {
                 throw Status.PERMISSION_DENIED.withDescription("이 스케줄을 삭제할 권한이 없습니다.").asRuntimeException();
             }
 
@@ -222,7 +252,4 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
                     .asRuntimeException());
         }
     }
-
-
-
 }

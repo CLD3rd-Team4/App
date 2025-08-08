@@ -1,6 +1,7 @@
-package com.mapzip.schedule.dto;
+package com.mapzip.recommend.dto.tmap;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -8,11 +9,14 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
-public class Geometry {
+public class Feature {
 
     @JsonProperty("type")
     private String type;
 
-    @JsonProperty("coordinates")
-    private Object coordinates;
+    @JsonProperty("geometry")
+    private Geometry geometry;
+
+    @JsonProperty("properties")
+    private Properties properties;
 }

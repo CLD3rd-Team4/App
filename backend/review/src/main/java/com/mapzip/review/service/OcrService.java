@@ -12,6 +12,9 @@ import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -22,8 +25,11 @@ public class OcrService {
     
     private static final Logger logger = LoggerFactory.getLogger(OcrService.class);
     
-    @Value("${google.cloud.vision.api-key}")
+    @Value("${google.cloud.vision.api-key:}")
     private String serviceAccountKey;
+    
+    @Value("${google.cloud.vision.credentials-path:}")
+    private String credentialsPath;
     
     private static final Pattern DATE_PATTERN = 
         Pattern.compile("(\\d{4}[-/.]\\d{1,2}[-/.]\\d{1,2}|\\d{1,2}[-/.]\\d{1,2}[-/.]\\d{4})");
@@ -35,22 +41,36 @@ public class OcrService {
                                           String expectedRestaurantName, 
                                           String expectedAddress) {
         try {
-            // Google Cloud Vision API 클라이언트 생성 (Service Account 기반)
+            // Google Cloud Vision API 클라이언트 생성 (운영 환경 대응)
             GoogleCredentials credentials;
             
             if (serviceAccountKey != null && !serviceAccountKey.isEmpty()) {
-                // Config Server에서 받은 서비스 계정 키 JSON 문자열을 사용
+                // Config Server 암호화된 서비스 계정 키 JSON 사용
                 try {
+                    logger.info("Config Server 서비스 계정 키 사용");
                     credentials = ServiceAccountCredentials.fromStream(
                         new ByteArrayInputStream(serviceAccountKey.getBytes())
                     );
                 } catch (Exception e) {
-                    logger.warn("서비스 계정 키 파싱 실패, 기본 자격증명 사용: {}", e.getMessage());
-                    credentials = GoogleCredentials.getApplicationDefault();
+                    logger.error("서비스 계정 키 파싱 실패: {}", e.getMessage());
+                    throw new RuntimeException("구글 클라우드 비전 API 인증 실패", e);
+                }
+            } else if (credentialsPath != null && !credentialsPath.isEmpty()) {
+                // Kubernetes Secret 마운트된 파일 경로 사용
+                try {
+                    logger.info("Kubernetes Secret 서비스 계정 키 사용: {}", credentialsPath);
+                    credentials = ServiceAccountCredentials.fromStream(
+                        new ByteArrayInputStream(java.nio.file.Files.readAllBytes(
+                            java.nio.file.Paths.get(credentialsPath)))
+                    );
+                } catch (Exception e) {
+                    logger.error("서비스 계정 키 파일 읽기 실패: {}", e.getMessage());
+                    throw new RuntimeException("구글 클라우드 비전 API 인증 실패", e);
                 }
             } else {
-                // 환경변수 또는 기본 자격증명 사용
-                credentials = GoogleCredentials.getApplicationDefault();
+                // 어떤 인증 정보도 없는 경우 오류 발생
+                throw new IllegalStateException("구글 클라우드 비전 API 인증 정보가 설정되지 않았습니다. " +
+                    "google.cloud.vision.api-key 또는 google.cloud.vision.credentials-path를 설정해주세요.");
             }
             
             final GoogleCredentials finalCredentials = credentials;
@@ -280,5 +300,81 @@ public class OcrService {
         result.setConfidence(0.0);
         result.setRawText(message);
         return result;
+    }
+    
+    /**
+     * OCR 영수증 날짜와 실제 방문 날짜를 비교하여 검증
+     * @param ocrVisitDate OCR에서 추출된 방문 날짜
+     * @param actualVisitDate 실제 방문 날짜 (사용자가 입력한 날짜)
+     * @return 검증 결과
+     */
+    public boolean validateVisitDate(String ocrVisitDate, String actualVisitDate) {
+        if (ocrVisitDate == null || actualVisitDate == null) {
+            logger.warn("날짜 정보가 없음 - OCR: {}, Actual: {}", ocrVisitDate, actualVisitDate);
+            return false;
+        }
+        
+        try {
+            LocalDate ocrDate = parseDate(ocrVisitDate);
+            LocalDate actualDate = parseDate(actualVisitDate);
+            
+            if (ocrDate == null || actualDate == null) {
+                logger.warn("날짜 파싱 실패 - OCR: {}, Actual: {}", ocrVisitDate, actualVisitDate);
+                return false;
+            }
+            
+            // OCR 영수증 날짜가 실제 방문 날짜보다 과거면 false
+            if (ocrDate.isBefore(actualDate)) {
+                logger.warn("영수증 날짜({})가 방문 날짜({})보다 과거입니다", ocrDate, actualDate);
+                return false;
+            }
+            
+            // OCR 영수증 날짜가 방문 날짜보다 너무 미래면 false (7일 이상 차이)
+            if (ocrDate.isAfter(actualDate.plusDays(7))) {
+                logger.warn("영수증 날짜({})가 방문 날짜({})보다 7일 이상 미래입니다", ocrDate, actualDate);
+                return false;
+            }
+            
+            return true;
+            
+        } catch (Exception e) {
+            logger.error("날짜 검증 중 오류 발생", e);
+            return false;
+        }
+    }
+    
+    /**
+     * 다양한 날짜 형식을 파싱하여 LocalDate로 변환
+     */
+    private LocalDate parseDate(String dateStr) {
+        if (dateStr == null || dateStr.trim().isEmpty()) {
+            return null;
+        }
+        
+        String cleanDate = dateStr.trim();
+        
+        // 다양한 날짜 형식 시도
+        String[] patterns = {
+            "yyyy-MM-dd",
+            "yyyy/MM/dd", 
+            "yyyy.MM.dd",
+            "MM-dd-yyyy",
+            "MM/dd/yyyy",
+            "dd-MM-yyyy",
+            "dd/MM/yyyy",
+            "dd.MM.yyyy"
+        };
+        
+        for (String pattern : patterns) {
+            try {
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern(pattern);
+                return LocalDate.parse(cleanDate, formatter);
+            } catch (DateTimeParseException e) {
+                // 다음 패턴 시도
+            }
+        }
+        
+        logger.warn("지원되지 않는 날짜 형식: {}", cleanDate);
+        return null;
     }
 }

@@ -45,11 +45,7 @@ public class Schedule {
     @Column(name = "departure_time", nullable = false, length = 20)
     private String departureTime;
 
-    /**
-     * Tmap API를 통해 계산된 예상 도착 시간
-     */
-    @Column(name = "calculated_arrival_time", length = 20)
-    private String calculatedArrivalTime;
+    
 
     /**
      * 출발지 정보 (JSON 형태로 저장)
@@ -75,12 +71,7 @@ public class Schedule {
     @Column(columnDefinition = "jsonb")
     private String waypoints;
 
-    /**
-     * 사용자 메모
-     */
-    @Lob
-    @Column(name = "user_note")
-    private String userNote;
+    
 
     /**
      * 여행 목적
@@ -109,6 +100,11 @@ public class Schedule {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    /**
+     * 사용자에 의해 현재 선택된 스케줄인지 여부
+     */
+    
 
     @OneToMany(mappedBy = "schedule", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private java.util.List<MealTimeSlot> mealTimeSlots = new java.util.ArrayList<>();

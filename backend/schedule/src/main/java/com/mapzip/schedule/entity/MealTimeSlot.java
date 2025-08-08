@@ -52,13 +52,7 @@ public class MealTimeSlot {
     @Column(nullable = false)
     private Integer radius = 1000; // 기본값 1000m
 
-    /**
-     * 경로상 계산된 예상 식사/간식 위치 (JSON 형태로 저장)
-     * MealLocation 객체를 JSONB 타입으로 변환하여 저장합니다.
-     */
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "calculated_location", columnDefinition = "jsonb")
-    private String calculatedLocation;
+    
 
     @OneToOne(mappedBy = "mealTimeSlot", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private SelectedRestaurant selectedRestaurant;

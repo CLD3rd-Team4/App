@@ -19,25 +19,26 @@ spring:
       discovery:
         enabled: true
         
-  # Redis 캐싱 설정 (ElastiCache 연결)
+  # Valkey 캐싱 설정 (ElastiCache 운영 환경)
   data:
-    redis:
-      host: ${REDIS_HOST:elasticache-review.service-platform.svc.cluster.local}
+    valkey:
+      host: ${REDIS_HOST:mapzip-dev-review-cache.2iapp0.ng.0001.apn2.cache.amazonaws.com}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
+      password: ${REDIS_PASSWORD:}  # AUTH 비활성화됨
       database: ${REDIS_DATABASE:0}
-      timeout: ${REDIS_TIMEOUT:2000ms}
+      timeout: ${REDIS_TIMEOUT:3000ms}
+      ssl: false
       lettuce:
         pool:
-          max-active: ${REDIS_POOL_MAX_ACTIVE:8}
-          max-idle: ${REDIS_POOL_MAX_IDLE:8}
-          min-idle: ${REDIS_POOL_MIN_IDLE:0}
-          max-wait: ${REDIS_POOL_MAX_WAIT:-1ms}
+          max-active: ${REDIS_POOL_MAX_ACTIVE:16}
+          max-idle: ${REDIS_POOL_MAX_IDLE:16}
+          min-idle: ${REDIS_POOL_MIN_IDLE:4}
+          max-wait: ${REDIS_POOL_MAX_WAIT:3000ms}
           
   # 캐시 설정
   cache:
-    type: redis
-    redis:
+    type: valkey
+    valkey:
       time-to-live: ${CACHE_DEFAULT_TTL:1800000}  # 기본 30분 TTL (밀리초)
       cache-null-values: false
       
@@ -58,16 +59,16 @@ aws:
   
   # DynamoDB 연결 (IRSA 사용으로 자격증명 불필요)
   dynamodb:
-    table-name: ${DYNAMODB_TABLE_NAME:${TERRAFORM_WORKSPACE:dev}-mapzip-reviews}
+    table-name: ${DYNAMODB_TABLE_NAME:mapzip-${TERRAFORM_WORKSPACE:dev}-review}
     endpoint: ${DYNAMODB_ENDPOINT:}
     region: ${AWS_REGION:ap-northeast-2}
     
   # S3 설정 (IRSA 사용으로 자격증명 불필요)
   s3:
-    bucket-name: mapzip-${TERRAFORM_WORKSPACE:dev}-image
+    bucket-name: ${S3_BUCKET_NAME:mapzip-${TERRAFORM_WORKSPACE:dev}-image}  # 실제 S3 버킷 이름 (terraform main.tf 참조)
     region: ${AWS_REGION:ap-northeast-2}
     presign-duration: ${S3_PRESIGN_DURATION:PT1H}  # Pre-signed URL 유효시간 (1시간)
-    cloudfront-domain: ${CLOUDFRONT_IMAGE_DOMAIN:https://img.mapzip.shop}  # CloudFront 이미지 도메인
+    cloudfront-domain: ${CLOUDFRONT_IMAGE_DOMAIN:https://img.mapzip.shop}  # CloudFront 배포 도메인 (terraform main.tf line 213 참조)
     
   # MSK Kafka 설정 (main 클러스터) - 환경변수 필수
   kafka:
@@ -150,8 +151,8 @@ review:
     default-size: ${PAGINATION_DEFAULT_SIZE:20}
     max-size: ${PAGINATION_MAX_SIZE:100}
   cache:
-    user-reviews-ttl: ${CACHE_USER_REVIEWS_TTL:3600}      # 1시간 (초)
-    restaurant-reviews-ttl: ${CACHE_RESTAURANT_REVIEWS_TTL:7200}  # 2시간 (초)
-    review-stats-ttl: ${CACHE_REVIEW_STATS_TTL:21600}     # 6시간 (초)
-    ocr-results-ttl: ${CACHE_OCR_RESULTS_TTL:86400}       # 24시간 (초)
-    recommendation-ttl: ${CACHE_RECOMMENDATION_TTL:14400}  # 4시간 (초)
+    user-reviews-ttl: ${CACHE_USER_REVIEWS_TTL:7200}       # 2시간 (운영환경 증가)
+    restaurant-reviews-ttl: ${CACHE_RESTAURANT_REVIEWS_TTL:14400}  # 4시간
+    review-stats-ttl: ${CACHE_REVIEW_STATS_TTL:43200}      # 12시간
+    ocr-results-ttl: ${CACHE_OCR_RESULTS_TTL:172800}       # 48시간 (운영환경 증가)
+    recommendation-ttl: ${CACHE_RECOMMENDATION_TTL:21600}   # 6시간

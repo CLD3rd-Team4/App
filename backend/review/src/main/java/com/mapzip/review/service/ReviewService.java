@@ -2,8 +2,11 @@ package com.mapzip.review.service;
 
 import com.mapzip.review.dto.OcrResultDto;
 import com.mapzip.review.entity.ReviewEntity;
+import com.mapzip.review.entity.PendingReviewEntity;
 import com.mapzip.review.grpc.HeaderInterceptor;
+import com.mapzip.review.grpc.ReviewProto;
 import com.mapzip.review.repository.ReviewRepository;
+import com.mapzip.review.repository.PendingReviewRepository;
 import io.grpc.Context;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -26,16 +30,22 @@ public class ReviewService {
     private static final Logger logger = LoggerFactory.getLogger(ReviewService.class);
     
     private final ReviewRepository reviewRepository;
+    private final PendingReviewRepository pendingReviewRepository;
     private final OcrService ocrService;
     private final S3Service s3Service;
+    private final RedisTemplate<String, Object> redisTemplate;
     
     @Autowired
     public ReviewService(ReviewRepository reviewRepository, 
+                        PendingReviewRepository pendingReviewRepository,
                         OcrService ocrService, 
-                        S3Service s3Service) {
+                        S3Service s3Service,
+                        RedisTemplate<String, Object> redisTemplate) {
         this.reviewRepository = reviewRepository;
+        this.pendingReviewRepository = pendingReviewRepository;
         this.ocrService = ocrService;
         this.s3Service = s3Service;
+        this.redisTemplate = redisTemplate;
     }
     
     @Caching(evict = {
@@ -45,7 +55,7 @@ public class ReviewService {
     })
     public ReviewCreateResult createReview(String userId, String restaurantId, String restaurantName, 
                                          String restaurantAddress, int rating, String content,
-                                         List<byte[]> receiptImages, List<byte[]> reviewImages) {
+                                         List<byte[]> receiptImages, List<byte[]> reviewImages, String visitDate) {
         try {
             // 사용자 인증 검증
             validateUserAuthentication(userId);
@@ -63,6 +73,15 @@ public class ReviewService {
 
                 if (!isVerified) {
                     return new ReviewCreateResult(null, ocrResult, false, "영수증 검증에 실패하여 리뷰를 생성할 수 없습니다.");
+                }
+                
+                // OCR 날짜와 실제 방문 날짜 비교 검증
+                if (visitDate != null && ocrResult.getVisitDate() != null) {
+                    boolean isDateValid = ocrService.validateVisitDate(ocrResult.getVisitDate(), visitDate);
+                    if (!isDateValid) {
+                        return new ReviewCreateResult(null, ocrResult, false, 
+                            "영수증 날짜가 방문 날짜와 일치하지 않습니다. 리뷰 작성이 차단되었습니다.");
+                    }
                 }
             }
             
@@ -373,6 +392,234 @@ public class ReviewService {
         }
         
         logger.debug("User authentication validated for userId: {}", authenticatedUserId);
+    }
+    
+    /**
+     * 추천 서버에서 보낸 식당 정보를 Valkey에 저장
+     * @param userId 사용자 ID
+     * @param places 식당 정보 목록
+     */
+    public void storePlacesForReview(String userId, List<ReviewProto.ReviewPlaceInfo> places) {
+        logger.info("Storing {} places for user: {}", places.size(), userId);
+        
+        try {
+            String key = "places_for_review:" + userId;
+            
+            // 기존 데이터 삭제 후 새로운 데이터 저장
+            redisTemplate.delete(key);
+            
+            // 각 식당 정보를 JSON으로 변환하여 저장
+            for (int i = 0; i < places.size(); i++) {
+                ReviewProto.ReviewPlaceInfo place = places.get(i);
+                String placeJson = String.format(
+                    "{\"id\":\"%s\",\"placeName\":\"%s\",\"addressName\":\"%s\",\"placeUrl\":\"%s\",\"scheduledTime\":\"%s\"}",
+                    place.getId(),
+                    place.getPlaceName().replace("\"", "\\\""),
+                    place.getAddressName().replace("\"", "\\\""),
+                    place.getPlaceUrl(),
+                    place.getScheduledTime()
+                );
+                
+                redisTemplate.opsForList().rightPush(key, placeJson);
+            }
+            
+            // TTL 설정 (7일)
+            redisTemplate.expire(key, java.time.Duration.ofDays(7));
+            
+            logger.info("Successfully stored {} places for user: {}", places.size(), userId);
+            
+        } catch (Exception e) {
+            logger.error("Failed to store places for user: {}", userId, e);
+            throw new RuntimeException("식당 정보 저장 실패: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 사용자가 리뷰 작성 가능한 식당 목록 조회
+     * @param userId 사용자 ID
+     * @return 식당 정보 목록
+     */
+    public List<ReviewProto.ReviewPlaceInfo> getPlacesForReview(String userId) {
+        logger.info("Getting places for review for user: {}", userId);
+        
+        try {
+            String key = "places_for_review:" + userId;
+            List<Object> placesData = redisTemplate.opsForList().range(key, 0, -1);
+            
+            if (placesData == null || placesData.isEmpty()) {
+                logger.info("No places found for user: {}", userId);
+                return List.of();
+            }
+            
+            List<ReviewProto.ReviewPlaceInfo> places = new ArrayList<>();
+            for (Object placeData : placesData) {
+                try {
+                    String placeJson = placeData.toString();
+                    // 간단한 JSON 파싱 (실제로는 Jackson 등을 사용하는 것이 좋음)
+                    String id = extractJsonValue(placeJson, "id");
+                    String placeName = extractJsonValue(placeJson, "placeName");
+                    String addressName = extractJsonValue(placeJson, "addressName");
+                    String placeUrl = extractJsonValue(placeJson, "placeUrl");
+                    String scheduledTime = extractJsonValue(placeJson, "scheduledTime");
+                    
+                    ReviewProto.ReviewPlaceInfo place = ReviewProto.ReviewPlaceInfo.newBuilder()
+                            .setId(id)
+                            .setPlaceName(placeName)
+                            .setAddressName(addressName)
+                            .setPlaceUrl(placeUrl)
+                            .setScheduledTime(scheduledTime)
+                            .build();
+                    
+                    places.add(place);
+                } catch (Exception e) {
+                    logger.warn("Failed to parse place data: {}", placeData, e);
+                }
+            }
+            
+            logger.info("Retrieved {} places for user: {}", places.size(), userId);
+            return places;
+            
+        } catch (Exception e) {
+            logger.error("Failed to get places for user: {}", userId, e);
+            return List.of();
+        }
+    }
+    
+    /**
+     * 추천 서버용 리뷰 요약 정보 제공
+     * @param restaurantIds 식당 ID 목록
+     * @return 식당별 리뷰 요약
+     */
+    public List<ReviewProto.RestaurantReviewSummary> getReviewSummaryForRecommendation(List<String> restaurantIds) {
+        logger.info("Getting review summary for {} restaurants", restaurantIds.size());
+        
+        List<ReviewProto.RestaurantReviewSummary> summaries = new ArrayList<>();
+        
+        for (String restaurantId : restaurantIds) {
+            try {
+                // 평균 평점과 총 리뷰 수 조회
+                double averageRating = getRestaurantAverageRating(restaurantId);
+                long totalReviews = getRestaurantReviewCount(restaurantId);
+                
+                // 상위 3개 리뷰 조회 (평점 4점 이상, 최신순)
+                List<ReviewEntity> topReviews = reviewRepository.findByRestaurantId(restaurantId, 0, 10)
+                        .stream()
+                        .filter(review -> review.getRating() != null && review.getRating() >= 4)
+                        .filter(review -> review.getContent() != null && review.getContent().length() >= 10)
+                        .limit(3)
+                        .collect(Collectors.toList());
+                
+                List<String> topReviewContents = topReviews.stream()
+                        .map(ReviewEntity::getContent)
+                        .collect(Collectors.toList());
+                
+                ReviewProto.RestaurantReviewSummary summary = ReviewProto.RestaurantReviewSummary.newBuilder()
+                        .setRestaurantId(restaurantId)
+                        .setAverageRating(averageRating)
+                        .setTotalReviews((int) totalReviews)
+                        .addAllTopReviews(topReviewContents)
+                        .build();
+                
+                summaries.add(summary);
+                
+            } catch (Exception e) {
+                logger.warn("Failed to get review summary for restaurant: {}", restaurantId, e);
+                // 에러가 발생한 경우 기본값으로 추가
+                ReviewProto.RestaurantReviewSummary defaultSummary = ReviewProto.RestaurantReviewSummary.newBuilder()
+                        .setRestaurantId(restaurantId)
+                        .setAverageRating(0.0)
+                        .setTotalReviews(0)
+                        .build();
+                
+                summaries.add(defaultSummary);
+            }
+        }
+        
+        logger.info("Generated review summaries for {} restaurants", summaries.size());
+        return summaries;
+    }
+    
+    /**
+     * 간단한 JSON 값 추출 유틸리티 메서드
+     * 실제 운영에서는 Jackson ObjectMapper 사용 권장
+     */
+    private String extractJsonValue(String json, String key) {
+        String pattern = "\"" + key + "\":\"([^\"]*)\""; 
+        java.util.regex.Pattern regex = java.util.regex.Pattern.compile(pattern);
+        java.util.regex.Matcher matcher = regex.matcher(json);
+        
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        return "";
+    }
+    
+    // === 미작성 리뷰 관리 메서드들 ===
+    
+    /**
+     * 추천서버에서 선택된 식당들을 미작성 리뷰로 저장
+     */
+    public boolean savePendingReviews(String userId, List<ReviewProto.ReviewPlaceInfo> places) {
+        logger.info("Saving {} pending reviews for user: {}", places.size(), userId);
+        
+        try {
+            List<PendingReviewEntity> pendingReviews = places.stream()
+                    .map(place -> {
+                        PendingReviewEntity entity = new PendingReviewEntity();
+                        entity.setUserId(userId);
+                        entity.setRestaurantId(place.getId());
+                        entity.setPlaceName(place.getPlaceName());
+                        entity.setAddressName(place.getAddressName());
+                        entity.setPlaceUrl(place.getPlaceUrl());
+                        entity.setScheduledTime(place.getScheduledTime());
+                        return entity;
+                    })
+                    .collect(Collectors.toList());
+            
+            return pendingReviewRepository.saveBatch(pendingReviews);
+            
+        } catch (Exception e) {
+            logger.error("Failed to save pending reviews for user: {}", userId, e);
+            return false;
+        }
+    }
+    
+    /**
+     * 사용자의 미작성 리뷰 목록 조회
+     */
+    public List<PendingReviewEntity> getPendingReviewsByUserId(String userId) {
+        logger.info("Getting pending reviews for user: {}", userId);
+        return pendingReviewRepository.findIncompleteByUserId(userId);
+    }
+    
+    /**
+     * 미작성 리뷰 삭제 (사용자가 안간 경우)
+     */
+    public boolean deletePendingReview(String userId, String scheduledTime, String restaurantId) {
+        logger.info("Deleting pending review for user: {}, restaurant: {}", userId, restaurantId);
+        
+        String compositeKey = scheduledTime + "#" + restaurantId;
+        return pendingReviewRepository.delete(userId, compositeKey);
+    }
+    
+    /**
+     * 리뷰 작성 완료 시 미작성 리뷰를 완료 처리
+     */
+    public boolean markPendingReviewAsCompleted(String userId, String restaurantId, String scheduledTime) {
+        logger.info("Marking pending review as completed for user: {}, restaurant: {}", userId, restaurantId);
+        
+        String compositeKey = scheduledTime + "#" + restaurantId;
+        return pendingReviewRepository.markAsCompleted(userId, compositeKey);
+    }
+    
+    /**
+     * 특정 미작성 리뷰 상세 조회
+     */
+    public Optional<PendingReviewEntity> getPendingReviewDetail(String userId, String scheduledTime, String restaurantId) {
+        logger.info("Getting pending review detail for user: {}, restaurant: {}", userId, restaurantId);
+        
+        String compositeKey = scheduledTime + "#" + restaurantId;
+        return pendingReviewRepository.findByUserIdAndCompositeKey(userId, compositeKey);
     }
     
     // 내부 클래스: 리뷰 생성 결과

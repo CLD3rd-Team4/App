@@ -1,7 +1,8 @@
-package com.mapzip.schedule.dto;
+package com.mapzip.recommend.dto.tmap;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 

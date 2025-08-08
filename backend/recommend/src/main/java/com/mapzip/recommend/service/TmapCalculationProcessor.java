@@ -1,16 +1,24 @@
-package com.mapzip.schedule.service;
+package com.mapzip.recommend.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
-import com.mapzip.schedule.client.TmapClient;
-import com.mapzip.schedule.dto.*;
+import com.mapzip.recommend.client.TmapClient;
+import com.mapzip.recommend.dto.*;
+import com.mapzip.recommend.dto.tmap.Feature;
+import com.mapzip.recommend.dto.tmap.Properties;
+import com.mapzip.recommend.dto.tmap.TmapLocation;
+import com.mapzip.recommend.dto.tmap.TmapRouteRequest;
+import com.mapzip.recommend.dto.tmap.TmapRouteResponse;
+import com.mapzip.recommend.dto.tmap.TmapRoutesInfo;
+import com.mapzip.recommend.dto.tmap.TmapWaypoint;
+import com.mapzip.recommend.dto.tmap.WaypointsContainer;
 import com.mapzip.schedule.entity.MealTimeSlot;
 import com.mapzip.schedule.entity.Schedule;
 import com.mapzip.schedule.grpc.Location;
 import com.mapzip.schedule.grpc.Waypoint;
 import com.mapzip.schedule.repository.ScheduleRepository;
-import com.mapzip.schedule.util.TimeUtil;
+import com.mapzip.recommend.util.TimeUtil;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -23,7 +31,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.mapzip.schedule.dto.Feature;
 
 @Service
 @Slf4j

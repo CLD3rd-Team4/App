@@ -64,7 +64,7 @@ public class S3Service {
             
             // 2. 파일명 생성
             String fileName = generateFileName(userId, contentType);
-            String keyName = "reviews/" + fileName;
+            String keyName = "review/" + fileName;
             
             // 3. S3 업로드 (Private 버킷) - CloudFront를 통해 접근 가능
             PutObjectRequest putRequest = PutObjectRequest.builder()

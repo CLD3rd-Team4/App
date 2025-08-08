@@ -14,6 +14,9 @@ import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.connection.lettuce.LettucePoolingClientConfiguration;
+import io.lettuce.core.ClientOptions;
+import io.lettuce.core.SocketOptions;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
@@ -56,7 +59,7 @@ public class CacheConfig {
     private long recommendationTtl;
 
     /**
-     * Redis 연결 팩토리 설정
+     * ElastiCache Redis 연결 팩토리 설정
      */
     @Bean
     public RedisConnectionFactory redisConnectionFactory() {
@@ -69,7 +72,18 @@ public class CacheConfig {
             redisConfig.setPassword(redisPassword);
         }
 
-        return new LettuceConnectionFactory(redisConfig);
+        // ElastiCache 최적화를 위한 Lettuce 클라이언트 설정
+        LettucePoolingClientConfiguration clientConfig = LettucePoolingClientConfiguration.builder()
+                .clientOptions(ClientOptions.builder()
+                    .socketOptions(SocketOptions.builder()
+                        .connectTimeout(Duration.ofMillis(2000))
+                        .keepAlive(true)
+                        .build())
+                    .build())
+                .commandTimeout(Duration.ofMillis(2000))
+                .build();
+
+        return new LettuceConnectionFactory(redisConfig, clientConfig);
     }
 
     /**
