@@ -36,15 +36,38 @@ public class CustomRouteLocator {
                                 .filter(jwtAuthenticationFilter.apply(new JwtAuthenticationFilter.Config())))
                         .uri("http://recommend.service-recommend:9090"))
 
-                // 리뷰 서비스 라우팅 (이미지 포함 - HTTP)
-                .route("review-http", r -> r.path("/review", "/review/verify-receipt")
+                // HTTP (port 8080): 이미지 처리 + HTTP 전용 API
+                .route("review-http-post", r -> r.path("/review")
+                        .and().method("POST")  // 이미지 업로드 전용
+                        .filters(f -> f
+                                .filter(xssProtectionFilter.apply(new XssProtectionFilter.Config()))
+                                .filter(jwtAuthenticationFilter.apply(new JwtAuthenticationFilter.Config())))
+                        .uri("http://review.service-review:8080"))
+                
+                .route("review-http-verify", r -> r.path("/review/verify-receipt")
+                        .and().method("POST")  // OCR 검증 전용
                         .filters(f -> f
                                 .filter(xssProtectionFilter.apply(new XssProtectionFilter.Config()))
                                 .filter(jwtAuthenticationFilter.apply(new JwtAuthenticationFilter.Config())))
                         .uri("http://review.service-review:8080"))
 
-                // 리뷰 서비스 라우팅 (이미지 없음 - gRPC)  
+                .route("review-http-pending", r -> r.path("/review/pending", "/review/pending/**")
+                        .and().method("GET", "DELETE")  // 미작성 리뷰 관리
+                        .filters(f -> f
+                                .filter(xssProtectionFilter.apply(new XssProtectionFilter.Config()))
+                                .filter(jwtAuthenticationFilter.apply(new JwtAuthenticationFilter.Config())))
+                        .uri("http://review.service-review:8080"))
+                
+                .route("review-http-health", r -> r.path("/review/health")
+                        .and().method("GET")  // 헬스체크
+                        .filters(f -> f
+                                .filter(xssProtectionFilter.apply(new XssProtectionFilter.Config()))
+                                .filter(jwtAuthenticationFilter.apply(new JwtAuthenticationFilter.Config())))
+                        .uri("http://review.service-review:8080"))
+
+                // gRPC (port 50051): 일반 조회 API 
                 .route("review-grpc", r -> r.path("/review/**")
+                        .and().method("GET", "PUT", "DELETE")  // 나머지 API들
                         .filters(f -> f
                                 .filter(xssProtectionFilter.apply(new XssProtectionFilter.Config()))
                                 .filter(jwtAuthenticationFilter.apply(new JwtAuthenticationFilter.Config())))
