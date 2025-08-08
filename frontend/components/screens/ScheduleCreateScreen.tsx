@@ -57,7 +57,7 @@ export default function ScheduleCreateScreen({ isEdit = false, initialData = nul
   const handleOptionalComplete = async (finalOptionalData: any) => {
     try {
       const scheduleData = {
-        userId: "test-user-123", // TODO: 실제 사용자 ID로 교체
+        // userId는 JWT 토큰에서 자동으로 추출
         title: requiredData.scheduleName,
         departureTime: requiredData.departureTime,
         arrivalTime: initialData?.arrivalTime || "",

@@ -49,8 +49,8 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
       
       const result = await ocrApi.processReceipt(
         capturedImage,
-        restaurant.name || '',
-        restaurant.address || ''
+        restaurant.placeName || restaurant.name || '',
+        restaurant.addressName || restaurant.address || ''
       )
       setOcrResult(result)
       setStep(2)
@@ -98,7 +98,7 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
       
       const reviewData: CreateReviewRequest = {
         restaurantId: restaurant.restaurantId || restaurant.id || '',
-        restaurantName: restaurant.placeName || restaurant.name,
+        restaurantName: restaurant.placeName || restaurant.name || '',
         restaurantAddress: restaurant.addressName || restaurant.address || '',
         rating,
         content: reviewText,
@@ -143,7 +143,7 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
             </div>
 
             <div className="mb-4">
-              <p className="text-sm text-gray-600 mb-2">식당명: {restaurant.placeName || restaurant.name}</p>
+              <p className="text-sm text-gray-600 mb-2">식당명: {restaurant.placeName || restaurant.name || '식당명'}</p>
               <p className="text-sm text-gray-600 mb-2">주소: {restaurant.addressName || restaurant.address || "주소 정보"}</p>
               {restaurant.scheduledTime && (
                 <p className="text-sm text-blue-600">예정 시간: {restaurant.scheduledTime}</p>

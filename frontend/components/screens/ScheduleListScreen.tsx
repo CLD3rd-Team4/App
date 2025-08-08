@@ -28,7 +28,7 @@ export default function ScheduleListScreen() {
   const loadScheduleList = async () => {
     try {
       setIsLoading(true)
-      const data = await scheduleApi.getSchedules("test-user-123")
+      const data = await scheduleApi.getSchedules()
       setSchedules(data)
     } catch (error) {
       console.error("스케줄 목록 로드 실패:", error)
@@ -75,7 +75,7 @@ export default function ScheduleListScreen() {
       return
     }
     try {
-      await scheduleApi.deleteSchedule(scheduleId, "test-user-123")
+      await scheduleApi.deleteSchedule(scheduleId)
       setSchedules(schedules.filter((schedule) => schedule.id !== scheduleId))
     } catch (error) {
       console.error("스케줄 삭제 실패:", error)
