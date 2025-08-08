@@ -20,7 +20,7 @@ export default function KakaoCallbackPage() {
         if (!code) return;
 
         if (sessionStorage.getItem("kakaoLoginDone")) {
-            api.get("/oauth2/me/kakaoid")
+            api.get("/auth/me/kakaoid")
                 .then((res) => {
                     console.log("인증 확인:", res.data);
                     router.push("/");
