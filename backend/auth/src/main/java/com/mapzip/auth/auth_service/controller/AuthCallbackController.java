@@ -7,10 +7,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
 import java.util.HashMap;
@@ -23,30 +20,30 @@ public class AuthCallbackController {
 
     private final KakaoOAuthService kakaoOAuthService;
 
-    @GetMapping("/kakao/callback")
+    @PostMapping("/kakao/callback")
     public ResponseEntity<Map<String, String>> handleKakaoCallback(@RequestParam String code) {
-        System.out.println("callback 도착");
+        System.out.println("callback 요청");
         TokenResponseDto token = kakaoOAuthService.loginWithKakao(code);
-        System.out.println("controller에 token 도착");
+
         // 쿠키 설정
         ResponseCookie accessTokenCookie = ResponseCookie.from("accessToken", token.getAccessToken())
                 .httpOnly(true)
-                .secure(false) // HTTPS 환경일 경우 true
+                .secure(true) // HTTPS 환경일 경우 true
                 .path("/")
                 .maxAge(Duration.ofHours(1))
-                .sameSite("None") // 또는 Strict, None (CORS 정책에 따라)
+                .sameSite("Lax") // 또는 Strict, None (CORS 정책에 따라)
                 .build();
 
         // refreshToken 쿠키 설정
         ResponseCookie refreshTokenCookie = ResponseCookie.from("refreshToken", token.getRefreshToken())
                 .httpOnly(true)
-                .secure(false)
+                .secure(true)
                 .path("/")
                 .maxAge(Duration.ofDays(1))
-                .sameSite("None")
+                .sameSite("Lax")
                 .build();
 
-        System.out.println("쿠키 설정");
+        System.out.println("쿠키 설정 완료");
         Map<String, String> response = new HashMap<>();
         response.put("message", "로그인 성공");
 

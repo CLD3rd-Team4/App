@@ -36,16 +36,12 @@
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
-<<<<<<< HEAD
         <!-- Spring Authorization Server -->
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-oauth2-authorization-server</artifactId>
             <version>1.4.1</version>
         </dependency>
-
-=======
->>>>>>> 3ac0fe2 (feat: auth서버 구축)
         <!-- Spring Cloud Config Client -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>

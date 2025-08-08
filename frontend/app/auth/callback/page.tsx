@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useRef } from "react"
+import api from "../../../lib/interceptor"
 
 export default function KakaoCallbackPage() {
     const router = useRouter()
@@ -19,41 +20,29 @@ export default function KakaoCallbackPage() {
         if (!code) return;
 
         if (sessionStorage.getItem("kakaoLoginDone")) {
-            fetch("http://localhost:8080/oauth2/me/kakaoid", {
-                credentials: "include",
-            })
+            api.get("/oauth2/me/kakaoid")
                 .then((res) => {
-                    if (!res.ok) throw new Error("인증 실패");
-                    return res.text();
-                })
-                .then((text) => {
-                    console.log("인증 확인:", text);
+                    console.log("인증 확인:", res.data);
                     router.push("/");
                 })
-                .catch(() => {
+                .catch((err) => {
+                    console.log("인증 실패 또는 쿠키 없음", err);
                     sessionStorage.removeItem("kakaoLoginDone");
-                    console.log("쿠키 없고 인증도 안됨");
-                    router.push("/login");
+                    router.push("/auth/login");
                 });
             return;
         }
 
         sessionStorage.setItem("kakaoLoginDone", "true");
 
-        fetch(`http://localhost:8080/auth/kakao/callback?code=${code}`, {
-            credentials: "include",
-        })
+        api.post(`/auth/kakao/callback?code=${code}`)
             .then((res) => {
-                if (!res.ok) throw new Error("로그인 실패");
-                return res.json();
-            })
-            .then((data) => {
-                console.log("서버 응답 메시지:", data.message);
-                router.push("/");
+                console.log("서버 응답 메시지:", res.data.message);
+                router.push("/"); // 로그인 성공
             })
             .catch((err) => {
-                console.error("로그인 실패", err);
-                router.push("/login");
+                console.error("로그인 실패", err)
+                router.push("/auth/login")
             });
 
     }, [searchParams, router]);

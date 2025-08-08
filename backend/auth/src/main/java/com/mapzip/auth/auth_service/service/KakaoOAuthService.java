@@ -58,6 +58,7 @@ public class KakaoOAuthService {
                 .subject(kakaoUserInfo.kakaoId().toString())
                 .issuedAt(now)
                 .expiresAt(now.plus(1, ChronoUnit.HOURS))
+                .claim("kakaoId", kakaoUserInfo.kakaoId().toString())
                 .claim("nickname", kakaoUserInfo.nickname())
                 .build();
 
@@ -72,12 +73,10 @@ public class KakaoOAuthService {
     }
 
     private String getKakaoAccessToken(String code) {
-        System.out.println("getKakaoAccessToken");
-        System.out.println("client_id: " + clientId);
-        System.out.println("redirect_uri: " + redirectUri);
-        System.out.println("code: " + code);
-        System.out.println("client_secret: " + clientSecret); // 있으면 출력
-
+//        System.out.println("getKakaoAccessToken");
+//        System.out.println("client_id: " + clientId);
+//        System.out.println("redirect_uri: " + redirectUri);
+//        System.out.println("code: " + code);
 
         String requestBody = "grant_type=authorization_code" +
                 "&client_id=" + clientId +
