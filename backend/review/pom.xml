@@ -171,9 +171,6 @@
                     <includes>
                         <include>**/*.proto</include>
                     </includes>
-                    <additionalProtoPathElements>
-                        <additionalProtoPathElement>${project.basedir}/googleapis</additionalProtoPathElement>
-                    </additionalProtoPathElements>
                 </configuration>
                 <executions>
                     <execution>
