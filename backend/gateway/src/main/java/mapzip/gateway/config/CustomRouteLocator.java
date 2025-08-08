@@ -31,6 +31,7 @@ public class CustomRouteLocator {
 
                 // 추천 서비스 라우팅
                 .route("recommend-service", r -> r.path("/recommend/**")
+                        .and().method("GET", "POST")  // 추천 조회 및 생성
                         .filters(f -> f
                                 .filter(xssProtectionFilter.apply(new XssProtectionFilter.Config()))
                                 .filter(jwtAuthenticationFilter.apply(new JwtAuthenticationFilter.Config())))
@@ -75,6 +76,7 @@ public class CustomRouteLocator {
 
                 // 스케줄 서비스 라우팅
                 .route("schedule-service", r -> r.path("/schedule/**")
+                        .and().method("GET", "POST", "PUT", "DELETE")  // 스케줄 CRUD
                         .filters(f -> f
                                 .filter(xssProtectionFilter.apply(new XssProtectionFilter.Config()))
                                 .filter(jwtAuthenticationFilter.apply(new JwtAuthenticationFilter.Config())))
