@@ -11,27 +11,26 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class RefreshTokenService {
 
-    private final StringRedisTemplate redisTemplate;
+    private final StringRedisTemplate redis;
+    private static final Duration TTL = Duration.ofDays(1);
 
-    public void save(String refreshToken, String kakaoIdAsString) {
-        System.out.println("refreshTokenService의 save에서 진입");
-
-        try {
-            redisTemplate.opsForValue().set(refreshToken, kakaoIdAsString, Duration.ofDays(1));
-            System.out.println("Redis 저장 성공");
-        } catch (Exception e) {
-            System.out.println("Redis 저장 실패");
-            e.printStackTrace(); // 예외 로그 확인
-        }
+    private String key(String refreshToken) {
+        return "rt:token:" + refreshToken;
     }
 
-
-    public Optional<String> getUserIdFromRefreshToken(String token) {
-        return Optional.ofNullable(redisTemplate.opsForValue().get(token));
+    // 발급/로그인 시 저장 (멀티 세션 허용)
+    public void save(String refreshToken, String kakaoId) {
+        redis.opsForValue().set(key(refreshToken), kakaoId, TTL);
     }
 
+    // 리프레시 요청에서 토큰으로 사용자(kakaoId)
+    public Optional<String> getUserIdFromRefreshToken(String refreshToken) {
+        return Optional.ofNullable(redis.opsForValue().get(key(refreshToken)));
+    }
+
+    //단일 세션로그아웃: 그 토큰만 무효화
     public void delete(String refreshToken) {
-        redisTemplate.delete(refreshToken);
+        redis.delete(key(refreshToken));
     }
 }
 

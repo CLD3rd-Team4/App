@@ -33,7 +33,7 @@ public class UserController {
                 .secure(true)
                 .domain(".mapzip.shop")
                 .path("/")
-                .maxAge(Duration.ofHours(1))
+                .maxAge(Duration.ofDays(1))
                 .sameSite("None")
                 .build();
 
