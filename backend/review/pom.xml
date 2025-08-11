@@ -182,7 +182,7 @@
                 </executions>
             </plugin>
 
-            <!-- Protocol Buffers descriptor generation (pb 파일 생성용 - 주석처리) -->
+            <!-- Protocol Buffers descriptor generation (pb 파일 생성용 주석처리해놨음) -->
             <!--
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
@@ -199,12 +199,13 @@
                             <executable>${settings.localRepository}/com/google/protobuf/protoc/${protobuf.version}/protoc-${protobuf.version}-${os.detected.classifier}.exe</executable>
                             <arguments>
                                 <argument>-I${project.basedir}/src/main/proto</argument>
+                                <argument>-I${project.basedir}/googleapis</argument>
                                 <argument>-descriptor_set_out=${project.basedir}/target/review_proto.pb</argument>
                                 <argument>-include_imports</argument>
                                 <argument>-include_source_info</argument>
                                 <argument>review.proto</argument>
                             </arguments>
-                            <workingDirectory>${project.basedir}</workingDirectory>
+                            <workingDirectory>${project.basedir}/src/main/proto</workingDirectory>
                         </configuration>
                     </execution>
                 </executions>

@@ -96,14 +96,9 @@ public class ReviewGrpcService extends ReviewServiceGrpc.ReviewServiceImplBase {
                 return;
             }
             
-            // 요청한 사용자 ID와 인증된 사용자 ID가 일치하는지 확인
-            if (!authenticatedUserId.equals(request.getUserId())) {
-                responseObserver.onError(new StatusRuntimeException(Status.PERMISSION_DENIED.withDescription("Access denied: Cannot access other user's reviews")));
-                return;
-            }
-            
+            // Gateway에서 검증된 사용자 ID 사용 (헤더에서 추출됨)
             List<ReviewEntity> reviews = reviewService.getUserReviews(
-                    request.getUserId(), request.getPage(), request.getSize());
+                    authenticatedUserId, request.getPage(), request.getSize());
             
             ReviewProto.GetUserReviewsResponse response = ReviewProto.GetUserReviewsResponse.newBuilder()
                     .addAllReviews(reviews.stream()
