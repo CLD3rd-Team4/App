@@ -104,28 +104,10 @@ jobs:
               echo "🔧 패치 중: $YAML_FILE"
 
               export IMAGE="061039804626.dkr.ecr.ap-northeast-2.amazonaws.com/mapzip-dev-ecr-pb:$SHORT_SHA"
-              export PB_FILE="${srv}_proto.pb"
 
-              yq -i '
-                if has("initContainers") then
-                  .initContainers[] |= (
-                    select(.name == "copy-pb") |= (
-                      .image = strenv(IMAGE)
-                    )
-                  )
-                else
-                  .initContainers = [{
-                    name: "copy-pb",
-                    image: strenv(IMAGE),
-                    command: ["/bin/sh", "-c"],
-                    args: ["cp /data/" + strenv(PB_FILE) + " /shared/"],
-                    volumeMounts: [{
-                      name: "pb-volume",
-                      mountPath: "/shared"
-                    }]
-                  }]
-                end
-              ' "$YAML_FILE"
+              yq eval '
+                (select(.kind == "Deployment").spec.template.spec.initContainers[] | select(.name == "copy-pb")).image = strenv(IMAGE)
+              ' -i "$YAML_FILE"
             else
               echo "⚠️ 파일 없음: $YAML_FILE"
             fi
