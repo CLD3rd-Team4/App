@@ -69,9 +69,9 @@ management:
         enabled: true
       group:
         readiness:
-          include: readinessState,db,grpc
+          include: readinessState,db,grpcServer
         liveness:
-          include: livenessState,db,grpc
+          include: livenessState,db,grpcServer
   metrics:
     export:
       prometheus:

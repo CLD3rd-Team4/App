@@ -168,5 +168,4 @@ message DeleteScheduleRequest {
 message DeleteScheduleResponse {
   string message = 1;
   bool success = 2;
-  
 }
