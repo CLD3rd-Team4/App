@@ -99,6 +99,7 @@ message CreateScheduleRequest {
   string purpose = 7;
   repeated string companions = 8;
   int32 arrival_buffer_minutes = 9; // 도착 여유 시간 (분)
+  string user_note = 10; // 사용자 요구사항
 }
 
 message CreateScheduleResponse {
@@ -139,6 +140,7 @@ message GetScheduleDetailResponse {
     string purpose = 7;
     repeated string companions = 8;
     int32 arrival_buffer_minutes = 9; // 도착 여유 시간 (분)
+    string user_note = 10; // 사용자 요구사항
   }
   ScheduleDetail schedule = 1;
 }
@@ -155,6 +157,7 @@ message UpdateScheduleRequest {
   string purpose = 8;
   repeated string companions = 9;
   int32 arrival_buffer_minutes = 10; // 도착 여유 시간 (분)
+  string user_note = 11; // 사용자 요구사항
 }
 
 // 3.5 스케줄 삭제
