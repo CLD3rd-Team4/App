@@ -412,6 +412,22 @@ export const reviewApi = {
     }
   },
 
+  // 사용자 리뷰 목록 조회 (JWT 토큰에서 userId 자동 추출)
+  getUserReviews: async (page: number = 1, size: number = 10): Promise<any> => {
+    try {
+      const response = await api.get('/review/user', {
+        params: { page, size }
+      });
+      return response.data;
+    } catch (error) {
+      if (error instanceof APIError) throw error;
+      if (error instanceof Error) {
+        throw new APIError('네트워크 오류가 발생했습니다: ' + error.message, 0, { originalError: error });
+      }
+      throw new APIError('알 수 없는 네트워크 오류가 발생했습니다', 0, { originalError: error });
+    }
+  },
+
   // 미작성 리뷰 목록 조회
   getPendingReviews: async (): Promise<any[]> => {
     try {
