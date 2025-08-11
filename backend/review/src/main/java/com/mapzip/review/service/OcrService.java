@@ -47,7 +47,7 @@ public class OcrService {
             if (serviceAccountKey != null && !serviceAccountKey.isEmpty()) {
                 // Config Server 암호화된 서비스 계정 키 JSON 사용
                 try {
-                    logger.info("Config Server 서비스 계정 키 사용");
+                    logger.info("Config Server 인증 방식 사용");
                     credentials = ServiceAccountCredentials.fromStream(
                         new ByteArrayInputStream(serviceAccountKey.getBytes())
                     );

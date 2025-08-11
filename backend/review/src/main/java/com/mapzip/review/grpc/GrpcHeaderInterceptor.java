@@ -35,7 +35,7 @@ public class GrpcHeaderInterceptor implements ServerInterceptor {
                 return new ServerCall.Listener<ReqT>() {};
             }
             // 개발환경에서는 기본값 사용
-            userId = "dev-user";
+            userId = "anonymous-dev-user-" + System.currentTimeMillis();
         } else {
             logger.debug("Extracted User-Id from header: {} for method: {}", 
                         userId, call.getMethodDescriptor().getFullMethodName());
