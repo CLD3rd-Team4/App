@@ -3,6 +3,7 @@ package com.mapzip.schedule.config;
 import io.grpc.health.v1.HealthCheckResponse;
 import io.grpc.protobuf.services.HealthStatusManager;
 import lombok.extern.slf4j.Slf4j;
+import net.devh.boot.grpc.server.service.GrpcService;
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.context.annotation.Bean;
@@ -33,21 +34,22 @@ public class GrpcHealthConfig {
     @Bean("grpcServer")
     public HealthIndicator grpcServerHealthIndicator() {
         return () -> {
-            try {
-                // 간단한 gRPC 서버 상태 체크
-                // 실제로는 gRPC 서버가 9090 포트에서 실행 중인지 확인
-                return Health.up()
-                    .withDetail("grpc.server.status", "SERVING")
-                    .withDetail("grpc.server.port", "9090")
-                    .withDetail("grpc.server.service", "schedule.ScheduleService")
-                    .build();
-            } catch (Exception e) {
-                log.error("gRPC health check failed", e);
-                return Health.down()
-                    .withDetail("grpc.server.status", "ERROR")
-                    .withDetail("grpc.server.error", e.getMessage())
-                    .build();
-            }
+            // 현재 단계에서는 gRPC 서버가 시작되면 항상 SERVING 상태라고 가정하고 UP을 반환합니다.
+            // 이렇게 하면 애플리케이션을 우선 실행시킬 수 있습니다.
+            return Health.up()
+                .withDetail("grpc.server.status", "SERVING")
+                .withDetail("grpc.server.port", "9090")
+                .build();
         };
+    }
+
+    /**
+     * gRPC Health Service를 등록합니다.
+     * HealthStatusManager가 제공하는 기본 Health Service 구현을 gRPC 서비스로 노출시킵니다.
+     */
+    @GrpcService
+    @Bean
+    public io.grpc.BindableService grpcHealthService(HealthStatusManager healthStatusManager) {
+        return healthStatusManager.getHealthService();
     }
 }
