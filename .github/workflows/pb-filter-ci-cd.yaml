@@ -110,15 +110,15 @@ jobs:
                 if has("initContainers") then
                   .initContainers[] |= (
                     select(.name == "copy-pb") |= (
-                      .image = env(IMAGE)
+                      .image = $IMAGE
                     )
                   )
                 else
                   .initContainers = [{
                     name: "copy-pb",
-                    image: env(IMAGE),
+                    image: $IMAGE,
                     command: ["/bin/sh", "-c"],
-                    args: ["cp /data/" + env(PB_FILE) + " /shared/"],
+                    args: ["cp /data/" + $PB_FILE + " /shared/"],
                     volumeMounts: [{
                       name: "pb-volume",
                       mountPath: "/shared"
