@@ -103,8 +103,8 @@ jobs:
             if [ -f "$YAML_FILE" ]; then
               echo "🔧 패치 중: $YAML_FILE"
 
-              IMAGE="061039804626.dkr.ecr.ap-northeast-2.amazonaws.com/mapzip-dev-ecr-pb:$SHORT_SHA"
-              PB_FILE="${srv}_proto.pb"
+              export IMAGE="061039804626.dkr.ecr.ap-northeast-2.amazonaws.com/mapzip-dev-ecr-pb:$SHORT_SHA"
+              export PB_FILE="${srv}_proto.pb"
 
               yq e '
                 if has("initContainers") then
@@ -125,12 +125,12 @@ jobs:
                     }]
                   }]
                 end
-              ' -i "$YAML_FILE" --arg IMAGE "$IMAGE" --arg PB_FILE "$PB_FILE"
+              ' -i "$YAML_FILE"
             else
               echo "⚠️ 파일 없음: $YAML_FILE"
             fi
           done
-
+          
       - name: Commit and push changes
         run: |
           git config user.name "github-actions[bot]"

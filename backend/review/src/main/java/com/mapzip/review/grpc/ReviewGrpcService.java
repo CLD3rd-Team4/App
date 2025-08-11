@@ -33,7 +33,8 @@ public class ReviewGrpcService extends ReviewServiceGrpc.ReviewServiceImplBase {
         try {
             logger.info("Creating review for restaurant: {}", request.getRestaurantId());
             
-            String userId = HeaderInterceptor.USER_ID_CONTEXT_KEY.get();
+            // Gateway에서 이미 JWT를 검증하고 x-user-id 헤더를 주입하므로 직접 추출
+            String userId = getCurrentUserId();
             if (userId == null || userId.isEmpty()) {
                 responseObserver.onError(new StatusRuntimeException(Status.UNAUTHENTICATED.withDescription("User ID is missing")));
                 return;
@@ -89,7 +90,7 @@ public class ReviewGrpcService extends ReviewServiceGrpc.ReviewServiceImplBase {
     public void getUserReviews(ReviewProto.GetUserReviewsRequest request,
                              StreamObserver<ReviewProto.GetUserReviewsResponse> responseObserver) {
         try {
-            String authenticatedUserId = HeaderInterceptor.USER_ID_CONTEXT_KEY.get();
+            String authenticatedUserId = getCurrentUserId();
             if (authenticatedUserId == null || authenticatedUserId.isEmpty()) {
                 responseObserver.onError(new StatusRuntimeException(Status.UNAUTHENTICATED.withDescription("User ID is missing")));
                 return;
@@ -155,7 +156,7 @@ public class ReviewGrpcService extends ReviewServiceGrpc.ReviewServiceImplBase {
     public void getReview(ReviewProto.GetReviewRequest request,
                         StreamObserver<ReviewProto.GetReviewResponse> responseObserver) {
         try {
-            String authenticatedUserId = HeaderInterceptor.USER_ID_CONTEXT_KEY.get();
+            String authenticatedUserId = getCurrentUserId();
             // 리뷰 조회는 누구나 가능하므로 인증 체크만 수행 (로그인 여부 확인)
             if (authenticatedUserId == null || authenticatedUserId.isEmpty()) {
                 responseObserver.onError(new StatusRuntimeException(Status.UNAUTHENTICATED.withDescription("User ID is missing")));
@@ -190,7 +191,8 @@ public class ReviewGrpcService extends ReviewServiceGrpc.ReviewServiceImplBase {
     public void updateReview(ReviewProto.UpdateReviewRequest request,
                            StreamObserver<ReviewProto.UpdateReviewResponse> responseObserver) {
         try {
-            String userId = HeaderInterceptor.USER_ID_CONTEXT_KEY.get();
+            // Gateway에서 이미 JWT를 검증하고 x-user-id 헤더를 주입하므로 직접 추출
+            String userId = getCurrentUserId();
             if (userId == null || userId.isEmpty()) {
                 responseObserver.onError(new StatusRuntimeException(Status.UNAUTHENTICATED.withDescription("User ID is missing")));
                 return;
@@ -231,7 +233,8 @@ public class ReviewGrpcService extends ReviewServiceGrpc.ReviewServiceImplBase {
     public void deleteReview(ReviewProto.DeleteReviewRequest request,
                            StreamObserver<ReviewProto.DeleteReviewResponse> responseObserver) {
         try {
-            String userId = HeaderInterceptor.USER_ID_CONTEXT_KEY.get();
+            // Gateway에서 이미 JWT를 검증하고 x-user-id 헤더를 주입하므로 직접 추출
+            String userId = getCurrentUserId();
             if (userId == null || userId.isEmpty()) {
                 responseObserver.onError(new StatusRuntimeException(Status.UNAUTHENTICATED.withDescription("User ID is missing")));
                 return;
@@ -460,10 +463,10 @@ public class ReviewGrpcService extends ReviewServiceGrpc.ReviewServiceImplBase {
     }
     
     private String getCurrentUserId() {
-        // HeaderInterceptor에서 설정한 사용자 ID를 가져오는 로직
-        String userId = HeaderInterceptor.USER_ID_CONTEXT_KEY.get();
+        // GrpcHeaderInterceptor에서 설정한 Context에서 사용자 ID 추출
+        String userId = GrpcHeaderInterceptor.USER_ID_CONTEXT_KEY.get();
         if (userId == null || userId.isEmpty()) {
-            throw new SecurityException("사용자 인증이 필요합니다.");
+            throw new SecurityException("사용자 인증이 필요합니다. Gateway에서 x-user-id 헤더가 전달되지 않았습니다.");
         }
         return userId;
     }

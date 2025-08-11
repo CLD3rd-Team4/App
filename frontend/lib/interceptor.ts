@@ -22,6 +22,11 @@ function subscribeTokenRefresh(
     refreshSubscribers.push({ resolve, reject })
 }
 
+// 요청 인터셉터 - Gateway에서 JWT 검증 후 x-user-id 헤더를 자동 주입하므로 제거
+        // Gateway에서 이미 JWT를 검증하고 x-user-id 헤더를 주입하므로 
+        // 프론트엔드에서는 별도 처리 불필요 쿠키에 포함
+
+
 function onTokenRefreshed() {
     refreshSubscribers.forEach(({ resolve }) => resolve())
     refreshSubscribers = []
@@ -31,6 +36,7 @@ function onRefreshFailed(error: any) {
     refreshSubscribers.forEach(({ reject }) => reject(error))
     refreshSubscribers = []
 }
+
 
 // 응답 인터셉터
 api.interceptors.response.use(

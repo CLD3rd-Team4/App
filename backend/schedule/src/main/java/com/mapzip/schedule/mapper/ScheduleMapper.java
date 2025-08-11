@@ -45,7 +45,6 @@ public class ScheduleMapper {
     public Schedule toEntity(CreateScheduleRequest request) throws JsonProcessingException {
         Schedule schedule = new Schedule();
         schedule.setId(java.util.UUID.randomUUID().toString());
-        schedule.setUserId(request.getUserId());
         schedule.setTitle(request.getTitle());
         schedule.setDepartureTime(request.getDepartureTime());
         
@@ -59,6 +58,8 @@ public class ScheduleMapper {
                 .collect(Collectors.toList());
         schedule.setWaypoints(gson.toJson(waypointMaps));
         schedule.setCompanions(gson.toJson(request.getCompanionsList()));
+        schedule.setArrivalBufferMinutes(request.getArrivalBufferMinutes());
+        schedule.setUserNote(request.getUserNote());
 
         return schedule;
     }
@@ -77,6 +78,8 @@ public class ScheduleMapper {
                 .collect(Collectors.toList());
         schedule.setWaypoints(gson.toJson(waypointMaps));
         schedule.setCompanions(gson.toJson(request.getCompanionsList()));
+        schedule.setArrivalBufferMinutes(request.getArrivalBufferMinutes());
+        schedule.setUserNote(request.getUserNote());
     }
 
     public GetScheduleListResponse.ScheduleSummary toSummary(Schedule schedule) {
@@ -126,7 +129,9 @@ public class ScheduleMapper {
                 .setDestination(destination)
                 .addAllWaypoints(waypoints)
                 .addAllMealSlots(mealTimeSlots)
-                .setPurpose(schedule.getPurpose() != null ? schedule.getPurpose() : "");
+                .setPurpose(schedule.getPurpose() != null ? schedule.getPurpose() : "")
+                .setArrivalBufferMinutes(schedule.getArrivalBufferMinutes() != null ? schedule.getArrivalBufferMinutes() : 0)
+                .setUserNote(schedule.getUserNote() != null ? schedule.getUserNote() : "");
 
         if (companions != null) {
             builder.addAllCompanions(companions);

@@ -19,6 +19,7 @@ interface RequiredData {
   arrivalTime: string
   estimatedArrivalTime: string
   targetMealTimes: MealTime[]
+  arrivalBufferMinutes: number // 도착 여유 시간 (분)
 }
 
 interface ScheduleCreateRequiredScreenProps {
@@ -39,6 +40,7 @@ export default function ScheduleCreateRequiredScreen({
       arrivalTime: "",
       estimatedArrivalTime: "18:30", // 백엔드에서 계산해서 받을 예정
       targetMealTimes: [],
+      arrivalBufferMinutes: 0, // 기본값 0으로 설정
     },
   )
   const [selectedAdjustment, setSelectedAdjustment] = useState<string>("")
@@ -123,7 +125,7 @@ export default function ScheduleCreateRequiredScreen({
 
     currentTime.setMinutes(currentTime.getMinutes() + minutes)
     const newTime = `${currentTime.getHours().toString().padStart(2, "0")}:${currentTime.getMinutes().toString().padStart(2, "0")}`
-    setFormData((prev) => ({ ...prev, arrivalTime: newTime }))
+    setFormData((prev) => ({ ...prev, arrivalTime: newTime, arrivalBufferMinutes: minutes }))
   }
 
   const handleNext = () => {

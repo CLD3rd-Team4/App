@@ -22,7 +22,7 @@ spring:
   # Valkey 캐싱 설정 (ElastiCache 운영 환경)
   data:
     valkey:
-      host: ${REDIS_HOST:mapzip-dev-review-cache.2iapp0.ng.0001.apn2.cache.amazonaws.com}
+      host: ${REDIS_HOST:review-cache.mapzip.shop}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}  # AUTH 비활성화됨
       database: ${REDIS_DATABASE:0}

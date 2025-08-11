@@ -39,7 +39,7 @@ export default function VisitedRestaurantsScreen() {
   const handleDeleteUnwritten = async (restaurantId: string, scheduledTime: string) => {
     try {
       await visitedRestaurantApi.deletePendingReview(restaurantId, scheduledTime)
-      setVisitedRestaurants((prev) => prev.filter((r) => r.id !== restaurantId))
+      setVisitedRestaurants((prev) => prev.filter((r) => (r.restaurantId || r.id) !== restaurantId))
       console.log('미작성 리뷰가 삭제되었습니다.')
     } catch (error) {
       console.error('미작성 리뷰 삭제 실패:', error)
@@ -112,7 +112,7 @@ export default function VisitedRestaurantsScreen() {
                     <div className="flex items-start gap-3">
                       <img
                         src={restaurant.image || "/placeholder.svg?height=50&width=50&query=restaurant"}
-                        alt={restaurant.name}
+                        alt={restaurant.placeName || restaurant.name || '식당'}
                         className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
                       />
                       <div className="flex-1 min-w-0">

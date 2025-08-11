@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useSchedule } from "@/hooks/useSchedule"
+import useSchedule from "@/hooks/useSchedule"
 import ScheduleCreateLocationScreen from "./ScheduleCreateLocationScreen"
 import ScheduleCreateRequiredScreen from "./ScheduleCreateRequiredScreen"
 import ScheduleCreateOptionalScreen from "./ScheduleCreateOptionalScreen"
@@ -30,6 +30,7 @@ export default function ScheduleCreateScreen({ isEdit = false, initialData = nul
       setRequiredData({
         scheduleName: initialData.title,
         departureTime: initialData.departureTime,
+        arrivalBufferMinutes: initialData.arrivalBufferMinutes,
         targetMealTimes: initialData.mealSlots.map((ms: any) => ({
           type: ms.mealType === 'MEAL' ? '식사' : '간식',
           time: ms.scheduledTime,
@@ -57,10 +58,11 @@ export default function ScheduleCreateScreen({ isEdit = false, initialData = nul
   const handleOptionalComplete = async (finalOptionalData: any) => {
     try {
       const scheduleData = {
-        userId: "test-user-123", // TODO: 실제 사용자 ID로 교체
+        // userId는 JWT 토큰에서 자동으로 추출
         title: requiredData.scheduleName,
         departureTime: requiredData.departureTime,
         arrivalTime: initialData?.arrivalTime || "",
+        arrivalBufferMinutes: requiredData.arrivalBufferMinutes, // 도착 여유 시간 추가
         mealSlots: requiredData.targetMealTimes.map((mt: any) => ({
           mealType: mt.type === '식사' ? 'MEAL' : 'SNACK',
           scheduledTime: mt.time,
@@ -75,7 +77,7 @@ export default function ScheduleCreateScreen({ isEdit = false, initialData = nul
       };
 
       if (isEdit && initialData?.id) {
-        await updateSchedule({ ...scheduleData, id: initialData.id });
+        await updateSchedule(initialData.id);
       } else {
         await createSchedule(scheduleData);
       }

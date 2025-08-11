@@ -1,9 +1,11 @@
 package com.mapzip.review.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mapzip.review.dto.OcrResultDto;
 import com.mapzip.review.entity.ReviewEntity;
 import com.mapzip.review.entity.PendingReviewEntity;
-import com.mapzip.review.grpc.HeaderInterceptor;
+import com.mapzip.review.grpc.GrpcHeaderInterceptor;
 import com.mapzip.review.grpc.ReviewProto;
 import com.mapzip.review.repository.ReviewRepository;
 import com.mapzip.review.repository.PendingReviewRepository;
@@ -34,18 +36,21 @@ public class ReviewService {
     private final OcrService ocrService;
     private final S3Service s3Service;
     private final RedisTemplate<String, Object> redisTemplate;
+    private final ObjectMapper objectMapper;
     
     @Autowired
     public ReviewService(ReviewRepository reviewRepository, 
                         PendingReviewRepository pendingReviewRepository,
                         OcrService ocrService, 
                         S3Service s3Service,
-                        RedisTemplate<String, Object> redisTemplate) {
+                        RedisTemplate<String, Object> redisTemplate,
+                        ObjectMapper objectMapper) {
         this.reviewRepository = reviewRepository;
         this.pendingReviewRepository = pendingReviewRepository;
         this.ocrService = ocrService;
         this.s3Service = s3Service;
         this.redisTemplate = redisTemplate;
+        this.objectMapper = objectMapper;
     }
     
     @Caching(evict = {
@@ -381,7 +386,7 @@ public class ReviewService {
      * gRPC Context에서 받은 사용자 ID와 요청의 사용자 ID가 일치하는지 확인
      */
     private void validateUserAuthentication(String requestedUserId) {
-        String authenticatedUserId = HeaderInterceptor.USER_ID_CONTEXT_KEY.get();
+        String authenticatedUserId = GrpcHeaderInterceptor.USER_ID_CONTEXT_KEY.get();
         
         if (authenticatedUserId == null || authenticatedUserId.isEmpty()) {
             throw new SecurityException("인증되지 않은 사용자입니다.");

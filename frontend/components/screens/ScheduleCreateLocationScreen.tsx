@@ -50,19 +50,46 @@ export default function ScheduleCreateLocationScreen({
 
   // 지도 초기화
   useEffect(() => {
-    if (!mapContainer.current || !window.kakao) return
+    const KAKAO_MAP_SCRIPT_ID = "kakao-map-script";
+    const KAKAO_MAP_APP_KEY = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY;
 
-    const mapOption = {
-      center: new window.kakao.maps.LatLng(37.566826, 126.9786567),
-      level: 8,
+    const initMap = () => {
+      if (mapContainer.current) {
+        const mapOption = {
+          center: new window.kakao.maps.LatLng(37.566826, 126.9786567),
+          level: 8,
+        };
+        map.current = new window.kakao.maps.Map(mapContainer.current, mapOption);
+
+        // 초기 데이터가 있으면 마커 표시
+        if (initialData?.departure) addMarker(initialData.departure, "blue");
+        if (initialData?.destination) addMarker(initialData.destination, "red");
+        initialData?.waypoints?.forEach((wp) => wp && addMarker(wp, "yellow"));
+      }
+    };
+
+    // 스크립트가 이미 로드되었는지 확인
+    if (window.kakao && window.kakao.maps) {
+      // 이미 로드되었다면 바로 지도 초기화
+      initMap();
+    } else {
+      // 로드되지 않았다면 스크립트 동적 주입
+      const script = document.createElement("script");
+      script.id = KAKAO_MAP_SCRIPT_ID;
+      script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_MAP_APP_KEY}&libraries=services&autoload=false`;
+      script.onload = () => {
+        window.kakao.maps.load(initMap);
+      };
+      script.onerror = () => {
+        console.error("Kakao map script load error.");
+      };
+
+      // 스크립트가 이미 주입되었는지 확인 후 추가
+      if (!document.getElementById(KAKAO_MAP_SCRIPT_ID)) {
+        document.head.appendChild(script);
+      }
     }
-    map.current = new window.kakao.maps.Map(mapContainer.current, mapOption)
-
-    // 초기 데이터가 있으면 마커 표시
-    if (initialData?.departure) addMarker(initialData.departure, "blue")
-    if (initialData?.destination) addMarker(initialData.destination, "red")
-    initialData?.waypoints?.forEach((wp) => wp && addMarker(wp, "yellow"))
-  }, [])
+  }, [initialData]);
 
   // 모든 마커 제거
   const clearMarkers = () => {

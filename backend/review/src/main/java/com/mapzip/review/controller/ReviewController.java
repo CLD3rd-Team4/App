@@ -39,12 +39,13 @@ public class ReviewController {
      */
     @PostMapping(value = "/verify-receipt", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Map<String, Object>> verifyReceipt(
+            @RequestHeader("x-user-id") String userId,
             @RequestParam("receiptImage") MultipartFile receiptImage,
             @RequestParam("expectedRestaurantName") String expectedRestaurantName,
             @RequestParam("expectedAddress") String expectedAddress) {
         
         try {
-            logger.info("Verifying receipt for restaurant: {}", expectedRestaurantName);
+            logger.info("Verifying receipt for user: {}, restaurant: {}", userId, expectedRestaurantName);
             
             // 파일 검증
             if (receiptImage.isEmpty()) {
@@ -76,7 +77,7 @@ public class ReviewController {
      */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Map<String, Object>> createReview(
-            @RequestHeader("X-User-Id") String userId,
+            @RequestHeader("x-user-id") String userId,
             @RequestParam("restaurantId") String restaurantId,
             @RequestParam("restaurantName") String restaurantName,
             @RequestParam("restaurantAddress") String restaurantAddress,
@@ -146,8 +147,7 @@ public class ReviewController {
      * 사용자의 미작성 리뷰 목록 조회
      */
     @GetMapping("/pending")
-    public ResponseEntity<Map<String, Object>> getPendingReviews(
-            @RequestHeader("x-user-id") String userId) {
+    public ResponseEntity<Map<String, Object>> getPendingReviews(@RequestHeader("x-user-id") String userId) {
         try {
             logger.info("Getting pending reviews for user: {}", userId);
             
@@ -160,7 +160,7 @@ public class ReviewController {
             ));
             
         } catch (Exception e) {
-            logger.error("Error getting pending reviews for user: {}", userId, e);
+            logger.error("Error getting pending reviews", e);
             return ResponseEntity.internalServerError()
                 .body(Map.of("success", false, "message", "미작성 리뷰 목록 조회 실패"));
         }

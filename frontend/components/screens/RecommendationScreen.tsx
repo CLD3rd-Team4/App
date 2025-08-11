@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Star, ChevronDown, ChevronUp } from "lucide-react"
-import { useSchedule } from "@/hooks/useSchedule"
+import useSchedule from "@/hooks/useSchedule"
 import type { Restaurant } from "@/types"
 
 interface MealSection {
@@ -21,7 +21,7 @@ interface MealSection {
 const MOCK_RESTAURANTS: Restaurant[] = [
   {
     id: "1",
-    name: "맛있는 한식당",
+    placeName: "맛있는 한식당",
     description: "전통 한식 전문점으로 정갈한 반찬과 깔끔한 맛",
     aiReason: "사용자의 비건 요구사항에 맞는 다양한 채식 메뉴 제공",
     rating: 4.2,
@@ -30,7 +30,7 @@ const MOCK_RESTAURANTS: Restaurant[] = [
   },
   {
     id: "2",
-    name: "건강한 샐러드바",
+    placeName: "건강한 샐러드바",
     description: "신선한 채소와 건강식으로 유명한 샐러드 전문점",
     aiReason: "비건 친화적인 메뉴와 신선한 재료 사용",
     rating: 4.5,
@@ -39,7 +39,7 @@ const MOCK_RESTAURANTS: Restaurant[] = [
   },
   {
     id: "3",
-    name: "이탈리안 파스타",
+    placeName: "이탈리안 파스타",
     description: "수제 파스타와 정통 이탈리아 요리 전문점",
     aiReason: "비건 파스타 옵션과 다양한 채식 메뉴 보유",
     rating: 4.0,
@@ -48,7 +48,7 @@ const MOCK_RESTAURANTS: Restaurant[] = [
   },
   {
     id: "4",
-    name: "카페 브런치",
+    placeName: "카페 브런치",
     description: "분위기 좋은 브런치 카페, 디저트와 커피가 맛있음",
     aiReason: "간식 시간에 적합한 비건 디저트와 음료 제공",
     rating: 4.3,
@@ -57,7 +57,7 @@ const MOCK_RESTAURANTS: Restaurant[] = [
   },
   {
     id: "5",
-    name: "아시안 퓨전",
+    placeName: "아시안 퓨전",
     description: "아시아 각국의 요리를 현대적으로 재해석한 퓨전 레스토랑",
     aiReason: "다양한 채식 아시아 요리와 건강한 재료 사용",
     rating: 4.1,
@@ -66,7 +66,7 @@ const MOCK_RESTAURANTS: Restaurant[] = [
   },
   {
     id: "6",
-    name: "디저트 하우스",
+    placeName: "디저트 하우스",
     description: "수제 디저트와 케이크 전문점, 달콤한 간식의 천국",
     aiReason: "비건 디저트 옵션과 간식 시간에 완벽한 메뉴",
     rating: 4.4,
@@ -75,7 +75,7 @@ const MOCK_RESTAURANTS: Restaurant[] = [
   },
   {
     id: "7",
-    name: "해산물 전문점",
+    placeName: "해산물 전문점",
     description: "신선한 해산물과 회를 전문으로 하는 레스토랑",
     aiReason: "지역 특산물을 활용한 신선한 해산물 메뉴",
     rating: 4.6,
@@ -84,7 +84,7 @@ const MOCK_RESTAURANTS: Restaurant[] = [
   },
   {
     id: "8",
-    name: "고기구이 전문점",
+    placeName: "고기구이 전문점",
     description: "숯불구이와 한우 전문점, 고품질 육류 제공",
     aiReason: "고품질 한우와 숯불구이의 깊은 맛",
     rating: 4.7,
@@ -93,7 +93,7 @@ const MOCK_RESTAURANTS: Restaurant[] = [
   },
   {
     id: "9",
-    name: "중식당",
+    placeName: "중식당",
     description: "정통 중화요리와 딤섬을 맛볼 수 있는 중식당",
     aiReason: "다양한 중화요리와 합리적인 가격",
     rating: 4.2,
@@ -106,7 +106,7 @@ const MOCK_RESTAURANTS: Restaurant[] = [
 const MOCK_PREVIOUS_SELECTIONS = {
   "meal-1": {
     id: "prev-1",
-    name: "이전에 선택한 한식당",
+    placeName: "이전에 선택한 한식당",
     description: "지난번에 선택했던 맛있는 한식당",
     aiReason: "이전 방문 기록을 바탕으로 한 추천",
     rating: 4.3,
@@ -115,7 +115,7 @@ const MOCK_PREVIOUS_SELECTIONS = {
   },
   "snack-1": {
     id: "prev-2",
-    name: "이전 선택 카페",
+    placeName: "이전 선택 카페",
     description: "지난번에 선택했던 브런치 카페",
     aiReason: "이전 선택 기록을 바탕으로 한 추천",
     rating: 4.1,
@@ -333,7 +333,7 @@ export default function RecommendationScreen() {
                     </div>
                     <div className="flex items-center gap-2">
                       {selectedRestaurants[section.id] && (
-                        <span className="text-sm text-gray-600">{selectedRestaurants[section.id].name}</span>
+                        <span className="text-sm text-gray-600">{selectedRestaurants[section.id].placeName || selectedRestaurants[section.id].name}</span>
                       )}
                       {expandedSections.has(section.id) ? (
                         <ChevronUp className="w-5 h-5 text-gray-400" />
@@ -354,7 +354,7 @@ export default function RecommendationScreen() {
                               <span className="text-xs bg-green-500 text-white px-2 py-1 rounded-full font-medium">
                                 이전 선택
                               </span>
-                              <h3 className="font-medium">{section.previousSelection.name}</h3>
+                              <h3 className="font-medium">{section.previousSelection.placeName || section.previousSelection.name}</h3>
                             </div>
                             <div className="flex items-start gap-3">
                               <img
@@ -364,7 +364,7 @@ export default function RecommendationScreen() {
                                   "/placeholder.svg" ||
                                   "/placeholder.svg"
                                 }
-                                alt={section.previousSelection.name}
+                                alt={section.previousSelection.placeName || section.previousSelection.name}
                                 className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
                               />
                               <div className="flex-1 min-w-0">
@@ -420,13 +420,13 @@ export default function RecommendationScreen() {
                                 {/* 음식점 이미지 */}
                                 <img
                                   src={restaurant.image || "/placeholder.svg?height=80&width=80&query=restaurant"}
-                                  alt={restaurant.name}
+                                  alt={restaurant.placeName || restaurant.name}
                                   className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
                                 />
 
                                 <div className="flex-1 min-w-0">
                                   {/* 이름 */}
-                                  <h3 className="font-semibold text-lg mb-1">{restaurant.name}</h3>
+                                  <h3 className="font-semibold text-lg mb-1">{restaurant.placeName || restaurant.name}</h3>
 
                                   {/* 한줄평 */}
                                   <p className="text-sm text-gray-600 mb-2">{restaurant.description}</p>
@@ -480,7 +480,7 @@ export default function RecommendationScreen() {
                       return (
                         <div key={sectionId} className="flex items-center gap-2 text-sm">
                           <span className="font-medium">{section?.title}:</span>
-                          <span>{restaurant.name}</span>
+                          <span>{restaurant.placeName || restaurant.name}</span>
                         </div>
                       )
                     })}
