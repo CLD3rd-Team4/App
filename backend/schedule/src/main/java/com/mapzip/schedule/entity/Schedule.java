@@ -94,6 +94,12 @@ public class Schedule {
     private Integer arrivalBufferMinutes;
 
     /**
+     * 사용자 요구사항
+     */
+    @Column(name = "user_note", columnDefinition = "TEXT")
+    private String userNote;
+
+    /**
      * 레코드 생성 시간
      */
     @CreationTimestamp

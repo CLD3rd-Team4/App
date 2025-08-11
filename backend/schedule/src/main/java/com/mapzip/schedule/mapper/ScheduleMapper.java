@@ -59,6 +59,7 @@ public class ScheduleMapper {
         schedule.setWaypoints(gson.toJson(waypointMaps));
         schedule.setCompanions(gson.toJson(request.getCompanionsList()));
         schedule.setArrivalBufferMinutes(request.getArrivalBufferMinutes());
+        schedule.setUserNote(request.getUserNote());
 
         return schedule;
     }
@@ -78,6 +79,7 @@ public class ScheduleMapper {
         schedule.setWaypoints(gson.toJson(waypointMaps));
         schedule.setCompanions(gson.toJson(request.getCompanionsList()));
         schedule.setArrivalBufferMinutes(request.getArrivalBufferMinutes());
+        schedule.setUserNote(request.getUserNote());
     }
 
     public GetScheduleListResponse.ScheduleSummary toSummary(Schedule schedule) {
@@ -128,7 +130,8 @@ public class ScheduleMapper {
                 .addAllWaypoints(waypoints)
                 .addAllMealSlots(mealTimeSlots)
                 .setPurpose(schedule.getPurpose() != null ? schedule.getPurpose() : "")
-                .setArrivalBufferMinutes(schedule.getArrivalBufferMinutes() != null ? schedule.getArrivalBufferMinutes() : 0);
+                .setArrivalBufferMinutes(schedule.getArrivalBufferMinutes() != null ? schedule.getArrivalBufferMinutes() : 0)
+                .setUserNote(schedule.getUserNote() != null ? schedule.getUserNote() : "");
 
         if (companions != null) {
             builder.addAllCompanions(companions);

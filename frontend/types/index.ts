@@ -30,6 +30,7 @@ export interface Schedule {
   calculatedArrivalTime?: string; // 계산된 도착 시간 추가
   companions: string[]
   purpose: string
+  userNote?: string; // 사용자 요구사항
   selectedRestaurant?: Restaurant
   selectedRestaurants?: Array<{
     sectionId: string
