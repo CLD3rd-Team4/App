@@ -2,23 +2,29 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { useRouter } from "next/navigation"
 import { Camera, Star } from "lucide-react"
 import BottomNavigation from "@/components/common/BottomNavigation"
-import { visitedRestaurantApi } from "@/services/api"
+import { visitedRestaurantApi, reviewApi } from "@/services/api"
 import type { VisitedRestaurant } from "@/types"
 import { ReviewWriteModal } from "@/components/modals/ReviewWriteModal"
 
 export default function VisitedRestaurantsScreen() {
   const router = useRouter()
   const [visitedRestaurants, setVisitedRestaurants] = useState<VisitedRestaurant[]>([])
+  const [completedReviews, setCompletedReviews] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showReviewModal, setShowReviewModal] = useState(false)
   const [selectedRestaurant, setSelectedRestaurant] = useState<any>(null)
+  const [showNewRestaurantForm, setShowNewRestaurantForm] = useState(false)
+  const [newRestaurantName, setNewRestaurantName] = useState('')
+  const [newRestaurantAddress, setNewRestaurantAddress] = useState('')
 
   useEffect(() => {
     loadVisitedRestaurants()
+    loadCompletedReviews()
   }, [])
 
   const loadVisitedRestaurants = async () => {
@@ -33,6 +39,18 @@ export default function VisitedRestaurantsScreen() {
       setError(error.message || '데이터를 불러오는 데 실패했습니다.')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const loadCompletedReviews = async () => {
+    try {
+      const response = await reviewApi.getUserReviews(1, 10)
+      console.log('작성된 리뷰 데이터:', response) // 디버깅용
+      setCompletedReviews(response.data || [])
+    } catch (error: any) {
+      console.error("작성된 리뷰 목록 로드 실패:", error)
+      // 에러가 있어도 미작성 리뷰는 표시하도록 함
+      setCompletedReviews([])
     }
   }
 
@@ -52,17 +70,59 @@ export default function VisitedRestaurantsScreen() {
     setShowReviewModal(true)
   }
 
+  const handleNewRestaurantSubmit = () => {
+    if (!newRestaurantName.trim() || !newRestaurantAddress.trim()) {
+      alert('식당명과 주소를 모두 입력해주세요.')
+      return
+    }
+    
+    const newRestaurant = {
+      id: `new-${Date.now()}`,
+      restaurantId: `new-${Date.now()}`,
+      placeName: newRestaurantName.trim(),
+      addressName: newRestaurantAddress.trim(),
+      scheduledTime: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+    }
+    
+    setSelectedRestaurant(newRestaurant)
+    setShowReviewModal(true)
+    setShowNewRestaurantForm(false)
+    setNewRestaurantName('')
+    setNewRestaurantAddress('')
+  }
+
   const handleReviewComplete = (reviewData: any) => {
     // 작성 완료된 리뷰를 목록에 추가
     setShowReviewModal(false)
     setSelectedRestaurant(null)
-    // 리뷰 목록 새로고침
+    // 미작성 리뷰와 완료된 리뷰 목록 모두 새로고침
     loadVisitedRestaurants()
+    loadCompletedReviews()
   }
 
   const handleReviewClick = (reviewId: number) => {
     // 정적 환경에서 안전한 라우팅을 위해 trailing slash 추가
     router.push(`/review/detail/${reviewId}/`)
+  }
+
+  const handleDeleteReview = async (restaurantId: string, reviewId: string) => {
+    if (!window.confirm('정말로 이 리뷰를 삭제하시겠습니까?')) {
+      return;
+    }
+
+    try {
+      await reviewApi.deleteReview(restaurantId, reviewId);
+      console.log('리뷰가 삭제되었습니다.');
+      // 작성된 리뷰 목록 새로고침
+      loadCompletedReviews();
+    } catch (error: any) {
+      console.error('리뷰 삭제 실패:', error);
+      if (error.message.includes('권한이 없습니다')) {
+        alert('삭제 권한이 없습니다.');
+      } else {
+        alert('리뷰 삭제에 실패했습니다. 다시 시도해주세요.');
+      }
+    }
   }
 
   return (
@@ -93,7 +153,7 @@ export default function VisitedRestaurantsScreen() {
               <p className="text-gray-600 mb-4">미작성 리뷰가 없습니다.</p>
               <p className="text-sm text-gray-500 mb-4">최근 방문하신 식당? 후기를 남겨보세요.</p>
               <Button
-                onClick={() => handleWriteReview({ name: "새 식당", address: "주소 정보" })}
+                onClick={() => setShowNewRestaurantForm(true)}
                 className="bg-blue-500 hover:bg-blue-600 text-white flex items-center gap-2"
               >
                 <Camera className="w-4 h-4" />첫 리뷰 작성하기
@@ -151,28 +211,58 @@ export default function VisitedRestaurantsScreen() {
                 ))}
               </div>
 
-              {/* 작성 리뷰 섹션 */}
+              {/* 작성 리뷰 섹션 - 실제 API 연동 */}
               <div className="bg-white p-4 rounded-lg shadow-sm">
                 <h3 className="font-medium mb-3">작성 리뷰</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {[1, 2, 3, 4].map((index) => (
-                    <div
-                      key={index}
-                      className="bg-gray-100 rounded-lg p-3 cursor-pointer hover:bg-gray-200 transition-colors"
-                      onClick={() => handleReviewClick(index)}
-                    >
-                      <img
-                        src={`/placeholder.svg?height=80&width=120&query=food${index}`}
-                        alt={`리뷰 이미지 ${index}`}
-                        className="w-full h-16 object-cover rounded mb-2"
-                      />
-                      <div className="flex items-center">
-                        {/* 오른쪽 별점 제거, 왼쪽 별점만 유지 */}
-                        <span className="text-xs text-gray-600">★★★★</span>
+                {completedReviews.length === 0 ? (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-gray-500">작성된 리뷰가 없습니다.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    {completedReviews.slice(0, 4).map((review, index) => (
+                      <div
+                        key={review.reviewId || review.id || index}
+                        className="bg-gray-100 rounded-lg p-3 relative hover:bg-gray-200 transition-colors"
+                      >
+                        <div 
+                          className="cursor-pointer"
+                          onClick={() => handleReviewClick(review.reviewId || review.id || index)}
+                        >
+                        {review.imageUrls && review.imageUrls.length > 0 ? (
+                          <img
+                            src={review.imageUrls[0]}
+                            alt={`${review.restaurantName || '식당'} 리뷰 이미지`}
+                            className="w-full h-16 object-cover rounded mb-2"
+                          />
+                        ) : (
+                          <div className="w-full h-16 bg-gray-200 rounded mb-2 flex items-center justify-center">
+                            <span className="text-xs text-gray-500">이미지 없음</span>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            {'★'.repeat(review.rating || 0)}<span className="text-gray-300">{'★'.repeat(5 - (review.rating || 0))}</span>
+                          </div>
+                          <span className="text-xs text-gray-500 truncate ml-2">
+                            {review.restaurantName || '식당'}
+                          </span>
+                        </div>
+                        </div>
+                        {/* 삭제 버튼 */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteReview(review.restaurantId || review.id, review.reviewId || review.id);
+                          }}
+                          className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 transition-colors"
+                        >
+                          ×
+                        </button>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -182,7 +272,7 @@ export default function VisitedRestaurantsScreen() {
       {/* 카메라 버튼을 하단 네비게이션 위에 위치 */}
       <div className="floating-action-button">
         <Button
-          onClick={() => handleWriteReview({ name: "새 식당", address: "주소 정보" })}
+          onClick={() => setShowNewRestaurantForm(true)}
           className="w-12 h-12 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center"
         >
           <Camera className="w-5 h-5" />
@@ -190,6 +280,78 @@ export default function VisitedRestaurantsScreen() {
       </div>
 
       <BottomNavigation currentTab="visited" />
+      
+      {/* 새 식당 정보 입력 모달 */}
+      {showNewRestaurantForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-medium">새 식당 정보 입력</h2>
+              <Button 
+                onClick={() => {
+                  setShowNewRestaurantForm(false)
+                  setNewRestaurantName('')
+                  setNewRestaurantAddress('')
+                }} 
+                variant="ghost" 
+                size="sm"
+              >
+                ✕
+              </Button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  식당명 *
+                </label>
+                <Input
+                  type="text"
+                  value={newRestaurantName}
+                  onChange={(e) => setNewRestaurantName(e.target.value)}
+                  placeholder="식당명을 입력하세요"
+                  className="w-full"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  주소 *
+                </label>
+                <Input
+                  type="text"
+                  value={newRestaurantAddress}
+                  onChange={(e) => setNewRestaurantAddress(e.target.value)}
+                  placeholder="주소를 입력하세요"
+                  className="w-full"
+                />
+              </div>
+            </div>
+            
+            <div className="flex gap-3 mt-6">
+              <Button
+                onClick={() => {
+                  setShowNewRestaurantForm(false)
+                  setNewRestaurantName('')
+                  setNewRestaurantAddress('')
+                }}
+                variant="outline"
+                className="flex-1"
+              >
+                취소
+              </Button>
+              <Button
+                onClick={handleNewRestaurantSubmit}
+                disabled={!newRestaurantName.trim() || !newRestaurantAddress.trim()}
+                className="flex-1 bg-blue-500 hover:bg-blue-600 text-white disabled:bg-gray-400"
+              >
+                리뷰 작성하기
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {showReviewModal && selectedRestaurant && (
         <ReviewWriteModal
           restaurant={selectedRestaurant}

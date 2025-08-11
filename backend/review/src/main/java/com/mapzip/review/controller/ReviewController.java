@@ -2,6 +2,7 @@ package com.mapzip.review.controller;
 
 import com.mapzip.review.dto.OcrResultDto;
 import com.mapzip.review.entity.PendingReviewEntity;
+import com.mapzip.review.entity.ReviewEntity;
 import com.mapzip.review.service.ReviewService;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.slf4j.Logger;
@@ -16,6 +17,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.Optional;
+import org.springframework.http.HttpStatus;
 
 @RestController
 @RequestMapping("/review")
@@ -141,6 +145,59 @@ public class ReviewController {
         }
     }
     
+    // === 리뷰 조회 API ===
+    
+    /**
+     * 사용자의 작성된 리뷰 목록 조회
+     */
+    @GetMapping("/user")
+    public ResponseEntity<Map<String, Object>> getUserReviews(
+            @RequestHeader("x-user-id") String userId,
+            @RequestParam(defaultValue = "0") int page,  // 0부터 시작
+            @RequestParam(defaultValue = "10") int size) {
+        try {
+            logger.info("Getting user reviews for user: {}, page: {}, size: {}", userId, page, size);
+            
+            // 실제 서비스 로직 호출
+            List<ReviewEntity> reviews = reviewService.getUserReviews(userId, page, size);
+            long totalCount = reviewService.getUserReviewsCount(userId);
+            
+            // 다음 페이지 존재 여부 계산
+            boolean hasNext = (page + 1) * size < totalCount;
+            
+            // 리뷰 데이터를 Map으로 변환
+            List<Map<String, Object>> reviewData = reviews.stream()
+                .map(review -> Map.<String, Object>of(
+                    "reviewId", review.getReviewId(),
+                    "restaurantId", review.getRestaurantId(),
+                    "restaurantName", review.getRestaurantName() != null ? review.getRestaurantName() : "",
+                    "restaurantAddress", review.getRestaurantAddress() != null ? review.getRestaurantAddress() : "",
+                    "rating", review.getRating(),
+                    "content", review.getContent() != null ? review.getContent() : "",
+                    "imageUrls", review.getImageUrls() != null ? review.getImageUrls() : List.of(),
+                    "visitDate", review.getVisitDate() != null ? review.getVisitDate() : "",
+                    "isVerified", review.getIsVerified() != null ? review.getIsVerified() : false,
+                    "createdAt", review.getCreatedAt().toString(),
+                    "updatedAt", review.getUpdatedAt().toString()
+                ))
+                .collect(Collectors.toList());
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "data", reviewData,
+                "totalCount", totalCount,
+                "currentPage", page,
+                "totalPages", (totalCount + size - 1) / size,  // 전체 페이지 수
+                "hasNext", hasNext
+            ));
+            
+        } catch (Exception e) {
+            logger.error("Error getting user reviews", e);
+            return ResponseEntity.internalServerError()
+                .body(Map.of("success", false, "message", "사용자 리뷰 목록 조회 실패"));
+        }
+    }
+    
     // === 미작성 리뷰 관리 API ===
     
     /**
@@ -196,9 +253,145 @@ public class ReviewController {
     }
     
     /**
+     * 작성된 리뷰 삭제
+     */
+    @DeleteMapping("/{restaurantId}/{reviewId}")
+    public ResponseEntity<Map<String, Object>> deleteReview(
+            @RequestHeader("x-user-id") String userId,
+            @PathVariable String restaurantId,
+            @PathVariable String reviewId) {
+        try {
+            logger.info("Deleting review for user: {}, restaurant: {}, review: {}", userId, restaurantId, reviewId);
+            
+            reviewService.deleteReview(restaurantId, reviewId, userId);
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "리뷰가 삭제되었습니다."
+            ));
+            
+        } catch (RuntimeException e) {
+            logger.warn("Review deletion failed: {}", e.getMessage());
+            if (e.getMessage().contains("권한이 없습니다") || e.getMessage().contains("찾을 수 없습니다")) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("success", false, "message", e.getMessage()));
+            }
+            return ResponseEntity.badRequest()
+                .body(Map.of("success", false, "message", e.getMessage()));
+        } catch (Exception e) {
+            logger.error("Error deleting review", e);
+            return ResponseEntity.internalServerError()
+                .body(Map.of("success", false, "message", "리뷰 삭제 실패"));
+        }
+    }
+    
+    /**
+     * 특정 리뷰 상세 조회
+     */
+    @GetMapping("/{restaurantId}/{reviewId}")
+    public ResponseEntity<Map<String, Object>> getReview(
+            @RequestHeader("x-user-id") String userId,
+            @PathVariable String restaurantId,
+            @PathVariable String reviewId) {
+        try {
+            logger.info("Getting review detail for user: {}, restaurant: {}, review: {}", userId, restaurantId, reviewId);
+            
+            Optional<ReviewEntity> reviewOpt = reviewService.getReviewById(restaurantId, reviewId);
+            
+            if (reviewOpt.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            ReviewEntity review = reviewOpt.get();
+            
+            // 작성자가 아닌 경우에도 리뷰는 조회 가능 (공개 정보)
+            Map<String, Object> reviewData = Map.of(
+                "reviewId", review.getReviewId(),
+                "restaurantId", review.getRestaurantId(),
+                "restaurantName", review.getRestaurantName(),
+                "restaurantAddress", review.getRestaurantAddress(),
+                "userId", review.getUserId(),
+                "rating", review.getRating(),
+                "content", review.getContent(),
+                "imageUrls", review.getImageUrls(),
+                "visitDate", review.getVisitDate(),
+                "isVerified", review.isVerified(),
+                "createdAt", review.getCreatedAt(),
+                "updatedAt", review.getUpdatedAt(),
+                "isOwner", review.getUserId().equals(userId) // 수정/삭제 권한 체크용
+            );
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "data", reviewData
+            ));
+            
+        } catch (Exception e) {
+            logger.error("Error getting review detail", e);
+            return ResponseEntity.internalServerError()
+                .body(Map.of("success", false, "message", "리뷰 조회 실패"));
+        }
+    }
+    
+    /**
+     * 리뷰 수정
+     */
+    @PutMapping("/{restaurantId}/{reviewId}")
+    public ResponseEntity<Map<String, Object>> updateReview(
+            @RequestHeader("x-user-id") String userId,
+            @PathVariable String restaurantId,
+            @PathVariable String reviewId,
+            @RequestParam("rating") int rating,
+            @RequestParam("content") String content,
+            @RequestParam(value = "reviewImages", required = false) List<MultipartFile> reviewImages) {
+        try {
+            logger.info("Updating review for user: {}, restaurant: {}, review: {}", userId, restaurantId, reviewId);
+            
+            // 권한 검증 (작성자만 수정 가능)
+            Optional<ReviewEntity> existingReview = reviewService.getReviewById(restaurantId, reviewId);
+            if (existingReview.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            if (!existingReview.get().getUserId().equals(userId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("success", false, "message", "수정 권한이 없습니다."));
+            }
+            
+            ReviewEntity updatedReview = reviewService.updateReviewWithImages(restaurantId, reviewId, userId, rating, content, reviewImages);
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "리뷰가 수정되었습니다.",
+                "data", Map.of(
+                    "reviewId", updatedReview.getReviewId(),
+                    "restaurantId", updatedReview.getRestaurantId(),
+                    "rating", updatedReview.getRating(),
+                    "content", updatedReview.getContent(),
+                    "imageUrls", updatedReview.getImageUrls(),
+                    "updatedAt", updatedReview.getUpdatedAt()
+                )
+            ));
+            
+        } catch (RuntimeException e) {
+            logger.warn("Review update failed: {}", e.getMessage());
+            if (e.getMessage().contains("권한이 없습니다") || e.getMessage().contains("찾을 수 없습니다")) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("success", false, "message", e.getMessage()));
+            }
+            return ResponseEntity.badRequest()
+                .body(Map.of("success", false, "message", e.getMessage()));
+        } catch (Exception e) {
+            logger.error("Error updating review", e);
+            return ResponseEntity.internalServerError()
+                .body(Map.of("success", false, "message", "리뷰 수정 실패"));
+        }
+    }
+    
+    /**
      * 특정 미작성 리뷰 상세 조회
      */
-    @GetMapping("/pending/{restaurantId}")
+    @GetMapping("/pending/{restaurantId}/detail")
     public ResponseEntity<Map<String, Object>> getPendingReviewDetail(
             @RequestHeader("x-user-id") String userId,
             @PathVariable String restaurantId,
