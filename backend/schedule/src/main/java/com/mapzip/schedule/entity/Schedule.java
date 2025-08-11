@@ -88,6 +88,12 @@ public class Schedule {
     private String companions;
 
     /**
+     * 도착 여유 시간 (분)
+     */
+    @Column(name = "arrival_buffer_minutes")
+    private Integer arrivalBufferMinutes;
+
+    /**
      * 레코드 생성 시간
      */
     @CreationTimestamp

@@ -38,7 +38,7 @@ export interface Schedule {
   mealRadius?: "5km" | "10km" | "20km"
   targetMealTimes?: MealTime[]
   userRequirements?: string
-  userId?: string; // userId 추가
+  arrivalBufferMinutes?: number; // 도착 여유 시간 (분)
 }
 
 export interface Restaurant {
@@ -137,4 +137,3 @@ export interface LocationData {
   destination: LocationInfo | null;
   waypoints: (LocationInfo | null)[];
 }
-
