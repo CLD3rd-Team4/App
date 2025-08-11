@@ -46,6 +46,8 @@ grpc:
   server:
     port: 9090
     reflection-service-enabled: true
+    health:
+      enabled: true
   #  client:
 #    recommend-service: # kakao-api-service -> recommend-service 로 이름 변경
 #      address: static://recommend.service-recommend.svc.cluster.local:9090 # 실제 recommend 서비스 주소로 변경
@@ -67,6 +69,7 @@ management:
       show-details: always
       probes:
         enabled: true
+      validate-group-membership: false
       group:
         readiness:
           include: readinessState,db,grpcServer
@@ -99,4 +102,5 @@ cloud:
 # 개발 환경용 인증 설정
 auth:
   enabled: false
+
 
