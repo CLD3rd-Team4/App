@@ -90,15 +90,14 @@ enum MealType {
 
 // 3.1 스케줄 생성
 message CreateScheduleRequest {
-  string userId = 1;
-  string title = 2;
-  string departureTime = 3;
-  repeated MealTimeSlot mealSlots = 4;
-  Location departure = 5;
-  repeated Waypoint waypoints = 6;
-  Location destination = 7;
-  string purpose = 8;
-  repeated string companions = 9;
+  string title = 1;
+  string departureTime = 2;
+  repeated MealTimeSlot mealSlots = 3;
+  Location departure = 4;
+  repeated Waypoint waypoints = 5;
+  Location destination = 6;
+  string purpose = 7;
+  repeated string companions = 8;
 }
 
 message CreateScheduleResponse {
@@ -109,7 +108,7 @@ message CreateScheduleResponse {
 
 // 3.2 스케줄 목록 조회
 message GetScheduleListRequest {
-  string userId = 1;
+  // No fields needed, userId comes from header
 }
 
 message GetScheduleListResponse {
@@ -126,7 +125,6 @@ message GetScheduleListResponse {
 // 3.3 특정 스케줄 상세 조회
 message GetScheduleDetailRequest {
   string scheduleId = 1;
-  string userId = 2;
 }
 
 message GetScheduleDetailResponse {
@@ -148,21 +146,19 @@ message GetScheduleDetailResponse {
 // 3.4 스케줄 수정
 message UpdateScheduleRequest {
   string scheduleId = 1;
-  string userId = 2;
-  string title = 3;
-  string departureTime = 4;
-  repeated MealTimeSlot mealSlots = 5;
-  Location departure = 6;
-  repeated Waypoint waypoints = 7;
-  Location destination = 8;
-  string purpose = 9;
-  repeated string companions = 10;
+  string title = 2;
+  string departureTime = 3;
+  repeated MealTimeSlot mealSlots = 4;
+  Location departure = 5;
+  repeated Waypoint waypoints = 6;
+  Location destination = 7;
+  string purpose = 8;
+  repeated string companions = 9;
 }
 
 // 3.5 스케줄 삭제
 message DeleteScheduleRequest {
   string scheduleId = 1;
-  string userId = 2;
 }
 
 message DeleteScheduleResponse {

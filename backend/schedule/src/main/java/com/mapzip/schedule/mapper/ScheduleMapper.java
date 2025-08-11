@@ -45,7 +45,6 @@ public class ScheduleMapper {
     public Schedule toEntity(CreateScheduleRequest request) throws JsonProcessingException {
         Schedule schedule = new Schedule();
         schedule.setId(java.util.UUID.randomUUID().toString());
-        schedule.setUserId(request.getUserId());
         schedule.setTitle(request.getTitle());
         schedule.setDepartureTime(request.getDepartureTime());
         
