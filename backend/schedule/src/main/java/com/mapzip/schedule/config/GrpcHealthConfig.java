@@ -32,7 +32,7 @@ public class GrpcHealthConfig {
      * /actuator/health 엔드포인트에서 gRPC 서버 상태를 확인할 수 있게 합니다.
      */
     @Bean("grpcServer")
-    public HealthIndicator grpcServerHealthIndicator(HealthStatusManager healthStatusManager) {
+    public HealthIndicator grpcServerHealthIndicator() {
         return () -> {
             // 현재 단계에서는 gRPC 서버가 시작되면 항상 SERVING 상태라고 가정하고 UP을 반환합니다.
             // 이렇게 하면 애플리케이션을 우선 실행시킬 수 있습니다.

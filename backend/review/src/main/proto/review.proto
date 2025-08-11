@@ -7,7 +7,7 @@ import "google/api/annotations.proto";
 option java_package = "com.mapzip.review.grpc";
 option java_outer_classname = "ReviewProto";
 
-// 리뷰 서비스 정의
+// 리뷰 서비스 정의 
 service ReviewService {
     // 리뷰 작성 (영수증 OCR 검증 포함)
     rpc CreateReview(CreateReviewRequest) returns (CreateReviewResponse) {
@@ -20,7 +20,7 @@ service ReviewService {
     // 사용자별 리뷰 목록 조회
     rpc GetUserReviews(GetUserReviewsRequest) returns (GetUserReviewsResponse) {
         option (google.api.http) = {
-            get: "/review/user/{user_id}"
+            get: "/review/user"
         };
     }
     
@@ -125,9 +125,9 @@ message CreateReviewResponse {
 }
 
 message GetUserReviewsRequest {
-    string user_id = 1;
-    int32 page = 2;
-    int32 size = 3;
+    // user_id는 Gateway에서 x-user-id 헤더로 자동 주입됨
+    int32 page = 1;
+    int32 size = 2;
 }
 
 message GetUserReviewsResponse {
