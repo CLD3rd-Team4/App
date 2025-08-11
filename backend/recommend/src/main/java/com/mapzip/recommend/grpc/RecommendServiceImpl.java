@@ -39,14 +39,11 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 
 	@Override
 	public void sendRecommendRequest(RecommendRequest request, StreamObserver<RecommendResponse> responseObserver) {
-		// proto → DTO 변환
-		MultiSlotRecommendRequestDto dto = convertToDto(request);
-
 		// 추천 처리 로직 호출
-		recommendRequestService.sendRecommendRequest(dto);
+		recommendRequestService.sendRecommendRequest(request.getScheduleId());
 
 		// 응답
-		RecommendResponse response = RecommendResponse.newBuilder().setStatus("OK").setMessage("추천 요청이 성공적으로 처리되었습니다.")
+		RecommendResponse response = RecommendResponse.newBuilder().setStatus("OK").setMessage("스케줄 선택이 성공적으로 처리되었습니다.")
 				.build();
 
 		responseObserver.onNext(response);
@@ -56,6 +53,9 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 	@Override
 	@Transactional  
 	public void submitSelectedPlace(SelectedPlaceRequest request, StreamObserver<SubmitResponse> responseObserver) {
+		//동일 유저 다른 스케줄에서 선택한 식당 정보 db에서 삭제 
+		 selectionRepository.deleteByUserId(request.getUserId());
+		
 		// 요청에서 유저 및 스케줄 정보 추출
 		String userId = request.getUserId();
 		String scheduleId = request.getScheduleId();
@@ -63,6 +63,8 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 		for (SelectedPlace place : request.getSelectedPlacesList()) {
 			log.info("Saving place: slotId={}, id={}, name={}", 
 			        place.getSlotId(), place.getId(), place.getPlaceName());
+			log.info("incoming rating={}, review='{}'", place.getAverageRating(), place.getRepresentativeReview());
+
 			RecommendationSelectionEntity entity = RecommendationSelectionEntity.builder().userId(userId)
 					.scheduleId(scheduleId).slotId(place.getSlotId()).placeId(place.getId())
 					.placeName(place.getPlaceName()).mealType(place.getMealType())
@@ -70,6 +72,8 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 					.addressName(place.getAddressName())
 					.placeUrl(place.getPlaceUrl())
 					.selectedDate(LocalDate.now())
+					.averageRating(place.getAverageRating())
+					.representativeReview(place.getRepresentativeReview())
 					.build();
 			selectionRepository.save(entity);
 		}
@@ -118,9 +122,10 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
                         .setReason(node.path("reason").asText())
                         .setDistance(node.path("distance").asText())
                         .setScheduledTime(node.path("scheduledTime").asText())
-                        .setMealType(node.path("mealType").asText())
+                        .setMealType(node.path("mealType").asInt())
                         .setPlaceUrl(node.path("placeUrl").asText())
-                        .setRating(4.5) // 목 별점
+                        .setAverageRating(node.path("averageRating").asDouble())
+                        .setRepresentativeReview(node.path("representativeReview").asText())
                         .build();
 
                 slotMap.computeIfAbsent(slotId, k -> new ArrayList<>()).add(place);
@@ -180,7 +185,8 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 	                .setMealType(entity.getMealType())
 	                .setPlaceUrl(entity.getPlaceUrl())
 	                .setAddressName(entity.getAddressName())
-	                .setRating(4.5)  // 목 별점
+	                .setAverageRating(entity.getAverageRating())
+	                .setRepresentativeReview(entity.getRepresentativeReview())
 	                .build();
 
 	        slotMap.computeIfAbsent(entity.getSlotId(), k -> new ArrayList<>()).add(place);
@@ -244,7 +250,7 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 	        // 아직 응답하지 않은 경우 → 응답 리스트에 포함
 	        ReviewPlaceInfo reviewPlaceInfo = ReviewPlaceInfo.newBuilder()
 	                .setId(placeId)
-	                .setPlaceName(entity.getPlaceName())
+	                .setAddressName(entity.getAddressName())
 	                .setPlaceUrl(entity.getPlaceUrl())
 	                .setScheduledTime(entity.getSelectedDate().format(formatter))
 	                .build();
@@ -268,29 +274,5 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 
 
 	
-
-	private MultiSlotRecommendRequestDto convertToDto(RecommendRequest request) {
-		List<SlotInfoDto> slotDtos = request.getSlotsList().stream().map(slot -> {
-			SlotInfoDto dto = new SlotInfoDto();
-			dto.setSlotId(slot.getSlotId());
-			dto.setLat(slot.getLat());
-			dto.setLon(slot.getLon());
-			dto.setMealType(slot.getMealType());
-			dto.setScheduledTime(slot.getScheduledTime());
-			dto.setRadius(slot.getRadius());
-			return dto;
-		}).toList();
-
-		MultiSlotRecommendRequestDto dto = new MultiSlotRecommendRequestDto();
-		dto.setUserId(request.getUserId());
-		dto.setScheduleId(request.getScheduleId());
-		dto.setRecommendationRequestIds(request.getRecommendationRequestIdsList());
-		dto.setSlots(slotDtos);
-		dto.setUserNote(request.getUserNote());
-		dto.setPurpose(request.getPurpose());
-		dto.setCompanions(request.getCompanionsList());
-
-		return dto;
-	}
 
 }

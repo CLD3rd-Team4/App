@@ -90,7 +90,10 @@ public class RecommendService {
         다음은 사용자가 고려하고 있는 음식점 목록입니다 (카카오 장소 API JSON 형식입니다).%s
 
         사용자는 총 %d개의 시간대에 대해 식당을 추천받고자 합니다.
+        averageRating이 0이거나 representativeReview가 빈 문자열이면 리뷰가 없는거니 신경쓰지 말아주세
         아래 형식으로 각 시간대마다 식당을 3개씩 추천하고, 각 식당의 추천 이유를 간단히 작성해 주세요.
+        추천 이유는 다양한 요소를 고려해 작성하되, averageRating과 representativeReview 정보가 유용하다고 판단되면 자연스럽게 포함해 주세요.
+
         추천은 JSON 형식으로 출력해 주세요.
 
         ### 출력 형식 예시 ###

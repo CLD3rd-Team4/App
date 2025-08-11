@@ -24,4 +24,6 @@ public class Document {
     @JsonProperty("place_url")
     private String placeUrl;
     private String distance;
+    private Double averageRating;        
+    private String representativeReview;
 }

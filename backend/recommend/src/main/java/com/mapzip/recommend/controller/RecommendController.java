@@ -1,28 +1,29 @@
 package com.mapzip.recommend.controller;
 
-import org.springframework.data.redis.core.RedisTemplate;
+import java.util.Map;
+
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.mapzip.recommend.dto.MultiSlotRecommendRequestDto;
-import com.mapzip.recommend.dto.RecommendRequestDto;
-import com.mapzip.recommend.service.KakaoApiService;
-import com.mapzip.recommend.service.RecommendRequestService;
+import com.mapzip.recommend.dto.tmap.TmapScheduleRequest;
+import com.mapzip.recommend.service.RouteService;
+import com.mapzip.recommend.service.TmapRouteCalculator;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @RestController
 @RequiredArgsConstructor
+@Slf4j
 public class RecommendController {
 
-	
-	
-	//추천 결과 조회
-	
+    private final TmapRouteCalculator tmapRouteCalculator;
 
-	
+    @PostMapping("/api/tmap")
+    public ResponseEntity<Map<String, Object>> calculateRoute(@RequestBody TmapScheduleRequest request) {
+        Map<String, Object> result = tmapRouteCalculator.calculate(request);
+        return ResponseEntity.ok(result);
+    }
 }

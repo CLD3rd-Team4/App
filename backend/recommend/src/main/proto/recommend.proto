@@ -25,23 +25,9 @@ service RecommendService {
 }
 
 message RecommendRequest {
-  string userId = 1;
-  string scheduleId = 2;
-  repeated string recommendationRequestIds = 3;
-  repeated SlotInfo slots = 4;
-  string userNote = 5;
-  string purpose = 6;
-  repeated string companions = 7;
+  string scheduleId = 1;
 }
 
-message SlotInfo {
-  string slotId = 1;
-  double lat = 2;
-  double lon = 3;
-  string mealType = 4;
-  string scheduledTime = 5;
-  int32 radius = 6;
-}
 
 message RecommendResponse {
   string status = 1;
@@ -52,7 +38,7 @@ message RecommendResponse {
 
 message SelectedPlace {
   string slotId = 1;
-  string mealType = 2;
+  int32 mealType = 2;
   string scheduledTime = 3;
   string id = 4;
   string placeName = 5;
@@ -60,7 +46,8 @@ message SelectedPlace {
   string distance = 7;
   string placeUrl = 8;
   string addressName= 9;
-  double rating = 10;
+  double averageRating = 10;
+  string representativeReview = 11;
 }
 
 message SelectedPlaceRequest {
@@ -93,10 +80,11 @@ message PlaceInfo {
   string reason = 3;
   string distance = 4;
   string scheduledTime = 5;
-  string mealType = 6;
+  int32 mealType = 6;
   string placeUrl = 7;
   string addressName= 8;
-  double rating = 9;
+  double averageRating = 9;
+  string representativeReview = 10;
 }
 
 message GetRecommendationResultsResponse {

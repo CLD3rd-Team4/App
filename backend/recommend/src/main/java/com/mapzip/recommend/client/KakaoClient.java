@@ -21,7 +21,7 @@ public class KakaoClient {
         this.kakaoApiKey = kakaoApiKey;
     }
 
-    public Mono<KakaoSearchResponse> searchRestaurants(double latitude, double longitude, int radius) {
+    public Mono<KakaoSearchResponse> searchRestaurants(String latitude, String longitude, int radius) {
         return webClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/v2/local/search/category.json")

@@ -3,8 +3,6 @@ package com.mapzip.recommend.service;
 import org.springframework.stereotype.Service;
 
 import com.mapzip.recommend.dto.ReviewStatsDto;
-import com.mapzip.review.grpc.GetRestaurantStatsRequest;
-import com.mapzip.review.grpc.GetRestaurantStatsResponse;
 import com.mapzip.review.grpc.ReviewServiceGrpc;
 
 import lombok.RequiredArgsConstructor;
@@ -15,7 +13,7 @@ public class ReviewClientService {
 
     private final ReviewServiceGrpc.ReviewServiceBlockingStub reviewStub;
 
-    public ReviewStatsDto getRestaurantStats(String restaurantId) {
+    public ReviewStatsDto getRestaurantStats(String restaurant_id) {
 //        GetRestaurantStatsRequest request = GetRestaurantStatsRequest.newBuilder()
 //                .setRestaurantId(restaurantId)
 //                .build();

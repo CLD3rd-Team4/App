@@ -13,9 +13,9 @@ import lombok.Setter;
 @Builder
 public class SlotInfoDto {
     private String slotId;
-    private double lat;
-    private double lon;
+    private String lat;
+    private String lon;
     private String scheduledTime; 
-    private String mealType;
+    private int mealType;
     private int radius;
 }

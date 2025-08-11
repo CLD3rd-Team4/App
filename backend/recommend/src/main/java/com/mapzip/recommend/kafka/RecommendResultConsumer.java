@@ -1,5 +1,6 @@
 package com.mapzip.recommend.kafka;
 
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
@@ -18,21 +19,15 @@ public class RecommendResultConsumer {
 	private final RecommendRedisStoreService recommendRedisStoreService;
 
 	@KafkaListener(topics = "recommend-result", groupId = "recommend-result-group")
-	private void consume(String message) {
+	private void consume(ConsumerRecord<String, String> record) {
 		try {
 			// 로그로 수신 확인
-			RecommendResultDto recommendResultDto = objectMapper.readValue(message, RecommendResultDto.class);
-			log.info("📩 recommend-request 토픽 수신: userId={}, scheduleId={}", recommendResultDto.getUserId(),
-					recommendResultDto.getScheduleId());
-			recommendRedisStoreService.storeRecommendations(recommendResultDto.getUserId(),
-					recommendResultDto.getScheduleId(), recommendResultDto.getRecommendPlaceListJson(),
-					recommendResultDto.getRecommendationRequestIds(), 
-					recommendResultDto.getScheduledTimes()
-
-			);
+			String scheduleId = record.key();
+		    String userId = record.value();
+		    log.info("📩 recommend-result 수신: userId={}, scheduleId={}", userId, scheduleId);
 
 		} catch (Exception e) {
-			log.error("❌ recommend-request 처리 중 오류", e);
+			log.error("❌ recommend-result 처리 중 오류", e);
 		}
 	}
 }

@@ -24,12 +24,14 @@ public class RecommendationSelectionEntity {
     private String slotId;
     private String placeId;
     private String placeName;
-    private String mealType;
+    private Integer mealType;
     private String scheduledTime;
     private String reason;
     private String distance;
     private String placeUrl;
     private String addressName;
     private LocalDate selectedDate;
+    private Double averageRating;
+    private String representativeReview;
 }
 

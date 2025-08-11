@@ -96,7 +96,7 @@
 		<dependency>
 			<groupId>com.google.api.grpc</groupId>
 			<artifactId>proto-google-common-protos</artifactId>
-			 <version>2.20.0</version>
+			<version>2.20.0</version>
 		</dependency>
 
 		<!-- Protobuf & gRPC Stubs -->
@@ -136,6 +136,11 @@
 		<dependency>
 			<groupId>com.fasterxml.jackson.core</groupId>
 			<artifactId>jackson-databind</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.google.code.gson</groupId>
+			<artifactId>gson</artifactId>
+			<version>2.10.1</version> <!-- 또는 최신 안정 버전 -->
 		</dependency>
 
 

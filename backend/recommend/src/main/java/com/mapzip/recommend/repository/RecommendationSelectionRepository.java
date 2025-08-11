@@ -11,4 +11,5 @@ import com.mapzip.recommend.entity.RecommendationSelectionEntity;
 public interface RecommendationSelectionRepository extends JpaRepository<RecommendationSelectionEntity, Long> {
 	List<RecommendationSelectionEntity> findByUserIdAndScheduleId(String userId, String scheduleId);
 	List<RecommendationSelectionEntity> findByUserId(String userId);
+	void deleteByUserId(String userId);
 }
