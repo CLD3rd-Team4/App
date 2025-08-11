@@ -39,10 +39,9 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
     @Transactional
     public void createSchedule(CreateScheduleRequest request, StreamObserver<CreateScheduleResponse> responseObserver) {
         try {
+            String userId = GrpcInterceptorConfig.USER_ID_CONTEXT_KEY.get();
             Schedule schedule = scheduleMapper.toEntity(request);
-            if (schedule.getUserId() == null || schedule.getUserId().isEmpty()) {
-                schedule.setUserId("test-user-123");
-            }
+            schedule.setUserId(userId);
 
             List<com.mapzip.schedule.grpc.MealTimeSlot> mealSlotsRequest = request.getMealSlotsList();
             if (mealSlotsRequest != null && !mealSlotsRequest.isEmpty()) {
@@ -125,7 +124,8 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
     @Transactional(readOnly = true)
     public void getScheduleList(GetScheduleListRequest request, StreamObserver<GetScheduleListResponse> responseObserver) {
         try {
-            List<Schedule> schedules = scheduleRepository.findByUserIdOrderByCreatedAtDesc(request.getUserId());
+            String userId = GrpcInterceptorConfig.USER_ID_CONTEXT_KEY.get();
+            List<Schedule> schedules = scheduleRepository.findByUserIdOrderByCreatedAtDesc(userId);
             List<GetScheduleListResponse.ScheduleSummary> summaries = schedules.stream()
                     .map(scheduleMapper::toSummary)
                     .collect(Collectors.toList());

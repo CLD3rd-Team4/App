@@ -156,6 +156,12 @@
 			<artifactId>grpc-protobuf</artifactId>
 		</dependency>
 
+		<!-- gRPC Health Check Service - ADDED FOR HEALTH CHECK SUPPORT -->
+		<dependency>
+			<groupId>io.grpc</groupId>
+			<artifactId>grpc-services</artifactId>
+		</dependency>
+
 		<!-- Google Common Protos for gRPC HTTP annotations -->
 		<dependency>
 			<groupId>com.google.api.grpc</groupId>
