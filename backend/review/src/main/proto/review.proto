@@ -7,7 +7,7 @@ import "google/api/annotations.proto";
 option java_package = "com.mapzip.review.grpc";
 option java_outer_classname = "ReviewProto";
 
-// 리뷰 서비스 정의 
+// 리뷰 서비스 정의  
 service ReviewService {
     // 리뷰 작성 (영수증 OCR 검증 포함)
     rpc CreateReview(CreateReviewRequest) returns (CreateReviewResponse) {
