@@ -30,6 +30,7 @@ export default function ScheduleCreateScreen({ isEdit = false, initialData = nul
       setRequiredData({
         scheduleName: initialData.title,
         departureTime: initialData.departureTime,
+        arrivalBufferMinutes: initialData.arrivalBufferMinutes,
         targetMealTimes: initialData.mealSlots.map((ms: any) => ({
           type: ms.mealType === 'MEAL' ? '식사' : '간식',
           time: ms.scheduledTime,
@@ -61,6 +62,7 @@ export default function ScheduleCreateScreen({ isEdit = false, initialData = nul
         title: requiredData.scheduleName,
         departureTime: requiredData.departureTime,
         arrivalTime: initialData?.arrivalTime || "",
+        arrivalBufferMinutes: requiredData.arrivalBufferMinutes, // 도착 여유 시간 추가
         mealSlots: requiredData.targetMealTimes.map((mt: any) => ({
           mealType: mt.type === '식사' ? 'MEAL' : 'SNACK',
           scheduledTime: mt.time,
