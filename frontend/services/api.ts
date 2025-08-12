@@ -466,7 +466,8 @@ export const reviewApi = {
           content: reviewData.content,
           imageUrls: [],
           isVerified: response.data.isVerified || false,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
         } : null,
         ocrResult: { 
           isValid: response.data.isVerified || false,
