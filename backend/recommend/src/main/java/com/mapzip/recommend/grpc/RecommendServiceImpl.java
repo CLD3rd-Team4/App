@@ -4,6 +4,8 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -63,7 +65,6 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 		for (SelectedPlace place : request.getSelectedPlacesList()) {
 			log.info("Saving place: slotId={}, id={}, name={}", 
 			        place.getSlotId(), place.getId(), place.getPlaceName());
-			log.info("incoming rating={}, review='{}'", place.getAverageRating(), place.getRepresentativeReview());
 
 			RecommendationSelectionEntity entity = RecommendationSelectionEntity.builder().userId(userId)
 					.scheduleId(scheduleId).slotId(place.getSlotId()).placeId(place.getId())
@@ -85,72 +86,118 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 	}
 	
 	@Override
-    public void getRecommendationResults(GetRecommendationResultsRequest request,
-                                         StreamObserver<GetRecommendationResultsResponse> responseObserver) {
-        String userId = request.getUserId();
-        String scheduleId = request.getScheduleId();
-        String redisKeyPattern = String.format("recommend:%s:%s:*:place*", userId, scheduleId);
+	public void getRecommendationResults(GetRecommendationResultsRequest request,
+	                                     StreamObserver<GetRecommendationResultsResponse> responseObserver) {
 
-        Set<String> keys = redisTemplate.keys(redisKeyPattern);
+	    final String userId = request.getUserId();
+	    final String scheduleId = request.getScheduleId();
 
-        if (keys == null || keys.isEmpty()) {
-            GetRecommendationResultsResponse response = GetRecommendationResultsResponse.newBuilder()
-                    .setStatus("PENDING")
-                    .setMessage("추천 결과가 아직 준비되지 않았습니다.")
-                    .build();
-            responseObserver.onNext(response);
-            responseObserver.onCompleted();
-            return;
-        }
+	    // 키 포맷: recommend:{userId}:{scheduleId}:{slotId}:{MEAL|SNACK}:{placeN}
+	    final String redisKeyPattern = String.format("recommend:%s:%s:*:*:place*", userId, scheduleId);
 
-        Map<String, List<PlaceInfo>> slotMap = new HashMap<String, List<PlaceInfo>>();
+	    Set<String> keys = redisTemplate.keys(redisKeyPattern);
 
-        ObjectMapper objectMapper = new ObjectMapper();
+	    if (keys == null || keys.isEmpty()) {
+	        GetRecommendationResultsResponse response = GetRecommendationResultsResponse.newBuilder()
+	                .setStatus("PENDING")
+	                .setMessage("추천 결과가 아직 준비되지 않았습니다.")
+	                .build();
+	        responseObserver.onNext(response);
+	        responseObserver.onCompleted();
+	        return;
+	    }
 
-        for (String key : keys) {
-            String value = redisTemplate.opsForValue().get(key);
-            if (value == null) continue;
+	    // 정렬을 위해 order를 같이 보관
+	    class PlaceWithOrder {
+	        final PlaceInfo place;
+	        final int order;
+	        PlaceWithOrder(PlaceInfo p, int o) { this.place = p; this.order = o; }
+	    }
 
-            try {
-                JsonNode node = objectMapper.readTree(value);
-                String[] parts = key.split(":");
-                String slotId = parts[3];
+	    Map<String, List<PlaceWithOrder>> slotMap = new HashMap<>();
+	    ObjectMapper objectMapper = new ObjectMapper();
 
-                PlaceInfo place = PlaceInfo.newBuilder()
-                        .setId(node.path("id").asText())
-                        .setPlaceName(node.path("placeName").asText())
-                        .setReason(node.path("reason").asText())
-                        .setDistance(node.path("distance").asText())
-                        .setScheduledTime(node.path("scheduledTime").asText())
-                        .setMealType(node.path("mealType").asInt())
-                        .setPlaceUrl(node.path("placeUrl").asText())
-                        .setAverageRating(node.path("averageRating").asDouble())
-                        .setRepresentativeReview(node.path("representativeReview").asText())
-                        .build();
+	    // 키를 한 번 정렬(슬롯/플레이스 순으로 보장하고 싶으면 comparator 조정)
+	    List<String> sortedKeys = new ArrayList<>(keys);
+	    Collections.sort(sortedKeys);
 
-                slotMap.computeIfAbsent(slotId, k -> new ArrayList<>()).add(place);
+	    for (String key : sortedKeys) {
+	        String value = redisTemplate.opsForValue().get(key);
+	        if (value == null) continue;
 
-            } catch (Exception e) {
-                log.warn("❌ Redis 값 파싱 오류 - key: {}", key, e);
-            }
-        }
+	        try {
+	            // 키 파싱
+	            String[] parts = key.split(":");
+	            // expect: [recommend, userId, scheduleId, slot1, MEAL, place3]
+	            if (parts.length < 6) {
+	                log.warn("키 형식 불일치: {}", key);
+	                continue;
+	            }
+	            String slotId = parts[3];
+	            String mealTypeToken = parts[4];              // MEAL | SNACK
+	            String placeToken   = parts[5];               // place3
+	            int placeOrder = 0;
+	            try {
+	                placeOrder = Integer.parseInt(placeToken.replaceFirst("place", ""));
+	            } catch (NumberFormatException ignore) { /* 0으로 두기 */ }
 
-        List<SlotRecommendation> slotRecommendations = slotMap.entrySet().stream()
-        	    .map(entry -> SlotRecommendation.newBuilder()
-        	            .setSlotId(entry.getKey())
-        	            .addAllPlaces(entry.getValue())
-        	            .build())
-        	    .collect(Collectors.toList());
+	            int mealTypeFromKey =
+	                    "MEAL".equalsIgnoreCase(mealTypeToken)  ? 0 :
+	                    "SNACK".equalsIgnoreCase(mealTypeToken) ? 1 : -1;
 
-        GetRecommendationResultsResponse response = GetRecommendationResultsResponse.newBuilder()
-                .addAllSlotRecommendations(slotRecommendations)
-                .setStatus("OK")
-                .setMessage("추천 결과를 성공적으로 불러왔습니다.")
-                .build();
+	            // 값(JSON) 파싱
+	            JsonNode node = objectMapper.readTree(value);
 
-        responseObserver.onNext(response);
-        responseObserver.onCompleted();
-    }
+	            int mealType = node.path("mealType").isMissingNode()
+	                    ? mealTypeFromKey
+	                    : node.path("mealType").asInt(mealTypeFromKey);
+
+	            PlaceInfo place = PlaceInfo.newBuilder()
+	                    .setId(node.path("id").asText(""))
+	                    .setPlaceName(node.path("placeName").asText(""))
+	                    .setReason(node.path("reason").asText(""))
+	                    .setDistance(node.path("distance").asText(""))
+	                    .setScheduledTime(node.path("scheduledTime").asText("")) // 없으면 빈 문자열
+	                    .setMealType(mealType >= 0 ? mealType : 0)              // 기본 0(식사)
+	                    .setPlaceUrl(node.path("placeUrl").asText(""))
+	                    .setAverageRating(node.path("averageRating").asDouble(0))
+	                    .setAddressName(node.path("addressName").asText(""))
+	                    .setRepresentativeReview(node.path("representativeReview").asText(""))
+	                    .build();
+
+	            slotMap.computeIfAbsent(slotId, k -> new ArrayList<>())
+	                   .add(new PlaceWithOrder(place, placeOrder));
+
+	        } catch (Exception e) {
+	            log.warn("❌ Redis 값 파싱 오류 - key: {}", key, e);
+	        }
+	    }
+
+	    // 슬롯별 placeN 순으로 정렬해서 proto로 변환
+	    List<SlotRecommendation> slotRecommendations = slotMap.entrySet().stream()
+	            .map(entry -> {
+	                List<PlaceInfo> placesSorted = entry.getValue().stream()
+	                        .sorted(Comparator.comparingInt(p -> p.order))
+	                        .map(p -> p.place)
+	                        .toList();
+
+	                return SlotRecommendation.newBuilder()
+	                        .setSlotId(entry.getKey())
+	                        .addAllPlaces(placesSorted)
+	                        .build();
+	            })
+	            .toList();
+
+	    GetRecommendationResultsResponse response = GetRecommendationResultsResponse.newBuilder()
+	            .addAllSlotRecommendations(slotRecommendations)
+	            .setStatus("OK")
+	            .setMessage("추천 결과를 성공적으로 불러왔습니다.")
+	            .build();
+
+	    responseObserver.onNext(response);
+	    responseObserver.onCompleted();
+	}
+
 	
 	@Override
 	public void getSelectedPlaces(GetSelectedPlacesRequest request,

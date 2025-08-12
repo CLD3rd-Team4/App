@@ -52,9 +52,15 @@ public class MockTmapScheduleRequestBuilder {
                 .build());
         mealSlots.add(MealSlotData.builder()
                 .slotId("slot2")
-                .scheduledTime("오후 03:00")
+                .scheduledTime("오후 01:00")
                 .radius(800)
                 .mealType(1) // SNACK
+                .build());
+        mealSlots.add(MealSlotData.builder()
+                .slotId("slot3")
+                .scheduledTime("오후 01:30")
+                .radius(800)
+                .mealType(0) // SNACK
                 .build());
         return mealSlots;
     }
