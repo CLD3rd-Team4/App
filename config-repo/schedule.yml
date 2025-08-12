@@ -19,7 +19,7 @@ spring:
   # Valkey(Redis) 연결 설정 (AWS ElastiCache Serverless)
   data:
     redis:
-      host: schedule-cache.mapzip.shop
+      host: mapzip-dev-schedule-cache-serverless-2iapp0.serverless.apn2.cache.amazonaws.com
       port: 6379
       ssl:
         enabled: true
@@ -102,6 +102,3 @@ cloud:
 # 개발 환경용 인증 설정
 auth:
   enabled: false
-
-# Trigger GitHub Actions
-
