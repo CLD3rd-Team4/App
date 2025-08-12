@@ -23,12 +23,15 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Component
 public class XssProtectionFilter extends AbstractGatewayFilterFactory<XssProtectionFilter.Config> {
 
     private final PolicyFactory policy;
     private final ObjectMapper objectMapper;
+    private static final Logger log = LoggerFactory.getLogger(XssProtectionFilter.class);
 
     public XssProtectionFilter() {
         super(Config.class);
@@ -47,7 +50,9 @@ public class XssProtectionFilter extends AbstractGatewayFilterFactory<XssProtect
                 String query = originalUri.getQuery();
                 
                 if (query != null) {
+                    log.info("[XSS Filter] GET Query - Original: {}", query);
                     String sanitizedQuery = sanitizeXss(query);
+                    log.info("[XSS Filter] GET Query - Sanitized: {}", sanitizedQuery);
                     URI newUri = UriComponentsBuilder.fromUri(originalUri)
                             .replaceQuery(sanitizedQuery)
                             .build()
@@ -79,7 +84,10 @@ public class XssProtectionFilter extends AbstractGatewayFilterFactory<XssProtect
                                         })
                                         .reduce("", String::concat);
                                 
+                                log.info("[XSS Filter] Body - Original: {}", body);
+                                log.info("[XSS Filter] Content-Type: {}", request.getHeaders().getContentType());
                                 String sanitizedBody = sanitizeBody(body, request);
+                                log.info("[XSS Filter] Body - Sanitized: {}", sanitizedBody);
                                 DataBuffer buffer = exchange.getResponse().bufferFactory()
                                         .wrap(sanitizedBody.getBytes(StandardCharsets.UTF_8));
                                 return Flux.just(buffer);
@@ -111,16 +119,19 @@ public class XssProtectionFilter extends AbstractGatewayFilterFactory<XssProtect
 
     String sanitizeJsonBody(String jsonBody) {
         try {
+            log.debug("[XSS Filter] Parsing JSON body");
             JsonNode rootNode = objectMapper.readTree(jsonBody);
             JsonNode sanitizedNode = sanitizeJsonNode(rootNode);
             return objectMapper.writeValueAsString(sanitizedNode);
         } catch (Exception e) {
+            log.warn("[XSS Filter] JSON parsing failed, fallback to text sanitize: {}", e.getMessage());
             return sanitizeXss(jsonBody);
         }
     }
 
     String sanitizeFormBody(String formBody) {
         try {
+            log.debug("[XSS Filter] Parsing form-urlencoded body");
             return Arrays.stream(formBody.split("&"))
                     .map(pair -> {
                         String[] keyValue = pair.split("=", 2);
@@ -128,6 +139,7 @@ public class XssProtectionFilter extends AbstractGatewayFilterFactory<XssProtect
                             String key = URLDecoder.decode(keyValue[0], StandardCharsets.UTF_8);
                             String value = URLDecoder.decode(keyValue[1], StandardCharsets.UTF_8);
                             String sanitizedValue = sanitizeXss(value);
+                            log.debug("[XSS Filter] Form field '{}': '{}' -> '{}'", key, value, sanitizedValue);
                             return URLEncoder.encode(key, StandardCharsets.UTF_8) + "=" + 
                                    URLEncoder.encode(sanitizedValue, StandardCharsets.UTF_8);
                         }
@@ -135,6 +147,7 @@ public class XssProtectionFilter extends AbstractGatewayFilterFactory<XssProtect
                     })
                     .collect(Collectors.joining("&"));
         } catch (Exception e) {
+            log.warn("[XSS Filter] Form parsing failed, fallback to text sanitize: {}", e.getMessage());
             return sanitizeXss(formBody);
         }
     }
