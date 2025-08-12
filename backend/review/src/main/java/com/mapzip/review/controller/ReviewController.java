@@ -167,19 +167,21 @@ public class ReviewController {
             
             // 리뷰 데이터를 Map으로 변환
             List<Map<String, Object>> reviewData = reviews.stream()
-                .map(review -> Map.<String, Object>of(
-                    "reviewId", review.getReviewId(),
-                    "restaurantId", review.getRestaurantId(),
-                    "restaurantName", review.getRestaurantName() != null ? review.getRestaurantName() : "",
-                    "restaurantAddress", review.getRestaurantAddress() != null ? review.getRestaurantAddress() : "",
-                    "rating", review.getRating(),
-                    "content", review.getContent() != null ? review.getContent() : "",
-                    "imageUrls", review.getImageUrls() != null ? review.getImageUrls() : List.of(),
-                    "visitDate", review.getVisitDate() != null ? review.getVisitDate() : "",
-                    "isVerified", review.getIsVerified() != null ? review.getIsVerified() : false,
-                    "createdAt", review.getCreatedAt().toString(),
-                    "updatedAt", review.getUpdatedAt().toString()
-                ))
+                .map(review -> {
+                    Map<String, Object> reviewMap = new HashMap<>();
+                    reviewMap.put("reviewId", review.getReviewId());
+                    reviewMap.put("restaurantId", review.getRestaurantId());
+                    reviewMap.put("restaurantName", review.getRestaurantName() != null ? review.getRestaurantName() : "");
+                    reviewMap.put("restaurantAddress", review.getRestaurantAddress() != null ? review.getRestaurantAddress() : "");
+                    reviewMap.put("rating", review.getRating());
+                    reviewMap.put("content", review.getContent() != null ? review.getContent() : "");
+                    reviewMap.put("imageUrls", review.getImageUrls() != null ? review.getImageUrls() : List.of());
+                    reviewMap.put("visitDate", review.getVisitDate() != null ? review.getVisitDate() : "");
+                    reviewMap.put("isVerified", review.getIsVerified() != null ? review.getIsVerified() : false);
+                    reviewMap.put("createdAt", review.getCreatedAt().toString());
+                    reviewMap.put("updatedAt", review.getUpdatedAt().toString());
+                    return reviewMap;
+                })
                 .collect(Collectors.toList());
             
             return ResponseEntity.ok(Map.of(
@@ -305,21 +307,20 @@ public class ReviewController {
             ReviewEntity review = reviewOpt.get();
             
             // 작성자가 아닌 경우에도 리뷰는 조회 가능 (공개 정보)
-            Map<String, Object> reviewData = Map.of(
-                "reviewId", review.getReviewId(),
-                "restaurantId", review.getRestaurantId(),
-                "restaurantName", review.getRestaurantName(),
-                "restaurantAddress", review.getRestaurantAddress(),
-                "userId", review.getUserId(),
-                "rating", review.getRating(),
-                "content", review.getContent(),
-                "imageUrls", review.getImageUrls(),
-                "visitDate", review.getVisitDate(),
-                "isVerified", review.isVerified(),
-                "createdAt", review.getCreatedAt(),
-                "updatedAt", review.getUpdatedAt(),
-                "isOwner", review.getUserId().equals(userId) // 수정/삭제 권한 체크용
-            );
+            Map<String, Object> reviewData = new HashMap<>();
+            reviewData.put("reviewId", review.getReviewId());
+            reviewData.put("restaurantId", review.getRestaurantId());
+            reviewData.put("restaurantName", review.getRestaurantName());
+            reviewData.put("restaurantAddress", review.getRestaurantAddress());
+            reviewData.put("userId", review.getUserId());
+            reviewData.put("rating", review.getRating());
+            reviewData.put("content", review.getContent());
+            reviewData.put("imageUrls", review.getImageUrls());
+            reviewData.put("visitDate", review.getVisitDate());
+            reviewData.put("isVerified", review.getIsVerified());
+            reviewData.put("createdAt", review.getCreatedAt());
+            reviewData.put("updatedAt", review.getUpdatedAt());
+            reviewData.put("isOwner", review.getUserId().equals(userId));
             
             return ResponseEntity.ok(Map.of(
                 "success", true,

@@ -413,8 +413,28 @@ export const reviewApi = {
       return {
         success: response.data.success,
         message: response.data.message,
-        review: response.data.reviewId ? { id: response.data.reviewId } : null,
-        ocrResult: { isValid: response.data.isVerified || false }
+        review: response.data.reviewId ? {
+          id: response.data.reviewId,
+          restaurantId: reviewData.restaurantId,
+          restaurantName: reviewData.restaurantName,
+          restaurantAddress: reviewData.restaurantAddress,
+          userId: '',
+          visitDate: reviewData.visitDate || '',
+          rating: reviewData.rating,
+          content: reviewData.content,
+          imageUrls: [],
+          isVerified: response.data.isVerified || false,
+          createdAt: new Date().toISOString()
+        } : null,
+        ocrResult: { 
+          isValid: response.data.isVerified || false,
+          restaurantName: reviewData.restaurantName,
+          address: reviewData.restaurantAddress,
+          visitDate: reviewData.visitDate || '',
+          totalAmount: '',
+          rawText: '',
+          confidence: 0
+        }
       };
     } catch (error: any) {
       if (error instanceof APIError) throw error;

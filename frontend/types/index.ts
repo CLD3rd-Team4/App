@@ -98,7 +98,7 @@ export interface CreateReviewRequest {
 }
 
 export interface CreateReviewResponse {
-  review: Review
+  review: Review | null
   ocrResult?: OCRResult
   message: string
   success: boolean
