@@ -102,4 +102,3 @@ cloud:
 # 개발 환경용 인증 설정
 auth:
   enabled: false
-
