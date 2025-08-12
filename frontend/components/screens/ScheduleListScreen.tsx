@@ -79,10 +79,17 @@ export default function ScheduleListScreen() {
     setSelectedScheduleForPopup(null)
   }
 
-  const handleViewResults = () => {
-    if (!selectedScheduleForPopup) return;
-    selectSchedule(selectedScheduleForPopup.id)
-    closePopup()
+  const handleViewResults = async () => {
+    if (!selectedScheduleForPopup?.id) return
+    try {
+      await selectSchedule(selectedScheduleForPopup.id)
+      // selectSchedule 내부에서 라우팅이 처리되므로, 여기서는 팝업만 닫습니다.
+      closePopup()
+    } catch (error) {
+      // 에러 처리는 selectSchedule 훅 내부에서 이미 처리(alert)되므로 여기서는 추가 작업이 불필요할 수 있습니다.
+      // 필요 시, 여기서 추가적인 UI 피드백을 줄 수 있습니다.
+      console.error("Failed to view results:", error)
+    }
   }
 
   if (!isClient || isLoading) {

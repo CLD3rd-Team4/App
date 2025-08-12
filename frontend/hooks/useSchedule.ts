@@ -55,12 +55,19 @@ export default function useSchedule() {
   const selectSchedule = async (scheduleId: string) => {
     setIsProcessing(true)
     try {
-      await recommendApi.selectAndGetSummary(scheduleId)
+      // TODO: 추천 서버 준비 완료 시 아래 API 호출 주석 해제 필요
+      // await recommendApi.selectAndGetSummary(scheduleId)
+
+      // 테스트를 위한 임시 로직: API 호출 없이 성공한 것으로 간주하고 다음 단계로 진행
+      console.log(`[TEST] Schedule selection simulation for ID: ${scheduleId}`)
+      
       localStorage.setItem("scheduleSelected", "true")
       router.push("/recommendations")
     } catch (error) {
       console.error("스케줄 선택 및 처리 실패:", error)
       alert("스케줄 처리에 실패했습니다. 잠시 후 다시 시도해주세요.")
+      // 에러 발생 시 localStorage에 값이 남지 않도록 처리
+      localStorage.removeItem("scheduleSelected")
     } finally {
       setIsProcessing(false)
     }
