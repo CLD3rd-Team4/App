@@ -57,7 +57,7 @@ export default function useSchedule() {
     try {
       await recommendApi.selectAndGetSummary(scheduleId)
       localStorage.setItem("scheduleSelected", "true")
-      router.push("/")
+      router.push("/recommendations")
     } catch (error) {
       console.error("스케줄 선택 및 처리 실패:", error)
       alert("스케줄 처리에 실패했습니다. 잠시 후 다시 시도해주세요.")
