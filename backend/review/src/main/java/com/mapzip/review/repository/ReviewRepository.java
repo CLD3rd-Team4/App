@@ -62,15 +62,35 @@ public class ReviewRepository {
                 .collect(Collectors.toList());
     }
 
-    public List<ReviewEntity> findByUserId(String userId) {
+    public List<ReviewEntity> findByUserId(String userId, int page, int size) {
         DynamoDbIndex<ReviewEntity> index = reviewTable.index("UserIdIndex");
         QueryConditional queryConditional = QueryConditional
                 .keyEqualTo(Key.builder().partitionValue(userId).build());
 
-        return index.query(QueryEnhancedRequest.builder().queryConditional(queryConditional).build())
+        QueryEnhancedRequest queryRequest = QueryEnhancedRequest.builder()
+                .queryConditional(queryConditional)
+                .scanIndexForward(false) // 최신순 정렬 (created_at 역순)
+                .build();
+
+        return index.query(queryRequest)
                 .stream()
-                .flatMap(page -> page.items().stream())
+                .flatMap(queryPage -> queryPage.items().stream())
+                .skip((long) page * size)
+                .limit(size)
                 .collect(Collectors.toList());
+    }
+
+    public long countByUserId(String userId) {
+        DynamoDbIndex<ReviewEntity> index = reviewTable.index("UserIdIndex");
+        QueryConditional queryConditional = QueryConditional
+                .keyEqualTo(Key.builder().partitionValue(userId).build());
+
+        return index.query(QueryEnhancedRequest.builder()
+                .queryConditional(queryConditional)
+                .build())
+                .stream()
+                .mapToLong(queryPage -> queryPage.items().size())
+                .sum();
     }
 
     public long countByRestaurantId(String restaurantId) {
@@ -95,13 +115,16 @@ public class ReviewRepository {
     }
 
     public double getAverageRatingByRestaurantId(String restaurantId) {
-        List<ReviewEntity> reviews = findByRestaurantId(restaurantId, 0, 1000); // 최대 1000개 리뷰
-        
-        if (reviews.isEmpty()) {
-            return 0.0;
-        }
-        
-        return reviews.stream()
+        QueryConditional queryConditional = QueryConditional
+                .keyEqualTo(Key.builder().partitionValue(restaurantId).build());
+
+        // DynamoDB Stream으로 메모리 효율적으로 평점만 추출하여 평균 계산
+        return reviewTable.query(QueryEnhancedRequest.builder()
+                .queryConditional(queryConditional)
+                .build())
+                .stream()
+                .flatMap(page -> page.items().stream())
+                .filter(review -> review.getRating() != null && review.getRating() > 0)
                 .mapToInt(ReviewEntity::getRating)
                 .average()
                 .orElse(0.0);

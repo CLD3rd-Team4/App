@@ -323,15 +323,15 @@ public class OcrService {
                 return false;
             }
             
-            // OCR 영수증 날짜가 실제 방문 날짜보다 과거면 false
-            if (ocrDate.isBefore(actualDate)) {
-                logger.warn("영수증 날짜({})가 방문 날짜({})보다 과거입니다", ocrDate, actualDate);
+            // 방문일(actualDate)은 영수증 날짜(ocrDate)보다 이전일 수 없다.
+            if (actualDate.isBefore(ocrDate)) {
+                logger.warn("방문일({})이 영수증 날짜({})보다 과거입니다. (유효하지 않음)", actualDate, ocrDate);
                 return false;
             }
             
-            // OCR 영수증 날짜가 방문 날짜보다 너무 미래면 false (7일 이상 차이)
-            if (ocrDate.isAfter(actualDate.plusDays(7))) {
-                logger.warn("영수증 날짜({})가 방문 날짜({})보다 7일 이상 미래입니다", ocrDate, actualDate);
+            // 방문일(actualDate)은 영수증 날짜(ocrDate)로부터 7일 이내여야 한다.
+            if (actualDate.isAfter(ocrDate.plusDays(7))) {
+                logger.warn("방문일({})이 영수증 날짜({})로부터 7일이 초과했습니다. (유효하지 않음)", actualDate, ocrDate);
                 return false;
             }
             

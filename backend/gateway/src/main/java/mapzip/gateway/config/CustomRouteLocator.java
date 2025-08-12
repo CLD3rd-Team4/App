@@ -52,6 +52,13 @@ public class CustomRouteLocator {
                                 .filter(jwtAuthenticationFilter.apply(new JwtAuthenticationFilter.Config())))
                         .uri("http://review.service-review:8080"))
 
+                .route("review-http-user", r -> r.path("/review/user")
+                        .and().method("GET")  // 사용자 리뷰 목록 조회
+                        .filters(f -> f
+                                .filter(xssProtectionFilter.apply(new XssProtectionFilter.Config()))
+                                .filter(jwtAuthenticationFilter.apply(new JwtAuthenticationFilter.Config())))
+                        .uri("http://review.service-review:8080"))
+
                 .route("review-http-pending", r -> r.path("/review/pending", "/review/pending/**")
                         .and().method("GET", "DELETE")  // 미작성 리뷰 관리
                         .filters(f -> f

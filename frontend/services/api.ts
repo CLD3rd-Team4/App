@@ -364,24 +364,30 @@ export const ocrApi = {
       };
 
       const blob = dataUrlToBlob(imageData);
+      // 파라미터 전송
       formData.append('receiptImage', blob, 'receipt.jpg');
       formData.append('expectedRestaurantName', expectedRestaurantName);
       formData.append('expectedAddress', expectedAddress);
 
-      // axios를 사용하여 FormData 전송
+      // POST /review/verify-receipt
       const response = await api.post('/review/verify-receipt', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
       
-      return response.data;
-    } catch (error) {
+      // 응답 구조: { success: true, ocrResult: {...}, message: "..." }
+      return response.data?.ocrResult || response.data;
+    } catch (error: any) {
       if (error instanceof APIError) throw error;
-      if (error instanceof Error) {
-        throw new APIError('네트워크 오류가 발생했습니다: ' + error.message, 0, { originalError: error });
+      if (error.response?.data) {
+        throw new APIError(
+          error.response.data.message || '영수증 검증 중 오류가 발생했습니다',
+          error.response.status,
+          error.response.data
+        );
       }
-      throw new APIError('알 수 없는 네트워크 오류가 발생했습니다', 0, { originalError: error });
+      throw new APIError('네트워크 오류가 발생했습니다', 0, { originalError: error });
     }
   },
 };
@@ -403,6 +409,7 @@ export const reviewApi = {
         return new Blob([u8arr], { type: mime });
       };
 
+      // 파라미터 전송
       formData.append('restaurantId', reviewData.restaurantId);
       formData.append('restaurantName', reviewData.restaurantName);
       formData.append('restaurantAddress', reviewData.restaurantAddress);
@@ -437,20 +444,50 @@ export const reviewApi = {
         formData.append('visitDate', reviewData.visitDate);
       }
 
-      // axios를 사용하여 FormData 전송
+      // POST /review
       const response = await api.post('/review', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
       
-      return response.data;
-    } catch (error) {
+      // 응답 구조: { success: true, message: "...", reviewId: "...", isVerified: true }
+      return {
+        success: response.data.success,
+        message: response.data.message,
+        review: response.data.reviewId ? {
+          id: response.data.reviewId,
+          restaurantId: reviewData.restaurantId,
+          restaurantName: reviewData.restaurantName,
+          restaurantAddress: reviewData.restaurantAddress,
+          userId: '',
+          visitDate: reviewData.visitDate || '',
+          rating: reviewData.rating,
+          content: reviewData.content,
+          imageUrls: [],
+          isVerified: response.data.isVerified || false,
+          createdAt: new Date().toISOString()
+        } : null,
+        ocrResult: { 
+          isValid: response.data.isVerified || false,
+          restaurantName: reviewData.restaurantName,
+          address: reviewData.restaurantAddress,
+          visitDate: reviewData.visitDate || '',
+          totalAmount: '',
+          rawText: '',
+          confidence: 0
+        }
+      };
+    } catch (error: any) {
       if (error instanceof APIError) throw error;
-      if (error instanceof Error) {
-        throw new APIError('네트워크 오류가 발생했습니다: ' + error.message, 0, { originalError: error });
+      if (error.response?.data) {
+        throw new APIError(
+          error.response.data.message || '리뷰 작성 중 오류가 발생했습니다',
+          error.response.status,
+          error.response.data
+        );
       }
-      throw new APIError('알 수 없는 네트워크 오류가 발생했습니다', 0, { originalError: error });
+      throw new APIError('네트워크 오류가 발생했습니다', 0, { originalError: error });
     }
   },
 
@@ -477,52 +514,42 @@ export const reviewApi = {
       const response = await api.get('/review/pending');
       console.log('미작성 리뷰 API 응답:', response);
       
-      return response.data.data || [];
+      // 응답 구조: { success: true, data: [...], count: N }
+      return response.data?.data || [];
     } catch (error: any) {
-      console.error('미작성 리뷰 API 에러:', {
-        message: error.message,
-        status: error.response?.status,
-        data: error.response?.data,
-        config: {
-          url: error.config?.url,
-          method: error.config?.method,
-          headers: error.config?.headers
-        }
-      });
+      console.error('미작성 리뷰 API 에러:', error);
       
-      // Axios 에러인 경우
-      if (error.response && error.response.data) {
-        const { message, status, data } = error.response;
-        // 서버에서 내려준 에러 메시지가 있으면 사용
-        if (data && data.message) {
-          throw new APIError(data.message, status, data);
-        }
-        // 그렇지 않으면 일반적인 네트워크 오류 메시지 사용
-        throw new APIError(`네트워크 오류: ${status}`, status, data);
-      } 
-      // 일반 자바스크립트 에러인 경우
-      else if (error instanceof Error) {
+      if (error.response?.data) {
+        throw new APIError(
+          error.response.data.message || `네트워크 오류: ${error.response.status}`,
+          error.response.status,
+          error.response.data
+        );
+      } else if (error instanceof Error) {
         throw new APIError(`클라이언트 오류: ${error.message}`, 0, { originalError: error });
-      } 
-      // 그 외 알 수 없는 에러
-      else {
+      } else {
         throw new APIError('알 수 없는 오류가 발생했습니다.', 0, { originalError: error });
       }
     }
   },
 
-  // 미작성 리뷰 삭제 (사용자가 안간 경우)
+  // 미작성 리뷰 삭제
   deletePendingReview: async (restaurantId: string, scheduledTime: string): Promise<void> => {
     try {
+      // DELETE /review/pending/{restaurantId}?scheduledTime={scheduledTime}
       await api.delete(`/review/pending/${restaurantId}`, {
         params: { scheduledTime },
       });
-    } catch (error) {
-      if (error instanceof Error && error.message) {
-        if (error instanceof APIError) {
-            throw error; // APIError는 그대로 다시 던집니다.
-        }
-        throw new APIError(error.message, 0, { originalError: error });
+    } catch (error: any) {
+      if (error instanceof APIError) {
+        throw error;
+      }
+      if (error.response?.data) {
+        throw new APIError(
+          error.response.data.message || '미작성 리뷰 삭제 실패',
+          error.response.status,
+          error.response.data
+        );
       }
       throw new APIError('알 수 없는 오류가 발생했습니다', 0, { originalError: error });
     }
@@ -531,19 +558,123 @@ export const reviewApi = {
   // 특정 미작성 리뷰 상세 조회
   getPendingReviewDetail: async (restaurantId: string, scheduledTime: string): Promise<any> => {
     try {
-      const response = await api.get(`/review/pending/${restaurantId}`, {
+      // GET /review/pending/{restaurantId}/detail?scheduledTime={scheduledTime}
+      const response = await api.get(`/review/pending/${restaurantId}/detail`, {
         params: { scheduledTime },
       });
 
-      return response.data.data;
-    } catch (error) {
-      if (error instanceof Error && error.message) {
-        if (error instanceof APIError) {
-            throw error; // APIError는 그대로 다시 던집니다.
-        }
-        throw new APIError(error.message, 0, { originalError: error });
+      // 응답 구조: { success: true, data: {...} }
+      return response.data?.data;
+    } catch (error: any) {
+      if (error instanceof APIError) {
+        throw error;
+      }
+      if (error.response?.data) {
+        throw new APIError(
+          error.response.data.message || '미작성 리뷰 조회 실패',
+          error.response.status,
+          error.response.data
+        );
       }
       throw new APIError('알 수 없는 오류가 발생했습니다', 0, { originalError: error });
+    }
+  },
+
+  // 작성된 리뷰 삭제
+  deleteReview: async (restaurantId: string, reviewId: string): Promise<void> => {
+    try {
+      // DELETE /review/{restaurantId}/{reviewId}
+      await api.delete(`/review/${restaurantId}/${reviewId}`);
+    } catch (error: any) {
+      if (error instanceof APIError) {
+        throw error;
+      }
+      if (error.response?.data) {
+        throw new APIError(
+          error.response.data.message || '리뷰 삭제 실패',
+          error.response.status,
+          error.response.data
+        );
+      }
+      throw new APIError('알 수 없는 오류가 발생했습니다', 0, { originalError: error });
+    }
+  },
+
+  // 특정 리뷰 상세 조회
+  getReview: async (restaurantId: string, reviewId: string): Promise<any> => {
+    try {
+      // GET /review/{restaurantId}/{reviewId}
+      const response = await api.get(`/review/${restaurantId}/${reviewId}`);
+      
+      // 응답 구조: { success: true, data: {...} }
+      return response.data?.data;
+    } catch (error: any) {
+      if (error instanceof APIError) {
+        throw error;
+      }
+      if (error.response?.data) {
+        throw new APIError(
+          error.response.data.message || '리뷰 조회 실패',
+          error.response.status,
+          error.response.data
+        );
+      }
+      throw new APIError('알 수 없는 오류가 발생했습니다', 0, { originalError: error });
+    }
+  },
+
+  // 리뷰 수정
+  updateReview: async (restaurantId: string, reviewId: string, reviewData: {
+    rating: number;
+    content: string;
+    reviewImages?: string[];
+  }): Promise<any> => {
+    try {
+      const formData = new FormData();
+      
+      const dataUrlToBlob = (dataUrl: string): Blob => {
+        const arr = dataUrl.split(',');
+        const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        return new Blob([u8arr], { type: mime });
+      };
+
+      // 파라미터 전송
+      formData.append('rating', reviewData.rating.toString());
+      formData.append('content', reviewData.content);
+
+      if (reviewData.reviewImages) {
+        for (const image of reviewData.reviewImages) {
+          if (image) {
+            const blob = dataUrlToBlob(image);
+            formData.append('reviewImages', blob, 'review.jpg');
+          }
+        }
+      }
+
+      // PUT /review/{restaurantId}/{reviewId}
+      const response = await api.put(`/review/${restaurantId}/${reviewId}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      return response.data;
+    } catch (error: any) {
+      if (error instanceof APIError) throw error;
+      if (error.response?.data) {
+        throw new APIError(
+          error.response.data.message || '리뷰 수정 중 오류가 발생했습니다',
+          error.response.status,
+          error.response.data
+        );
+      }
+      throw new APIError('네트워크 오류가 발생했습니다', 0, { originalError: error });
     }
   },
 };

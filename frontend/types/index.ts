@@ -138,7 +138,8 @@ export interface CreateReviewRequest {
 }
 
 export interface CreateReviewResponse {
-  reviewId: string;
-  message: string;
-  success: boolean;
+  review: Review | null
+  ocrResult?: OCRResult
+  message: string
+  success: boolean
 }

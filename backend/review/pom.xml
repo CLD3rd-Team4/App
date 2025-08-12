@@ -71,6 +71,11 @@
             <artifactId>s3</artifactId>
             <version>2.21.26</version>
         </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>sts</artifactId>
+            <version>2.21.26</version>
+        </dependency>
 
         <!-- Google Cloud Vision API -->
         <dependency>
@@ -117,11 +122,13 @@
             <artifactId>spring-boot-starter-cache</artifactId>
         </dependency>
         
-        <!-- Spring Kafka for async processing -->
+        <!-- Spring Kafka는 현재 사용하지 않음 - 필요시 추가 -->
+        <!-- 
         <dependency>
             <groupId>org.springframework.kafka</groupId>
             <artifactId>spring-kafka</artifactId>
         </dependency>
+        -->
 
         <!-- Test Dependencies -->
         <dependency>
@@ -168,6 +175,7 @@
                     <pluginId>grpc-java</pluginId>
                     <pluginArtifact>io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
                     <protoSourceRoot>${project.basedir}/src/main/proto</protoSourceRoot>
+                    <!-- googleapis는 Maven 종속성에서 자동으로 가져옴 -->
                     <includes>
                         <include>**/*.proto</include>
                     </includes>
@@ -182,35 +190,8 @@
                 </executions>
             </plugin>
 
-            <!-- Protocol Buffers descriptor generation (pb 파일 생성용 주석처리해놨음) -->
-            <!--
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>exec-maven-plugin</artifactId>
-                <version>3.1.0</version>
-                <executions>
-                    <execution>
-                        <id>generate-proto-descriptor</id>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>exec</goal>
-                        </goals>
-                        <configuration>
-                            <executable>${settings.localRepository}/com/google/protobuf/protoc/${protobuf.version}/protoc-${protobuf.version}-${os.detected.classifier}.exe</executable>
-                            <arguments>
-                                <argument>-I${project.basedir}/src/main/proto</argument>
-                                <argument>-I${project.basedir}/googleapis</argument>
-                                <argument>-descriptor_set_out=${project.basedir}/target/review_proto.pb</argument>
-                                <argument>-include_imports</argument>
-                                <argument>-include_source_info</argument>
-                                <argument>review.proto</argument>
-                            </arguments>
-                            <workingDirectory>${project.basedir}/src/main/proto</workingDirectory>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            -->
+            <!-- Protocol Buffers descriptor generation (pb 파일 생성용 - 필요시 주석 해제) -->
+            
         </plugins>
     </build>
 </project>
