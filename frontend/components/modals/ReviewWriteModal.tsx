@@ -26,8 +26,56 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
   const [visitDate, setVisitDate] = useState(new Date().toISOString().split("T")[0])
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  
+  // OCR에서 추출한 식당명과 주소 상태 추가
+  const [restaurantName, setRestaurantName] = useState(restaurant.placeName || restaurant.name || '')
+  const [restaurantAddress, setRestaurantAddress] = useState(restaurant.addressName || restaurant.address || '')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
+
+  // OCR 날짜를 HTML date input 형식(yyyy-MM-dd)으로 변환
+  const formatDateForInput = (ocrDate: string): string | null => {
+    try {
+      // 다양한 날짜 형식 처리: 2024-08-11, 2024/08/11, 24-08-11, 08/11/2024 등
+      const patterns = [
+        /(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/, // 2024-08-11, 2024/08/11
+        /(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/, // 08/11/2024, 11-08-2024
+        /(\d{2})[-\/.](\d{1,2})[-\/.](\d{1,2})/, // 24-08-11, 24/08/11
+      ]
+      
+      for (let pattern of patterns) {
+        const match = ocrDate.match(pattern)
+        if (match) {
+          let year: string, month: string, day: string
+          
+          if (pattern === patterns[0]) { // yyyy-MM-dd 형식
+            [, year, month, day] = match
+          } else if (pattern === patterns[1]) { // MM/dd/yyyy 형식
+            [, month, day, year] = match
+          } else if (pattern === patterns[2]) { // yy-MM-dd 형식
+            [, year, month, day] = match
+            year = parseInt(year) > 50 ? `19${year}` : `20${year}` // 50보다 크면 1900년대, 작으면 2000년대
+          } else {
+            continue // 매칭되지 않은 경우 다음 패턴으로
+          }
+          
+          // 모든 값이 존재하는지 확인
+          if (!year || !month || !day) continue
+          
+          // 월과 일을 2자리로 패딩
+          month = month.padStart(2, '0')
+          day = day.padStart(2, '0')
+          
+          return `${year}-${month}-${day}`
+        }
+      }
+      
+      return null
+    } catch (error) {
+      console.error('날짜 변환 오류:', error)
+      return null
+    }
+  }
 
   const handleImageCapture = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -52,6 +100,22 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
         restaurant.placeName || restaurant.name || '',
         restaurant.addressName || restaurant.address || ''
       )
+      
+      // OCR 결과에서 추출한 식당명, 주소, 방문날짜로 자동 업데이트
+      if (result.restaurantName && result.restaurantName.trim()) {
+        setRestaurantName(result.restaurantName.trim())
+      }
+      if (result.address && result.address.trim()) {
+        setRestaurantAddress(result.address.trim())
+      }
+      if (result.visitDate && result.visitDate.trim()) {
+        // OCR에서 추출한 날짜를 yyyy-MM-dd 형식으로 변환
+        const formattedDate = formatDateForInput(result.visitDate.trim())
+        if (formattedDate) {
+          setVisitDate(formattedDate)
+        }
+      }
+      
       setOcrResult(result)
       setStep(2)
     } catch (error) {
@@ -98,8 +162,8 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
       
       const reviewData: CreateReviewRequest = {
         restaurantId: restaurant.restaurantId || restaurant.id || '',
-        restaurantName: restaurant.placeName || restaurant.name || '',
-        restaurantAddress: restaurant.addressName || restaurant.address || '',
+        restaurantName: restaurantName, // OCR에서 추출된 식당명 사용
+        restaurantAddress: restaurantAddress, // OCR에서 추출된 주소 사용
         rating,
         content: reviewText,
         receiptImages: capturedImage ? [capturedImage] : [],
@@ -143,8 +207,8 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
             </div>
 
             <div className="mb-4">
-              <p className="text-sm text-gray-600 mb-2">식당명: {restaurant.placeName || restaurant.name || '식당명'}</p>
-              <p className="text-sm text-gray-600 mb-2">주소: {restaurant.addressName || restaurant.address || "주소 정보"}</p>
+              <p className="text-sm text-gray-600 mb-2">식당명: {restaurantName || '식당명'}</p>
+              <p className="text-sm text-gray-600 mb-2">주소: {restaurantAddress || "주소 정보"}</p>
               {restaurant.scheduledTime && (
                 <p className="text-sm text-blue-600">예정 시간: {restaurant.scheduledTime}</p>
               )}
@@ -214,29 +278,65 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
           </div>
         )}
 
-        {/* Step 2: OCR 결과 확인 */}
+        {/* Step 2: OCR 결과 확인 및 수정 */}
         {step === 2 && ocrResult && (
           <div className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-medium">OCR 결과 확인</h2>
+              <h2 className="text-lg font-medium">OCR 결과 확인 및 수정</h2>
               <Button onClick={onCancel} variant="ghost" size="sm">
                 <X className="w-5 h-5" />
               </Button>
             </div>
 
+            {/* 식당 정보 수정 섹션 */}
+            <div className="space-y-4 mb-4">
+              <div>
+                <Label htmlFor="restaurantName" className="text-sm font-medium">
+                  식당명 {ocrResult.restaurantName ? '(OCR 자동 입력됨)' : ''}
+                </Label>
+                <Input
+                  id="restaurantName"
+                  type="text"
+                  value={restaurantName}
+                  onChange={(e) => setRestaurantName(e.target.value)}
+                  placeholder="식당명을 입력해주세요"
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="restaurantAddress" className="text-sm font-medium">
+                  주소 {ocrResult.address ? '(OCR 자동 입력됨)' : ''}
+                </Label>
+                <Input
+                  id="restaurantAddress"
+                  type="text"
+                  value={restaurantAddress}
+                  onChange={(e) => setRestaurantAddress(e.target.value)}
+                  placeholder="주소를 입력해주세요"
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="visitDateStep2" className="text-sm font-medium">
+                  방문날짜 {ocrResult.visitDate ? '(OCR 자동 입력됨)' : ''}
+                </Label>
+                <Input
+                  id="visitDateStep2"
+                  type="date"
+                  value={visitDate}
+                  onChange={(e) => setVisitDate(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+
             <div className="bg-gray-50 rounded-lg p-4 mb-4">
-              <h3 className="font-medium mb-2">추출된 정보</h3>
+              <h3 className="font-medium mb-2">OCR 추출 정보</h3>
               <div className="space-y-2 text-sm">
                 <p>
-                  <span className="font-medium">식당명:</span> {ocrResult.restaurantName}
-                </p>
-                {ocrResult.address && (
-                  <p>
-                    <span className="font-medium">주소:</span> {ocrResult.address}
-                  </p>
-                )}
-                <p>
-                  <span className="font-medium">방문일:</span> {ocrResult.visitDate}
+                  <span className="font-medium">방문일:</span> {ocrResult.visitDate || '추출되지 않음'}
                 </p>
                 {ocrResult.totalAmount && (
                   <p>
@@ -271,12 +371,20 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
               </Button>
               <Button
                 onClick={() => setStep(3)}
-                disabled={!ocrResult.isValid}
-                className="flex-1 bg-blue-500 hover:bg-blue-600 text-white"
+                disabled={!restaurantName.trim() || !restaurantAddress.trim()}
+                className="flex-1 bg-blue-500 hover:bg-blue-600 text-white disabled:bg-gray-400"
               >
-                다음
+                다음 {!ocrResult.isValid && '(수동 입력)'}
               </Button>
             </div>
+            
+            {!ocrResult.isValid && (
+              <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-800">
+                  <strong>참고:</strong> OCR 검증이 실패했지만, 정보를 수정하여 계속 진행할 수 있습니다.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -293,12 +401,31 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
             <div className="space-y-4">
               {/* OCR 결과 날짜 검증 메시지 */}
               {ocrResult && ocrResult.visitDate && (
-                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-800">
+                <div className={`mb-4 p-3 border rounded-lg ${
+                  formatDateForInput(ocrResult.visitDate) === visitDate 
+                    ? 'bg-green-50 border-green-200' 
+                    : 'bg-yellow-50 border-yellow-200'
+                }`}>
+                  <p className={`text-sm ${
+                    formatDateForInput(ocrResult.visitDate) === visitDate 
+                      ? 'text-green-800' 
+                      : 'text-yellow-800'
+                  }`}>
                     <strong>OCR 추출 날짜:</strong> {ocrResult.visitDate}
+                    {formatDateForInput(ocrResult.visitDate) === visitDate 
+                      ? ' ✓ 일치' 
+                      : ' ⚠️ 불일치'
+                    }
                   </p>
-                  <p className="text-xs text-blue-600 mt-1">
-                    방문 날짜와 일치하는지 확인해주세요.
+                  <p className={`text-xs mt-1 ${
+                    formatDateForInput(ocrResult.visitDate) === visitDate 
+                      ? 'text-green-600' 
+                      : 'text-yellow-600'
+                  }`}>
+                    {formatDateForInput(ocrResult.visitDate) === visitDate 
+                      ? '영수증 날짜와 방문 날짜가 일치합니다.' 
+                      : '영수증 날짜와 방문 날짜가 다릅니다. 정확한 날짜인지 확인해주세요.'
+                    }
                   </p>
                 </div>
               )}
