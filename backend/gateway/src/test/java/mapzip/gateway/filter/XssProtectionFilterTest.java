@@ -1,167 +1,65 @@
 package mapzip.gateway.filter;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
-import org.springframework.cloud.gateway.filter.GatewayFilter;
-import org.springframework.cloud.gateway.filter.GatewayFilterChain;
-import org.springframework.core.io.buffer.DataBuffer;
-import org.springframework.core.io.buffer.DefaultDataBufferFactory;
+import org.springframework.http.MediaType;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
-import reactor.test.StepVerifier;
+import org.springframework.web.server.ServerWebExchange;
 
-import java.nio.charset.StandardCharsets;
-
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 class XssProtectionFilterTest {
 
-    @Mock
-    private GatewayFilterChain filterChain;
-    
-    private XssProtectionFilter xssProtectionFilter;
+    private final XssProtectionFilter filter = new XssProtectionFilter();
 
-    @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
-        xssProtectionFilter = new XssProtectionFilter();
+    @Test
+    void testJsonBodySanitization() {
+        String maliciousJson = "{\"name\":\"<script>alert('xss')</script>John\",\"message\":\"Hello <b>world</b>\"}";
+        
+        MockServerHttpRequest request = MockServerHttpRequest.post("/test")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(maliciousJson);
+        
+        ServerWebExchange exchange = MockServerWebExchange.from(request);
+        
+        // JSON 파싱 테스트를 위한 직접 호출
+        String result = filter.sanitizeJsonBody(maliciousJson);
+        
+        assertFalse(result.contains("<script>"));
+        assertTrue(result.contains("John"));
+        assertTrue(result.contains("<b>world</b>")); // 허용된 태그는 유지
     }
 
     @Test
-    void shouldSanitizeGetRequestQueryParameters() {
-        // Given - OWASP는 <script> 태그를 완전히 제거함
-        MockServerHttpRequest request = MockServerHttpRequest
-                .get("/test?name=<script>alert('xss')</script>user&data=<img src=x onerror=alert(1)>")
-                .build();
-        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+    void testNonJsonBodySanitization() {
+        String maliciousText = "<script>alert('xss')</script>Hello";
         
-        when(filterChain.filter(any())).thenReturn(Mono.empty());
+        String result = filter.sanitizeXss(maliciousText);
         
-        // When
-        GatewayFilter filter = xssProtectionFilter.apply(new XssProtectionFilter.Config());
-        Mono<Void> result = filter.filter(exchange, filterChain);
-        
-        // Then
-        StepVerifier.create(result)
-                .verifyComplete();
-        
-        verify(filterChain).filter(any());
+        assertFalse(result.contains("<script>"));
+        assertTrue(result.contains("Hello"));
     }
 
     @Test
-    void shouldAllowCleanGetRequest() {
-        // Given
-        MockServerHttpRequest request = MockServerHttpRequest
-                .get("/test?name=user&data=normal")
-                .build();
-        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+    void testNestedJsonSanitization() {
+        String nestedJson = "{\"user\":{\"name\":\"<script>alert(1)</script>Test\",\"tags\":[\"<img src=x onerror=alert(1)>\",\"safe\"]}}";
         
-        when(filterChain.filter(any())).thenReturn(Mono.empty());
+        String result = filter.sanitizeJsonBody(nestedJson);
         
-        // When
-        GatewayFilter filter = xssProtectionFilter.apply(new XssProtectionFilter.Config());
-        Mono<Void> result = filter.filter(exchange, filterChain);
-        
-        // Then
-        StepVerifier.create(result)
-                .verifyComplete();
-        
-        verify(filterChain).filter(any());
+        assertFalse(result.contains("<script>"));
+        assertFalse(result.contains("onerror"));
+        assertTrue(result.contains("Test"));
+        assertTrue(result.contains("safe"));
     }
 
     @Test
-    void shouldSanitizePostRequestBody() {
-        // Given - OWASP는 위험한 스크립트와 이벤트 핸들러를 제거
-        String maliciousBody = "{\"name\":\"<script>alert('xss')</script>user\",\"data\":\"<iframe src=javascript:alert(1)></iframe>\"}";
-        DataBuffer dataBuffer = new DefaultDataBufferFactory().wrap(maliciousBody.getBytes(StandardCharsets.UTF_8));
+    void testFormUrlencodedSanitization() {
+        String formData = "name=%3Cscript%3Ealert%281%29%3C%2Fscript%3EJohn&message=Hello+%3Cb%3Eworld%3C%2Fb%3E";
         
-        MockServerHttpRequest request = MockServerHttpRequest
-                .post("/test")
-                .body(Flux.just(dataBuffer));
-        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+        String result = filter.sanitizeFormBody(formData);
         
-        when(filterChain.filter(any())).thenReturn(Mono.empty());
-        
-        // When
-        GatewayFilter filter = xssProtectionFilter.apply(new XssProtectionFilter.Config());
-        Mono<Void> result = filter.filter(exchange, filterChain);
-        
-        // Then
-        StepVerifier.create(result)
-                .verifyComplete();
-        
-        verify(filterChain).filter(any());
-    }
-
-    @Test
-    void shouldAllowSafeHtmlElements() {
-        // Given - OWASP 정책에서 허용하는 안전한 HTML 요소들
-        String safeBody = "{\"content\":\"<p>Hello <b>world</b>!</p><a href='https://example.com'>Link</a>\"}";
-        DataBuffer dataBuffer = new DefaultDataBufferFactory().wrap(safeBody.getBytes(StandardCharsets.UTF_8));
-        
-        MockServerHttpRequest request = MockServerHttpRequest
-                .post("/test")
-                .body(Flux.just(dataBuffer));
-        MockServerWebExchange exchange = MockServerWebExchange.from(request);
-        
-        when(filterChain.filter(any())).thenReturn(Mono.empty());
-        
-        // When
-        GatewayFilter filter = xssProtectionFilter.apply(new XssProtectionFilter.Config());
-        Mono<Void> result = filter.filter(exchange, filterChain);
-        
-        // Then
-        StepVerifier.create(result)
-                .verifyComplete();
-        
-        verify(filterChain).filter(any());
-    }
-
-    @Test
-    void shouldHandleNullQueryParameters() {
-        // Given
-        MockServerHttpRequest request = MockServerHttpRequest
-                .get("/test")
-                .build();
-        MockServerWebExchange exchange = MockServerWebExchange.from(request);
-        
-        when(filterChain.filter(any())).thenReturn(Mono.empty());
-        
-        // When
-        GatewayFilter filter = xssProtectionFilter.apply(new XssProtectionFilter.Config());
-        Mono<Void> result = filter.filter(exchange, filterChain);
-        
-        // Then
-        StepVerifier.create(result)
-                .verifyComplete();
-        
-        verify(filterChain).filter(any());
-    }
-
-    @Test
-    void shouldBlockAdvancedXssAttacks() {
-        // Given - 고급 XSS 공격 패턴들
-        MockServerHttpRequest request = MockServerHttpRequest
-                .get("/test?payload=<svg onload=alert(1)>&data=<object data=javascript:alert(1)>")
-                .build();
-        MockServerWebExchange exchange = MockServerWebExchange.from(request);
-        
-        when(filterChain.filter(any())).thenReturn(Mono.empty());
-        
-        // When
-        GatewayFilter filter = xssProtectionFilter.apply(new XssProtectionFilter.Config());
-        Mono<Void> result = filter.filter(exchange, filterChain);
-        
-        // Then
-        StepVerifier.create(result)
-                .verifyComplete();
-        
-        verify(filterChain).filter(any());
+        assertFalse(result.contains("script"));
+        assertTrue(result.contains("John"));
+        assertTrue(result.contains("world"));
     }
 }
