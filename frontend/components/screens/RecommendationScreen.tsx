@@ -333,7 +333,7 @@ export default function RecommendationScreen() {
                     </div>
                     <div className="flex items-center gap-2">
                       {selectedRestaurants[section.id] && (
-                        <span className="text-sm text-gray-600">{selectedRestaurants[section.id].placeName || selectedRestaurants[section.id].name}</span>
+                        <span className="text-sm text-gray-600">{selectedRestaurants[section.id].placeName}</span>
                       )}
                       {expandedSections.has(section.id) ? (
                         <ChevronUp className="w-5 h-5 text-gray-400" />
@@ -354,17 +354,15 @@ export default function RecommendationScreen() {
                               <span className="text-xs bg-green-500 text-white px-2 py-1 rounded-full font-medium">
                                 이전 선택
                               </span>
-                              <h3 className="font-medium">{section.previousSelection.placeName || section.previousSelection.name}</h3>
+                              <h3 className="font-medium">{section.previousSelection.placeName}</h3>
                             </div>
                             <div className="flex items-start gap-3">
                               <img
                                 src={
                                   section.previousSelection.image ||
-                                  "/placeholder.svg?height=60&width=60&query=restaurant" ||
-                                  "/placeholder.svg" ||
-                                  "/placeholder.svg"
+                                  "/placeholder.svg?height=60&width=60&query=restaurant"
                                 }
-                                alt={section.previousSelection.placeName || section.previousSelection.name}
+                                alt={section.previousSelection.placeName}
                                 className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
                               />
                               <div className="flex-1 min-w-0">
@@ -420,13 +418,13 @@ export default function RecommendationScreen() {
                                 {/* 음식점 이미지 */}
                                 <img
                                   src={restaurant.image || "/placeholder.svg?height=80&width=80&query=restaurant"}
-                                  alt={restaurant.placeName || restaurant.name}
+                                  alt={restaurant.placeName}
                                   className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
                                 />
 
                                 <div className="flex-1 min-w-0">
                                   {/* 이름 */}
-                                  <h3 className="font-semibold text-lg mb-1">{restaurant.placeName || restaurant.name}</h3>
+                                  <h3 className="font-semibold text-lg mb-1">{restaurant.placeName}</h3>
 
                                   {/* 한줄평 */}
                                   <p className="text-sm text-gray-600 mb-2">{restaurant.description}</p>
@@ -480,7 +478,7 @@ export default function RecommendationScreen() {
                       return (
                         <div key={sectionId} className="flex items-center gap-2 text-sm">
                           <span className="font-medium">{section?.title}:</span>
-                          <span>{restaurant.placeName || restaurant.name}</span>
+                          <span>{restaurant.placeName}</span>
                         </div>
                       )
                     })}

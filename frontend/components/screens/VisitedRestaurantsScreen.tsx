@@ -112,12 +112,12 @@ export default function VisitedRestaurantsScreen() {
                     <div className="flex items-start gap-3">
                       <img
                         src={restaurant.image || "/placeholder.svg?height=50&width=50&query=restaurant"}
-                        alt={restaurant.placeName || restaurant.name || '식당'}
+                        alt={restaurant.placeName || '식당'}
                         className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
                       />
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-medium mb-1">{restaurant.placeName || restaurant.name}</h3>
-                        <p className="text-sm text-gray-500 mb-2">{restaurant.addressName || restaurant.address}</p>
+                        <h3 className="font-medium mb-1">{restaurant.placeName}</h3>
+                        <p className="text-sm text-gray-500 mb-2">{restaurant.addressName}</p>
                         {restaurant.scheduledTime && (
                           <p className="text-xs text-blue-600 mb-2">예정 시간: {restaurant.scheduledTime}</p>
                         )}
