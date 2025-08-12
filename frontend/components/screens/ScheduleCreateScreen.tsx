@@ -6,6 +6,8 @@ import useSchedule from "@/hooks/useSchedule"
 import ScheduleCreateLocationScreen from "./ScheduleCreateLocationScreen"
 import ScheduleCreateRequiredScreen from "./ScheduleCreateRequiredScreen"
 import ScheduleCreateOptionalScreen from "./ScheduleCreateOptionalScreen"
+import type { LocationData, RequiredFormData, OptionalFormData, SchedulePayload, Waypoint } from "@/types";
+import { MealType } from "@/types";
 
 type CreateStep = "location" | "required" | "optional"
 
@@ -14,38 +16,10 @@ export default function ScheduleCreateScreen({ isEdit = false, initialData = nul
   const { createSchedule, updateSchedule } = useSchedule()
   const [currentStep, setCurrentStep] = useState<CreateStep>("location")
 
-  // 각 단계의 상태를 초기화합니다.
-  const [locationData, setLocationData] = useState<any>(null);
-  const [requiredData, setRequiredData] = useState<any>(null);
-  const [optionalData, setOptionalData] = useState<any>(null);
+  const [locationData, setLocationData] = useState<LocationData | null>(null);
+  const [requiredData, setRequiredData] = useState<any | null>(null);
 
-  // initialData prop이 비동기적으로 업데이트될 때 상태를 동기화하는 useEffect
-  useEffect(() => {
-    if (initialData) {
-      setLocationData({
-        departure: initialData.departure,
-        waypoints: initialData.waypoints,
-        destination: initialData.destination,
-      });
-      setRequiredData({
-        scheduleName: initialData.title,
-        departureTime: initialData.departureTime,
-        arrivalBufferMinutes: initialData.arrivalBufferMinutes,
-        targetMealTimes: initialData.mealSlots.map((ms: any) => ({
-          type: ms.mealType === 'MEAL' ? '식사' : '간식',
-          time: ms.scheduledTime,
-          radius: ms.radius / 1000, // m -> km
-        })),
-      });
-      setOptionalData({
-        userRequirements: initialData.userNote,
-        travelPurpose: initialData.purpose,
-        companions: initialData.companions,
-      });
-    }
-  }, [initialData]);
-
-  const handleLocationNext = (data: any) => {
+  const handleLocationNext = (data: LocationData) => {
     setLocationData(data)
     setCurrentStep("required")
   }
@@ -55,31 +29,41 @@ export default function ScheduleCreateScreen({ isEdit = false, initialData = nul
     setCurrentStep("optional")
   }
 
-  const handleOptionalComplete = async (finalOptionalData: any) => {
+  const handleOptionalComplete = async (optionalData: any) => {
+    if (!locationData || !requiredData) {
+        alert("위치 정보 또는 필수 정보가 없습니다.");
+        return;
+    }
+
     try {
-      const scheduleData = {
-        // userId는 JWT 토큰에서 자동으로 추출
+      // 데이터 변환 로직 (UI -> API)
+      const companionsArray = optionalData.companions 
+        ? (typeof optionalData.companions === 'string' 
+            ? optionalData.companions.split(',').map((c: string) => c.trim()).filter(Boolean) 
+            : Array.from(optionalData.companions))
+        : [];
+
+      const payload: SchedulePayload = {
         title: requiredData.scheduleName,
         departureTime: requiredData.departureTime,
-        arrivalTime: initialData?.arrivalTime || "",
-        arrivalBufferMinutes: requiredData.arrivalBufferMinutes, // 도착 여유 시간 추가
+        departure: locationData.departure!,
+        destination: locationData.destination!,
+        waypoints: locationData.waypoints?.filter(Boolean) as Waypoint[] || [],
         mealSlots: requiredData.targetMealTimes.map((mt: any) => ({
-          mealType: mt.type === '식사' ? 'MEAL' : 'SNACK',
+          mealType: mt.type === '식사' ? MealType.MEAL : MealType.SNACK,
           scheduledTime: mt.time,
-          radius: (parseFloat(mt.radius) || 1) * 1000, // km -> m
+          radius: parseInt(mt.radius.replace('km', '000'), 10),
         })),
-        departure: locationData.departure,
-        waypoints: locationData.waypoints,
-        destination: locationData.destination,
-        userNote: finalOptionalData.userRequirements,
-        purpose: finalOptionalData.travelPurpose,
-        companions: finalOptionalData.companions,
+        purpose: optionalData.travelPurpose,
+        companions: companionsArray,
+        userNote: optionalData.userRequirements,
+        arrivalBufferMinutes: requiredData.arrivalBufferMinutes || 30, // 기본값 설정
       };
 
       if (isEdit && initialData?.id) {
-        await updateSchedule(initialData.id);
+        await updateSchedule(initialData.id, payload);
       } else {
-        await createSchedule(scheduleData);
+        await createSchedule(payload);
       }
       
       router.push("/schedule");
@@ -109,8 +93,6 @@ export default function ScheduleCreateScreen({ isEdit = false, initialData = nul
         <ScheduleCreateOptionalScreen
           onComplete={handleOptionalComplete}
           onBack={handleBack}
-          initialData={optionalData}
-          isEdit={isEdit} // isEdit prop 전달
         />
       )}
     </>

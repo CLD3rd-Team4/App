@@ -42,6 +42,13 @@ function onRefreshFailed(error: any) {
 api.interceptors.response.use(
     (res) => res,
     async (error) => {
+        // 네트워크 에러 등으로 response가 없는 경우
+        if (!error.response) {
+            console.error("Network Error or no response:", error);
+            // 여기서 APIError를 생성하여 반환하면 각 API 호출부의 catch에서 처리 가능
+            return Promise.reject(new Error("네트워크에 연결할 수 없습니다. 연결 상태를 확인해주세요."));
+        }
+
         const {
         config,
         response: { status, data },
