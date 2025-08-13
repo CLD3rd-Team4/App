@@ -19,6 +19,34 @@ export default function ScheduleCreateScreen({ isEdit = false, initialData = nul
   const [locationData, setLocationData] = useState<LocationData | null>(null);
   const [requiredData, setRequiredData] = useState<any | null>(null);
 
+  useEffect(() => {
+    if (isEdit && initialData) {
+      const location: LocationData = {
+        departure: initialData.departure,
+        destination: initialData.destination,
+        waypoints: initialData.waypoints,
+      };
+
+      // ScheduleCreateRequiredScreen이 기대하는 타입에 맞게 데이터를 채웁니다.
+      const required: any = {
+        scheduleName: initialData.title,
+        departureTime: initialData.departureTime,
+        targetMealTimes: initialData.mealSlots.map((ms: any) => ({
+          type: ms.mealType === MealType.MEAL ? '식사' : '간식',
+          time: ms.scheduledTime,
+          radius: `${ms.radius / 1000}km`,
+        })),
+        arrivalBufferMinutes: initialData.arrivalBufferMinutes,
+        // 자식 컴포넌트가 요구하는 추가 필드를 초기화합니다.
+        arrivalTime: initialData.calculatedArrivalTime || "", 
+        estimatedArrivalTime: initialData.calculatedArrivalTime || "",
+      };
+      
+      setLocationData(location);
+      setRequiredData(required);
+    }
+  }, [isEdit, initialData]);
+
   const handleLocationNext = (data: LocationData) => {
     setLocationData(data)
     setCurrentStep("required")
@@ -87,7 +115,7 @@ export default function ScheduleCreateScreen({ isEdit = false, initialData = nul
         <ScheduleCreateLocationScreen onNext={handleLocationNext} initialData={locationData} />
       )}
       {currentStep === "required" && (
-        <ScheduleCreateRequiredScreen onNext={handleRequiredNext} onBack={handleBack} initialData={requiredData} />
+        <ScheduleCreateRequiredScreen onNext={handleRequiredNext} onBack={handleBack} initialData={requiredData || undefined} />
       )}
       {currentStep === "optional" && (
         <ScheduleCreateOptionalScreen
