@@ -234,10 +234,19 @@ export const scheduleApi = {
       // userId는 JWT 토큰에서 자동으로 추출되므로 파라미터 불필요
       const response = await api.get(`/schedule/${scheduleId}`);
       const data = response.data;
-      if (data && data.schedule) {
-        return { ...data, schedule: mapScheduleResponse(data.schedule) };
+
+      // 서버 응답 형식에 유연하게 대처:
+      // 1. 응답 데이터 자체가 schedule 객체인 경우 (e.g., { scheduleId: '...' })
+      // 2. 응답 데이터가 { schedule: { ... } } 형태로 감싸져 있는 경우
+      const scheduleData = data.schedule ? data.schedule : data;
+
+      if (scheduleData && Object.keys(scheduleData).length > 0) {
+        // scheduleId를 id로 매핑하고, 수정 페이지가 기대하는 { schedule: { ... } } 형식으로 반환
+        return { schedule: mapScheduleResponse(scheduleData) };
       }
-      return data;
+
+      // 유효한 스케줄 데이터가 없는 경우
+      return { schedule: null };
     } catch (error: any) {
       console.error("스케줄 상세 정보 조회 실패:", error);
       if (error.response) {
