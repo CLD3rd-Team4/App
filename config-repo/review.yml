@@ -70,19 +70,6 @@ aws:
     presign-duration: ${S3_PRESIGN_DURATION:PT1H}  # Pre-signed URL 유효시간 (1시간)
     cloudfront-domain: ${CLOUDFRONT_IMAGE_DOMAIN:https://img.mapzip.shop}  # CloudFront 배포 도메인 (terraform main.tf line 213 참조)
     
-  # MSK Kafka 설정 (main 클러스터) - 환경변수 필수
-  kafka:
-    bootstrap-servers: ${MSK_BOOTSTRAP_SERVERS}
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
-      acks: ${KAFKA_PRODUCER_ACKS:all}
-      retries: ${KAFKA_PRODUCER_RETRIES:3}
-    consumer:
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      group-id: review-service-${ENVIRONMENT:prod}
-      auto-offset-reset: ${KAFKA_CONSUMER_OFFSET_RESET:earliest}
 
 # Google Cloud Vision API (Config Server 암호화 방식)
 google:
@@ -137,7 +124,6 @@ logging:
     com.mapzip.review: ${LOG_LEVEL_REVIEW:INFO}
     software.amazon.awssdk: ${LOG_LEVEL_AWS:WARN}
     com.google.cloud: ${LOG_LEVEL_GOOGLE:WARN}
-    org.springframework.kafka: ${LOG_LEVEL_KAFKA:INFO}
 
 # Review Service Specific Settings
 review:

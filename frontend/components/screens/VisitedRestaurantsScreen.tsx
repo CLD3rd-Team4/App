@@ -222,12 +222,12 @@ export default function VisitedRestaurantsScreen() {
                   <div className="grid grid-cols-2 gap-3">
                     {completedReviews.slice(0, 4).map((review, index) => (
                       <div
-                        key={review.reviewId || review.id || index}
+                        key={review.id || index}
                         className="bg-gray-100 rounded-lg p-3 relative hover:bg-gray-200 transition-colors"
                       >
                         <div 
                           className="cursor-pointer"
-                          onClick={() => handleReviewClick(review.reviewId || review.id || index)}
+                          onClick={() => handleReviewClick(review.id || index)}
                         >
                         {review.imageUrls && review.imageUrls.length > 0 ? (
                           <img
@@ -253,7 +253,7 @@ export default function VisitedRestaurantsScreen() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDeleteReview(review.restaurantId || review.id, review.reviewId || review.id);
+                            handleDeleteReview(review.restaurantId || review.id, review.id);
                           }}
                           className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 transition-colors"
                         >

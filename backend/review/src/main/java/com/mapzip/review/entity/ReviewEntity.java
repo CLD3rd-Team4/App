@@ -49,7 +49,7 @@ public class ReviewEntity {
         return this.createdAtUserId;
     }
 
-    @DynamoDbSecondaryPartitionKey(indexNames = {"UserIdIndex", "VerifiedReviewsIndex", "RatingIndex"})
+    @DynamoDbSecondaryPartitionKey(indexNames = {"UserIdIndex", "RatingIndex"})
     @DynamoDbAttribute("user_id")
     public String getUserId() {
         return userId;
@@ -127,7 +127,6 @@ public class ReviewEntity {
     }
 
     @DynamoDbAttribute("is_verified")
-    @DynamoDbSecondarySortKey(indexNames = "VerifiedReviewsIndex")
     public Boolean getIsVerified() {
         return isVerified;
     }
@@ -137,7 +136,7 @@ public class ReviewEntity {
     }
 
     @DynamoDbAttribute("created_at")
-    @DynamoDbSecondarySortKey(indexNames = {"UserIdIndex", "VerifiedReviewsIndex", "RatingIndex"})
+    @DynamoDbSecondarySortKey(indexNames = {"UserIdIndex", "RatingIndex"})
     public Instant getCreatedAt() {
         return createdAt;
     }
