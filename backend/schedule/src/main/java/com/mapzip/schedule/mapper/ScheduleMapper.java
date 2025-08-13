@@ -6,7 +6,7 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.mapzip.schedule.entity.MealTimeSlot;
 import com.mapzip.schedule.entity.Schedule;
-import com.mapzip.schedule.entity.SelectedRestaurant;
+
 import com.mapzip.schedule.grpc.*;
 import com.mapzip.schedule.repository.MealTimeSlotRepository;
 
