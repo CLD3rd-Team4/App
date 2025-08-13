@@ -11,12 +11,13 @@ import software.amazon.awssdk.services.bedrockruntime.BedrockRuntimeClient;
 public class BedrockConfig {
 	
 
-    @Bean
-    public BedrockRuntimeClient bedrockRuntimeClient() {
-  
+   @Bean
+    public BedrockRuntimeClient bedrockRuntimeClient(
+            @Value("${aws.region:us-east-1}") String region  // Config Server에서 외부화
+    ) {
         return BedrockRuntimeClient.builder()
-                .region(Region.US_EAST_1) // Claude 3는 us-east-1에서만 작동
-                .credentialsProvider(ProfileCredentialsProvider.create("default"))
-                .build(); // ~/.aws/credentials에서 자동으로 인증
+                .region(Region.of(region))
+                .credentialsProvider(software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider.create())
+                .build();
     }
 }
