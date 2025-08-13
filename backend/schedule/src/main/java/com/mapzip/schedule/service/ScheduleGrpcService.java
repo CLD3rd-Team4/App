@@ -82,10 +82,11 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
 
 
 
-    @Override
-    @Transactional
-    public void updateSchedule(UpdateScheduleRequest request, StreamObserver<GetScheduleDetailResponse> responseObserver) {
-        try {
+            @Override
+        @Transactional
+        public void updateSchedule(UpdateScheduleRequest request, StreamObserver<GetScheduleDetailResponse> responseObserver) {
+            log.info("[DEBUG] updateSchedule RPC called with scheduleId: {}", request.getScheduleId());
+            try {
             Schedule schedule = scheduleRepository.findById(request.getScheduleId())
                     .orElseThrow(() -> Status.NOT_FOUND.withDescription("수정할 스케줄을 찾을 수 없습니다: " + request.getScheduleId()).asRuntimeException());
 
