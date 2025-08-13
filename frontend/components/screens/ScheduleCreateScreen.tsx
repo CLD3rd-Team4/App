@@ -11,23 +11,33 @@ import { MealType } from "@/types";
 
 type CreateStep = "location" | "required" | "optional"
 
+// OptionalData 타입을 OptionalScreen에서 가져오거나 여기에 정의
+interface OptionalData {
+  userRequirements: string;
+  travelPurpose: string;
+  companions: string[];
+}
+
 export default function ScheduleCreateScreen({ isEdit = false, initialData = null }: { isEdit?: boolean, initialData?: any }) {
   const router = useRouter()
   const { createSchedule, updateSchedule } = useSchedule()
   const [currentStep, setCurrentStep] = useState<CreateStep>("location")
-
+  
+  const [editId, setEditId] = useState<string | null>(null);
   const [locationData, setLocationData] = useState<LocationData | null>(null);
   const [requiredData, setRequiredData] = useState<any | null>(null);
+  const [optionalData, setOptionalData] = useState<OptionalData | null>(null);
 
   useEffect(() => {
     if (isEdit && initialData) {
+      setEditId(initialData.id);
+
       const location: LocationData = {
         departure: initialData.departure,
         destination: initialData.destination,
         waypoints: initialData.waypoints,
       };
 
-      // ScheduleCreateRequiredScreen이 기대하는 타입에 맞게 데이터를 채웁니다.
       const required: any = {
         scheduleName: initialData.title,
         departureTime: initialData.departureTime,
@@ -37,13 +47,19 @@ export default function ScheduleCreateScreen({ isEdit = false, initialData = nul
           radius: `${ms.radius / 1000}km`,
         })),
         arrivalBufferMinutes: initialData.arrivalBufferMinutes,
-        // 자식 컴포넌트가 요구하는 추가 필드를 초기화합니다.
         arrivalTime: initialData.calculatedArrivalTime || "", 
         estimatedArrivalTime: initialData.calculatedArrivalTime || "",
+      };
+
+      const optional: OptionalData = {
+        userRequirements: initialData.userNote || "",
+        travelPurpose: initialData.purpose || "",
+        companions: initialData.companions || [],
       };
       
       setLocationData(location);
       setRequiredData(required);
+      setOptionalData(optional);
     }
   }, [isEdit, initialData]);
 
@@ -57,19 +73,15 @@ export default function ScheduleCreateScreen({ isEdit = false, initialData = nul
     setCurrentStep("optional")
   }
 
-  const handleOptionalComplete = async (optionalData: any) => {
+  const handleOptionalComplete = async (optionalDataFromChild: OptionalData) => {
     if (!locationData || !requiredData) {
         alert("위치 정보 또는 필수 정보가 없습니다.");
         return;
     }
 
     try {
-      // 데이터 변환 로직 (UI -> API)
-      const companionsArray = optionalData.companions 
-        ? (typeof optionalData.companions === 'string' 
-            ? optionalData.companions.split(',').map((c: string) => c.trim()).filter(Boolean) 
-            : Array.from(optionalData.companions))
-        : [];
+      // optionalDataFromChild.companions는 항상 string[] 타입이므로, 타입 검사 로직을 단순화합니다.
+      const companionsArray = optionalDataFromChild.companions || [];
 
       const payload: SchedulePayload = {
         title: requiredData.scheduleName,
@@ -82,14 +94,14 @@ export default function ScheduleCreateScreen({ isEdit = false, initialData = nul
           scheduledTime: mt.time,
           radius: parseInt(mt.radius.replace('km', '000'), 10),
         })),
-        purpose: optionalData.travelPurpose,
+        purpose: optionalDataFromChild.travelPurpose,
         companions: companionsArray,
-        userNote: optionalData.userRequirements,
-        arrivalBufferMinutes: requiredData.arrivalBufferMinutes || 30, // 기본값 설정
+        userNote: optionalDataFromChild.userRequirements,
+        arrivalBufferMinutes: requiredData.arrivalBufferMinutes || 30,
       };
 
-      if (isEdit && initialData?.id) {
-        await updateSchedule(initialData.id, payload);
+      if (isEdit && editId) {
+        await updateSchedule(editId, payload);
       } else {
         await createSchedule(payload);
       }
@@ -121,6 +133,8 @@ export default function ScheduleCreateScreen({ isEdit = false, initialData = nul
         <ScheduleCreateOptionalScreen
           onComplete={handleOptionalComplete}
           onBack={handleBack}
+          initialData={optionalData || undefined}
+          isEdit={isEdit}
         />
       )}
     </>
