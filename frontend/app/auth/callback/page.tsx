@@ -14,12 +14,15 @@ function KakaoCallbackInner() {
         if (hasFetched.current) return;
         hasFetched.current = true;
 
+        console.log('useEffect 실행됨');
+
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get('code');
         if (!code) {
             router.replace('/auth/login?error=missing_code');
             return;
         }
+        console.log('카카오 로그인 code:', code);
 
         // 이미 콜백 처리한 브라우저라면 세션 확인만
         if (sessionStorage.getItem('kakaoLoginDone')) {
