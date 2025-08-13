@@ -36,10 +36,11 @@ function KakaoCallbackInner() {
         }
 
         // 최초 콜백 처리
-        sessionStorage.setItem('kakaoLoginDone', 'true');
-
         api.post(`/auth/kakao/callback?code=${code}`)
-            .then(() => router.replace('/'))
+            .then(() => {
+                sessionStorage.setItem('kakaoLoginDone', 'true');
+                router.replace('/')
+            })
             .catch(() => router.replace('/auth/login?error=callback_failed'));
     }, [router, searchParams]);
 
