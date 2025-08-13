@@ -19,7 +19,7 @@ interface RequiredData {
   arrivalTime: string
   estimatedArrivalTime: string
   targetMealTimes: MealTime[]
-  arrivalBufferMinutes: number // 도착 여유 시간 (분)
+  arrivalBufferMinutes: number
 }
 
 interface ScheduleCreateRequiredScreenProps {
@@ -38,9 +38,9 @@ export default function ScheduleCreateRequiredScreen({
       scheduleName: "",
       departureTime: "12:00",
       arrivalTime: "",
-      estimatedArrivalTime: "18:30", // 백엔드에서 계산해서 받을 예정
+      estimatedArrivalTime: "18:30",
       targetMealTimes: [],
-      arrivalBufferMinutes: 0, // 기본값 0으로 설정
+      arrivalBufferMinutes: 0,
     },
   )
   const [selectedAdjustment, setSelectedAdjustment] = useState<string>("")
@@ -63,20 +63,44 @@ export default function ScheduleCreateRequiredScreen({
     const departureMinutes = timeToMinutes(formData.departureTime)
 
     if (index === 0) {
-      // 첫 번째 식사는 출발시간 + 5분 이후
       return minutesToTime(departureMinutes + 5)
     } else {
-      // 이후 식사는 이전 식사시간 + 5분 이후
       const previousMealMinutes = timeToMinutes(formData.targetMealTimes[index - 1].time)
       return minutesToTime(previousMealMinutes + 5)
     }
+  }
+
+  // 출발시간 변경 시 식사시간들 자동 조정
+  const handleDepartureTimeChange = (newDepartureTime: string) => {
+    setFormData((prev) => {
+      const newDepartureMinutes = timeToMinutes(newDepartureTime)
+      
+      const updatedMealTimes = prev.targetMealTimes.map((meal, index) => {
+        const currentMealMinutes = timeToMinutes(meal.time)
+        const minRequiredMinutes = newDepartureMinutes + 5 + (index * 5)
+
+        if (currentMealMinutes < minRequiredMinutes) {
+          return {
+            ...meal,
+            time: minutesToTime(minRequiredMinutes)
+          }
+        }
+        return meal
+      })
+
+      return {
+        ...prev,
+        departureTime: newDepartureTime,
+        targetMealTimes: updatedMealTimes
+      }
+    })
   }
 
   const addMealTime = () => {
     const minTime = getMinTimeForMeal(formData.targetMealTimes.length)
     setFormData((prev) => ({
       ...prev,
-      targetMealTimes: [...prev.targetMealTimes, { type: "식사", time: minTime, radius: "5km" }], // 기본 반경 5km 추가
+      targetMealTimes: [...prev.targetMealTimes, { type: "식사", time: minTime, radius: "5km" }],
     }))
   }
 
@@ -89,14 +113,34 @@ export default function ScheduleCreateRequiredScreen({
 
   const updateMealTime = (index: number, field: keyof MealTime, value: string) => {
     if (field === "time") {
+      const newTimeMinutes = timeToMinutes(value)
       const minTime = getMinTimeForMeal(index)
       const minMinutes = timeToMinutes(minTime)
-      const selectedMinutes = timeToMinutes(value)
 
-      if (selectedMinutes < minMinutes) {
-        alert(`${index === 0 ? "출발시간" : "이전 식사시간"}의 5분 이후로 선택해주세요.`)
-        return
-      }
+      // 최소 시간보다 이른 경우 그냥 최소 시간으로 설정 (경고 없음)
+      const finalTime = newTimeMinutes < minMinutes ? minTime : value
+
+      setFormData((prev) => ({
+        ...prev,
+        targetMealTimes: prev.targetMealTimes.map((meal, i) => {
+          if (i === index) {
+            return { ...meal, time: finalTime }
+          }
+          // 이후 식사시간들도 필요시 자동 조정
+          if (i > index) {
+            const currentMealMinutes = timeToMinutes(meal.time)
+            const previousMealMinutes = timeToMinutes(prev.targetMealTimes[i - 1].time)
+            const adjustedPreviousMinutes = i - 1 === index ? timeToMinutes(finalTime) : previousMealMinutes
+            const minRequiredMinutes = adjustedPreviousMinutes + 5
+
+            if (currentMealMinutes < minRequiredMinutes) {
+              return { ...meal, time: minutesToTime(minRequiredMinutes) }
+            }
+          }
+          return meal
+        })
+      }))
+      return
     }
 
     setFormData((prev) => ({
@@ -107,7 +151,6 @@ export default function ScheduleCreateRequiredScreen({
 
   const adjustArrivalTime = (adjustment: string) => {
     setSelectedAdjustment(adjustment)
-    // TODO: 백엔드에서 계산된 예상 도착시간을 기준으로 조정
     const currentTime = new Date(`2024-01-01 ${formData.estimatedArrivalTime}`)
     let minutes = 0
 
@@ -164,7 +207,7 @@ export default function ScheduleCreateRequiredScreen({
           {/* 출발 시간 */}
           <TimePicker
             value={formData.departureTime}
-            onChange={(time) => setFormData((prev) => ({ ...prev, departureTime: time }))}
+            onChange={handleDepartureTimeChange}
             label="출발 시간"
           />
 
@@ -188,9 +231,6 @@ export default function ScheduleCreateRequiredScreen({
               ))}
             </div>
           </div>
-
-          {/* 식사 반경 */}
-          {/* 이 부분은 각 식사 시간 카드 내부로 이동 */}
 
           {/* 목표 식사 시간 */}
           <div>
@@ -258,6 +298,7 @@ export default function ScheduleCreateRequiredScreen({
               variant="outline"
               size="sm"
               className="w-full mt-3 text-blue-600 border-blue-200 bg-transparent"
+              disabled={formData.targetMealTimes.length >= 3}
             >
               {formData.targetMealTimes.length === 0 ? "추가하기" : "식사 시간 추가"}
             </Button>
@@ -265,7 +306,7 @@ export default function ScheduleCreateRequiredScreen({
         </div>
       </div>
 
-      {/* Fixed Progress Bar and Next Button - 하단 네비게이션과 같은 높이로 조정 */}
+      {/* Fixed Progress Bar and Next Button */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t z-50">
         <div className="max-w-md mx-auto p-4">
           <div className="flex items-center justify-between mb-3">

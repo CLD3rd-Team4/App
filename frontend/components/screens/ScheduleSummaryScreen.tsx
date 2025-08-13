@@ -7,6 +7,7 @@ import useSchedule from "@/hooks/useSchedule"
 import BottomNavigation from "@/components/common/BottomNavigation"
 import { RefreshCw, Star } from "lucide-react"
 import type { Restaurant, Schedule } from "@/types"
+import { MealType } from "@/types"
 
 // 타임라인 아이템 타입을 명시적으로 정의
 type TimelineItem = {
@@ -56,7 +57,9 @@ export default function ScheduleSummaryScreen() {
 
   const handleUpdate = () => {
     if (!selectedSchedule || !selectedSchedule.id) return
-    updateSchedule(selectedSchedule.id)
+    // 수정 페이지로 이동시키기 위해 localStorage에 데이터 저장
+    localStorage.setItem("editingSchedule", JSON.stringify(selectedSchedule));
+    router.push(`/schedule/edit?id=${selectedSchedule.id}`);
   }
 
   const handleRecommendationConfirm = () => {
@@ -106,13 +109,13 @@ export default function ScheduleSummaryScreen() {
     })
 
     selectedSchedule.selectedRestaurants?.forEach((item) => {
-      const mealTime = selectedSchedule.targetMealTimes?.find(
-        (mt) => mt.type === (item.sectionId.includes("meal") ? "식사" : "간식")
+      const mealTime = selectedSchedule.mealSlots?.find(
+        (mt) => mt.mealType === (item.sectionId.includes("meal") ? MealType.MEAL : MealType.SNACK)
       )
       items.push({
         type: "restaurant",
-        time: mealTime?.time || "",
-        title: item.restaurant.name || "선택된 식당",
+        time: mealTime?.scheduledTime || "",
+        title: item.restaurant.placeName || "선택된 식당",
         description: item.restaurant.description || "",
         rating: item.restaurant.rating || 0,
         icon: item.sectionId.includes("meal") ? "식사" : "간식",

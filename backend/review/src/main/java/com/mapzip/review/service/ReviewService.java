@@ -20,11 +20,14 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class ReviewService {
@@ -140,7 +143,12 @@ public class ReviewService {
     @Cacheable(value = "userReviews", key = "#userId + '_' + #page + '_' + #size")
     public List<ReviewEntity> getUserReviews(String userId, int page, int size) {
         logger.info("Fetching user reviews from database for userId: {}, page: {}, size: {}", userId, page, size);
-        return reviewRepository.findByUserId(userId);
+        return reviewRepository.findByUserId(userId, page, size);
+    }
+    
+    public long getUserReviewsCount(String userId) {
+        logger.info("Fetching user review count from database for userId: {}", userId);
+        return reviewRepository.countByUserId(userId);
     }
     
     @Cacheable(value = "restaurantReviews", key = "#restaurantId + '_' + #page + '_' + #size")
@@ -220,6 +228,73 @@ public class ReviewService {
     public double getRestaurantAverageRating(String restaurantId) {
         logger.info("Fetching average rating from database for restaurantId: {}", restaurantId);
         return reviewRepository.getAverageRatingByRestaurantId(restaurantId);
+    }
+    
+    /**
+     * 특정 리뷰 조회 (ID 기반)
+     */
+    @Cacheable(value = "singleReview", key = "#restaurantId + '_' + #reviewId")
+    public Optional<ReviewEntity> getReviewById(String restaurantId, String reviewId) {
+        logger.info("Fetching review from database for restaurantId: {}, reviewId: {}", restaurantId, reviewId);
+        return reviewRepository.findByRestaurantIdAndReviewId(restaurantId, reviewId);
+    }
+    
+    /**
+     * 리뷰 수정 (MultipartFile 버전 - 새 이미지 업로드 포함)
+     */
+    @Caching(evict = {
+        @CacheEvict(value = "userReviews", allEntries = true),
+        @CacheEvict(value = "restaurantReviews", allEntries = true),
+        @CacheEvict(value = "reviewStats", allEntries = true),
+        @CacheEvict(value = "singleReview", key = "#restaurantId + '_' + #reviewId")
+    })
+    public ReviewEntity updateReviewWithImages(String restaurantId, String reviewId, String userId, 
+                                             int rating, String content, List<MultipartFile> reviewImages) {
+        logger.info("Updating review with images: {}/{} by user: {}", restaurantId, reviewId, userId);
+        
+        // 사용자 권한 검증
+        validateUserAuthentication(userId);
+        
+        Optional<ReviewEntity> existingReview = reviewRepository.findByRestaurantIdAndReviewId(restaurantId, reviewId);
+        if (existingReview.isEmpty()) {
+            throw new RuntimeException("리뷰를 찾을 수 없습니다.");
+        }
+        
+        ReviewEntity review = existingReview.get();
+        
+        // 작성자 검증
+        if (!review.getUserId().equals(userId)) {
+            throw new RuntimeException("리뷰 수정 권한이 없습니다.");
+        }
+        
+        // 리뷰 내용 업데이트
+        review.setRating(rating);
+        review.setContent(content);
+        review.setUpdatedAt(Instant.now()); // 올바른 Instant 타입 사용
+        
+        // 새로운 이미지가 있으면 S3에 업로드하고 URL 업데이트
+        if (reviewImages != null && !reviewImages.isEmpty()) {
+            List<String> newImageUrls = new ArrayList<>();
+            
+            for (MultipartFile image : reviewImages) {
+                if (!image.isEmpty()) {
+                    try {
+                        // S3Service의 올바른 메소드 시그니처 사용
+                        byte[] imageData = image.getBytes();
+                        String imageUrl = s3Service.uploadImage(imageData, image.getContentType(), userId);
+                        newImageUrls.add(imageUrl);
+                    } catch (Exception e) {
+                        logger.warn("Failed to upload review image for user: {}", userId, e);
+                    }
+                }
+            }
+            
+            if (!newImageUrls.isEmpty()) {
+                review.setImageUrls(newImageUrls);
+            }
+        }
+        
+        return reviewRepository.save(review);
     }
     
     @Cacheable(value = "ocrResults", key = "T(java.util.Arrays).hashCode(#receiptImage) + '_' + #expectedRestaurantName")

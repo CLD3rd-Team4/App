@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast" // useToast 임포트
 
 interface ScheduleCreateLocationScreenProps {
   onNext: (data: LocationData) => void // LocationData를 받도록 수정
-  initialData?: LocationData
+  initialData?: LocationData | null
   isEdit?: boolean
 }
 
@@ -26,7 +26,7 @@ export default function ScheduleCreateLocationScreen({
   const map = useRef<any>(null)
   const markers = useRef<any[]>([])
 
-  const [formData, setFormData] = useState<LocationData>(
+  const [formData, setFormData] = useState<LocationData | null>(
     initialData || {
       departure: null,
       destination: null,
@@ -168,19 +168,19 @@ export default function ScheduleCreateLocationScreen({
     }
 
     if (activeField === "departure") {
-      setFormData((prev) => ({ ...prev, departure: locationInfo }))
+      setFormData((prev) => ({ ...(prev || { departure: null, destination: null, waypoints: [] }), departure: locationInfo }))
       clearMarkers()
       addMarker(locationInfo, "blue")
       // 기존 마커들 다시 추가
-      if (formData.destination) addMarker(formData.destination, "red")
-      formData.waypoints.forEach((wp) => wp && addMarker(wp, "yellow"))
+      if (formData && formData.destination) addMarker(formData.destination, "red")
+      formData?.waypoints.forEach((wp) => wp && addMarker(wp, "yellow"))
     } else if (activeField === "destination") {
-      setFormData((prev) => ({ ...prev, destination: locationInfo }))
+      setFormData((prev) => ({ ...(prev || { departure: null, destination: null, waypoints: [] }), destination: locationInfo }))
       addMarker(locationInfo, "red")
     } else if (typeof activeField === "number") {
       setFormData((prev) => ({
-        ...prev,
-        waypoints: prev.waypoints.map((wp, i) => (i === activeField ? locationInfo : wp)),
+        ...(prev || { departure: null, destination: null, waypoints: [] }),
+        waypoints: (prev?.waypoints || []).map((wp, i) => (i === activeField ? locationInfo : wp)),
       }))
       addMarker(locationInfo, "yellow")
     }
@@ -191,30 +191,30 @@ export default function ScheduleCreateLocationScreen({
   // 경유지 추가
   const addWaypoint = () => {
     setFormData((prev) => ({
-      ...prev,
-      waypoints: [...prev.waypoints, null as any],
+      ...(prev || { departure: null, destination: null, waypoints: [] }),
+      waypoints: [...(prev?.waypoints || []), null],
     }))
   }
 
   // 경유지 제거
   const removeWaypoint = (index: number) => {
     setFormData((prev) => ({
-      ...prev,
-      waypoints: prev.waypoints.filter((_, i) => i !== index),
+      ...(prev || { departure: null, destination: null, waypoints: [] }),
+      waypoints: (prev?.waypoints || []).filter((_, i) => i !== index),
     }))
 
     // 마커 새로고침
     setTimeout(() => {
       clearMarkers()
-      if (formData.departure) addMarker(formData.departure, "blue")
-      if (formData.destination) addMarker(formData.destination, "red")
-      formData.waypoints.filter((_, i) => i !== index).forEach((wp) => wp && addMarker(wp, "yellow"))
+      if (formData?.departure) addMarker(formData.departure, "blue")
+      if (formData?.destination) addMarker(formData.destination, "red")
+      formData?.waypoints?.filter((_, i) => i !== index).forEach((wp) => wp && addMarker(wp, "yellow"))
     }, 0)
   }
 
   // 완료 처리
   const handleComplete = async () => {
-    if (formData.departure && formData.destination && !isLoading) {
+    if (formData && formData.departure && formData.destination && !isLoading) {
       setIsLoading(true)
       try {
         // API 호출 대신, 상위 컴포넌트로 데이터 전달
@@ -271,12 +271,12 @@ export default function ScheduleCreateLocationScreen({
                   <span className="text-sm text-gray-600">출발지</span>
                 </div>
                 <div className="flex-1 text-sm">
-                  {formData.departure ? formData.departure.name : "출발지를 선택해주세요"}
+                  {formData?.departure ? formData.departure.name : "출발지를 선택해주세요"}
                 </div>
               </div>
 
               {/* 경유지들 */}
-              {formData.waypoints.map((waypoint, index) => (
+              {formData?.waypoints?.map((waypoint, index) => (
                 <div key={index} className="flex items-center border-b">
                   <Button
                     onClick={() => removeWaypoint(index)}
@@ -310,7 +310,7 @@ export default function ScheduleCreateLocationScreen({
                     <span className="text-sm text-gray-600">도착지</span>
                   </div>
                   <div className="flex-1 text-sm">
-                    {formData.destination ? formData.destination.name : "도착지를 선택해주세요"}
+                    {formData?.destination ? formData.destination.name : "도착지를 선택해주세요"}
                   </div>
                 </div>
                 <Button
@@ -318,6 +318,7 @@ export default function ScheduleCreateLocationScreen({
                   size="sm"
                   variant="ghost"
                   className="p-2 text-blue-600 hover:bg-blue-50 mr-2"
+                  disabled={(formData?.waypoints?.length || 0) >= 3}
                 >
                   <Plus className="w-4 h-4" />
                 </Button>
@@ -391,7 +392,7 @@ export default function ScheduleCreateLocationScreen({
       )}
 
       {/* 완료 버튼 */}
-      {!showSearchResults && formData.departure && formData.destination && (
+      {!showSearchResults && formData && formData.departure && formData.destination && (
         <div className="absolute bottom-6 left-4 right-4 z-30">
           <Button
             onClick={handleComplete}

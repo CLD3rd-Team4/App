@@ -19,7 +19,7 @@ spring:
   # Valkey(Redis) 연결 설정 (AWS ElastiCache Serverless)
   data:
     redis:
-      host: schedule-cache.mapzip.shop
+      host: mapzip-dev-schedule-cache-serverless-2iapp0.serverless.apn2.cache.amazonaws.com
       port: 6379
       ssl:
         enabled: true
@@ -46,6 +46,8 @@ grpc:
   server:
     port: 9090
     reflection-service-enabled: true
+    health:
+      enabled: true
   #  client:
 #    recommend-service: # kakao-api-service -> recommend-service 로 이름 변경
 #      address: static://recommend.service-recommend.svc.cluster.local:9090 # 실제 recommend 서비스 주소로 변경
@@ -67,11 +69,12 @@ management:
       show-details: always
       probes:
         enabled: true
+      validate-group-membership: false
       group:
         readiness:
-          include: readinessState,db,grpc
+          include: readinessState,db,grpcServer
         liveness:
-          include: livenessState,db,grpc
+          include: livenessState,db,grpcServer
   metrics:
     export:
       prometheus:
@@ -99,4 +102,3 @@ cloud:
 # 개발 환경용 인증 설정
 auth:
   enabled: false
-
