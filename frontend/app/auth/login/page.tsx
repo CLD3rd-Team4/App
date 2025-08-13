@@ -1,21 +1,29 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { useRouter } from "next/navigation"
-import Logo from "@/components/common/Logo"
+import { useState, useCallback } from "react";
+import Logo from "@/components/common/Logo";
 
 export default function LoginPage() {
-  const router = useRouter()
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleKakaoLogin = () => {
-    const REST_API_KEY = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID!
-    const REDIRECT_URI = process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI!
-    const KAKAO_AUTH_URL = `https://kauth.kakao.com/oauth/authorize?client_id=${REST_API_KEY}&redirect_uri=${REDIRECT_URI}&response_type=code`
+  const handleKakaoLogin = useCallback(() => {
+    setIsLoading(true);
 
-    window.location.href = KAKAO_AUTH_URL
-  }
+    const REST_API_KEY = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID;
+    const REDIRECT_URI = process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI;
+    if (!REST_API_KEY || !REDIRECT_URI) {
+      console.error("Kakao env 누락", { REST_API_KEY, REDIRECT_URI });
+      setIsLoading(false);
+      return;
+    }
+
+    const url = new URL("https://kauth.kakao.com/oauth/authorize");
+    url.searchParams.set("client_id", REST_API_KEY);
+    url.searchParams.set("redirect_uri", REDIRECT_URI);
+    url.searchParams.set("response_type", "code");
+
+    window.location.assign(url.toString());
+  }, []);
 
   return (
       <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center px-4">
@@ -26,23 +34,26 @@ export default function LoginPage() {
             <p className="text-gray-600 text-lg">맞춤형 맛집 추천</p>
           </div>
 
-          <Button
+          <button
+              type="button"
               onClick={handleKakaoLogin}
               disabled={isLoading}
-              className="w-full bg-[#FEE500] hover:bg-[#ffd900] text-black font-semibold py-3 rounded-lg"
+              aria-label="카카오로 로그인"
+              className="relative block mx-auto w-[280px] sm:w-[320px] p-0 bg-transparent border-0 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-black/30"
           >
-            {isLoading ? (
-                <div className="flex items-center justify-center">
-                  <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin mr-2"></div>
-                  로그인 중...
+            <img
+                src="/kakao_login_large_wide.png"
+                alt="카카오 로그인"
+                className="block w-full h-auto select-none"
+                draggable={false}
+            />
+            {isLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/10 rounded-lg">
+                  <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
                 </div>
-            ) : (
-                <>
-                  <span className="mr-2">Kakao로 시작하기</span>
-                </>
             )}
-          </Button>
+          </button>
         </div>
       </div>
-  )
+  );
 }
