@@ -184,6 +184,18 @@
       <artifactId>javax.annotation-api</artifactId>
       <version>1.3.2</version>
     </dependency>
+
+    <!-- Actuator -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+
+    <!-- Micrometer Prometheus Registry -->
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-registry-prometheus</artifactId>
+    </dependency>
   </dependencies>
 
   <build>
