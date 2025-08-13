@@ -18,11 +18,12 @@ COPY src/ src/
 # 애플리케이션 빌드
 RUN ./mvnw clean package -DskipTests -B
 
-# 실행 스테이지
+
 FROM eclipse-temurin:17-jre
 
 # curl 설치 (헬스체크용)
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
 
 # 애플리케이션 실행을 위한 사용자 생성 (보안)
 RUN addgroup --system spring && adduser --system spring --ingroup spring

@@ -1,41 +1,50 @@
 # Recommend 서비스 설정 (EKS 환경 기본)
-
 server:
   port: ${SERVER_PORT:8082}
 
 spring:
   application:
     name: recommend
-    
-  # Aurora PostgreSQL 연결 (recommend 클러스터) - 환경변수 필수
+
   datasource:
     url: jdbc:postgresql://${AURORA_RECOMMEND_ENDPOINT}:5432/mapzip_recommend
     username: mapzip-recommend-${TERRAFORM_WORKSPACE:dev}
-    password: ${DB_PASSWORD}
+    password: ${DB_PASSWORD} 
     driver-class-name: org.postgresql.Driver
-    
-  # JPA 설정 (운영 환경 기준)
+
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: validate 
     show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
-  # ElastiCache Valkey 연결 (recommend-cache 클러스터) - 환경변수 필수
   data:
-    valkey:
+    redis:                 
       host: ${ELASTICACHE_RECOMMEND_ENDPOINT}
       port: 6379
+      ssl:
+        enabled: true      
       timeout: 2000ms
       lettuce:
         pool:
-          max-active: 8
-          max-idle: 8
-          min-idle: 0
+          max-active: ${REDIS_POOL_MAX_ACTIVE:16}
+          max-idle: ${REDIS_POOL_MAX_IDLE:16}
+          min-idle: ${REDIS_POOL_MIN_IDLE:4}
+          max-wait: ${REDIS_POOL_MAX_WAIT:3000ms}
 
-  # MSK Kafka 설정 (main 클러스터) - 환경변수 필수
+  cloud:
+    kubernetes:
+      discovery:
+        enabled: true
+
+eureka:
+  client:
+    enabled: false
+
+# Kafka 
+spring:
   kafka:
     bootstrap-servers: ${MSK_BOOTSTRAP_SERVERS}
     producer:
@@ -50,15 +59,51 @@ spring:
       auto-offset-reset: earliest
 
 
-# Kubernetes 서비스 디스커버리 활성화
-spring:
-  cloud:
-    kubernetes:
-      discovery:
+# gRPC
+grpc:
+  server:
+    port: 9092
+    reflection-service-enabled: true
+
+# 다른 서비스 gRPC 
+#clients:
+#  review:
+#    host: 
+#    port :
+#  schedule:
+#    host: 
+#    port: 
+
+# 외부 API
+external:
+  api:
+    kakao:
+      url: https://dapi.kakao.com
+      key: '{cipher}e5f73fd4b6cd1e282bd91603b19d011c442d19738ed6c5c100cbc4fb7ab1155850c682aff9f016afb2329dc079c47fdbc9aec095cd232aeb23895147207e4d0a'   
+    tmap:
+      url: https://apis.openapi.sk.com
+      key: '{cipher}55383efce5fcfdaa80d7dc994be4a2ad55bd53efdbda26656eb3e3e42f646c328f267271a9062bed9aaba790a6ed668133da6d2d5a33d2ee0bc4839d160fc25b'
+      
+# AWS/Bedrock 
+aws:
+  region: us-east-1
+bedrock:
+  model-id: anthropic.claude-3-sonnet-20240229-v1:0
+  
+# Actuator/Prometheus 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  metrics:
+    export:
+      prometheus:
         enabled: true
 
-# Eureka 비활성화
-eureka:
-  client:
-    enabled: false
 

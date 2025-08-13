@@ -2,8 +2,9 @@ package com.mapzip.recommend.client;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mapzip.recommend.dto.TmapRouteRequest;
-import com.mapzip.recommend.dto.TmapRouteResponse;
+import com.mapzip.recommend.dto.tmap.TmapRouteRequest;
+import com.mapzip.recommend.dto.tmap.TmapRouteResponse;
+
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -28,11 +29,6 @@ public class TmapClient {
     }
 
     public Mono<TmapRouteResponse> getRoutePrediction(TmapRouteRequest requestBody) {
-        try {
-            log.info("TMap API Request Payload: {}", objectMapper.writeValueAsString(requestBody));
-        } catch (JsonProcessingException e) {
-            log.warn("Failed to serialize request body for logging", e);
-        }
 
         return webClient.post()
                 .uri("/tmap/routes/prediction?version=1")
@@ -44,19 +40,19 @@ public class TmapClient {
                 .onStatus(status -> status.isError(), response ->
                         response.bodyToMono(String.class)
                                 .flatMap(errorBody -> {
-                                    log.error("Tmap API request failed with status code: {} and body: {}", response.statusCode(), errorBody);
-                                    return Mono.error(new RuntimeException("Tmap API request failed."));
+                                    log.error("[Tmap] API request failed with status code: {} and body: {}", response.statusCode(), errorBody);
+                                    return Mono.error(new RuntimeException("[Tmap] API request failed."));
                                 })
                 )
                 .bodyToMono(String.class)
                 .flatMap(responseBody -> {
                     try {
-                        log.info("Tmap API Response: {}", responseBody);
+                        log.info("[Tmap] API response received");
                         TmapRouteResponse tmapResponse = objectMapper.readValue(responseBody, TmapRouteResponse.class);
                         return Mono.just(tmapResponse);
                     } catch (Exception e) {
-                        log.error("Error parsing Tmap response: {}", e.getMessage());
-                        return Mono.error(new RuntimeException("Error parsing Tmap response.", e));
+                        log.error("[Tmap]  Error parsing Tmap response: {}", e.getMessage());
+                        return Mono.error(new RuntimeException("[Tmap] Error parsing Tmap response.", e));
                     }
                 });
     }

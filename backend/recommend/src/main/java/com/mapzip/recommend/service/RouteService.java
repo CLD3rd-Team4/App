@@ -2,8 +2,9 @@ package com.mapzip.recommend.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mapzip.recommend.dto.Feature;
-import com.mapzip.recommend.dto.TmapRouteResponse;
+import com.mapzip.recommend.dto.tmap.MealSlotData;
+import com.mapzip.recommend.dto.tmap.Feature;
+import com.mapzip.recommend.dto.tmap.TmapRouteResponse;
 import com.mapzip.recommend.util.TimeUtil;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -18,17 +19,14 @@ import java.util.stream.Collectors;
 
 @Service
 @Slf4j
+@AllArgsConstructor
 public class RouteService {
 
     private final ObjectMapper objectMapper;
 
-    public RouteService(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-    }
-
     public List<CalculatedLocation> calculateMealLocations(
             TmapRouteResponse tmapResponse,
-            List<com.mapzip.schedule.entity.MealTimeSlot> mealSlots,
+            List<MealSlotData> mealSlots,
             LocalDateTime departureDateTime
     ) {
         log.info("Starting meal location calculation for {} meal slots.", mealSlots.size());
@@ -47,7 +45,7 @@ public class RouteService {
                 if (secondsFromDeparture < 0) {
                     if (!timePoints.isEmpty()) {
                         Coordinate departureCoord = timePoints.get(0).getCoordinate();
-                        calculatedLocations.add(new CalculatedLocation(mealSlot.getId(), departureCoord.getLat(), departureCoord.getLon()));
+                        calculatedLocations.add(new CalculatedLocation(mealSlot.getSlotId(), departureCoord.getLat(), departureCoord.getLon()));
                     }
                     continue;
                 }
@@ -55,9 +53,9 @@ public class RouteService {
                 TimePoint closestPoint = findClosestTimePoint(timePoints, secondsFromDeparture);
                 Coordinate location = closestPoint.getCoordinate();
                 log.info("Found closest point for slot '{}' at time {}s -> Lat: {}, Lon: {}", mealSlot.getScheduledTime(), closestPoint.getTime(), location.getLat(), location.getLon());
-                calculatedLocations.add(new CalculatedLocation(mealSlot.getId(), location.getLat(), location.getLon()));
+                calculatedLocations.add(new CalculatedLocation(mealSlot.getSlotId(), location.getLat(), location.getLon()));
             } catch (Exception e) {
-                log.error("Error calculating location for meal slot: {}", mealSlot.getId(), e);
+                log.error("Error calculating location for meal slot: {}", mealSlot.getSlotId(), e);
             }
         }
         log.info("Successfully calculated {} locations.", calculatedLocations.size());
@@ -130,3 +128,4 @@ public class RouteService {
         private double lon;
     }
 }
+

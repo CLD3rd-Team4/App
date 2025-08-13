@@ -1,0 +1,132 @@
+syntax = "proto3";
+import "google/api/annotations.proto";
+package com.mapzip.recommend.grpc;
+
+option java_multiple_files = true;
+option java_package = "com.mapzip.recommend.grpc";
+option java_outer_classname = "RecommendProto";
+
+service RecommendService {
+  rpc GetRecommendationResults(GetRecommendationResultsRequest) returns (GetRecommendationResultsResponse) {
+    option (google.api.http) = {
+      get: "/recommend/result"
+    };
+  }
+ 	
+  rpc SubmitSelectedPlace(SelectedPlaceRequest) returns (SubmitResponse) {
+    option (google.api.http) = {
+      post: "/recommend/submit"
+      body: "*"
+    };
+  }
+  rpc SendRecommendRequest (RecommendRequest) returns (RecommendResponse);
+  rpc GetSelectedPlaces(GetSelectedPlacesRequest) returns (GetSelectedPlacesResponse);
+  rpc PlacesForReview(PlacesForReviewRequest) returns (PlacesForReviewResponse);
+}
+
+message RecommendRequest {
+  string scheduleId = 1;
+}
+
+
+message RecommendResponse {
+  string status = 1;
+  string message = 2;
+}
+
+
+
+message SelectedPlace {
+  string slotId = 1;
+  int32 mealType = 2;
+  string scheduledTime = 3;
+  string id = 4;
+  string placeName = 5;
+  string reason = 6;
+  string distance = 7;
+  string placeUrl = 8;
+  string addressName= 9;
+  double averageRating = 10;
+  string representativeReview = 11;
+}
+
+message SelectedPlaceRequest {
+  string userId = 1;
+  string scheduleId = 2;
+  repeated SelectedPlace selectedPlaces = 3;
+}
+
+message SubmitResponse {
+  string status = 1;
+  string message = 2;
+}
+
+message GetRecommendationResultsRequest {
+  string userId = 1;
+  string scheduleId = 2;
+}
+
+
+
+
+message SlotRecommendation {
+  string slotId = 1;
+  repeated PlaceInfo places = 2;
+}
+
+message PlaceInfo {
+  string id = 1;
+  string placeName = 2;
+  string reason = 3;
+  string distance = 4;
+  string scheduledTime = 5;
+  int32 mealType = 6;
+  string placeUrl = 7;
+  string addressName= 8;
+  double averageRating = 9;
+  string representativeReview = 10;
+}
+
+message GetRecommendationResultsResponse {
+  repeated SlotRecommendation slotRecommendations = 1;
+  string status = 2;
+  string message = 3;
+}
+
+
+
+
+message GetSelectedPlacesRequest {
+  string userId = 1;
+  string scheduleId = 2;
+}
+
+message SlotSelectedPlaces {
+  string slotId = 1;
+  repeated PlaceInfo places = 2;
+}
+
+message GetSelectedPlacesResponse {
+  repeated SlotSelectedPlaces slotPlaces = 1;
+  string status = 2;
+  string message = 3;
+}
+
+
+
+message PlacesForReviewRequest {
+}
+
+message ReviewPlaceInfo {
+  string id = 1;
+  string placeName = 2;
+  string addressName = 3;
+  string placeUrl = 4;
+  string scheduledTime = 5;
+}
+
+message PlacesForReviewResponse {
+  repeated ReviewPlaceInfo places = 1;
+  string status = 2;
+  string message = 3;
+}
