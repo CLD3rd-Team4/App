@@ -20,6 +20,7 @@ import reactor.core.publisher.Mono;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.stream.Collectors;
@@ -43,12 +44,12 @@ public class XssProtectionFilter extends AbstractGatewayFilterFactory<XssProtect
     public GatewayFilter apply(Config config) {
         return (exchange, chain) -> {
             ServerHttpRequest request = exchange.getRequest();
-            
+
             // GET 요청은 쿼리 파라미터만 필터링
             if ("GET".equals(request.getMethod().name())) {
                 URI originalUri = request.getURI();
                 String query = originalUri.getQuery();
-                
+
                 if (query != null) {
                     log.info("[XSS Filter] GET Query - Original: {}", query);
                     String sanitizedQuery = sanitizeXss(query);
@@ -57,14 +58,14 @@ public class XssProtectionFilter extends AbstractGatewayFilterFactory<XssProtect
                             .replaceQuery(sanitizedQuery)
                             .build()
                             .toUri();
-                    
+
                     ServerHttpRequest filteredRequest = request.mutate()
                             .uri(newUri)
                             .build();
-                    
+
                     return chain.filter(exchange.mutate().request(filteredRequest).build());
                 }
-                
+
                 return chain.filter(exchange);
             }
 
@@ -75,27 +76,31 @@ public class XssProtectionFilter extends AbstractGatewayFilterFactory<XssProtect
                     return super.getBody()
                             .collectList()
                             .flatMapMany(dataBuffers -> {
-                                String body = dataBuffers.stream()
-                                        .map(dataBuffer -> {
-                                            byte[] bytes = new byte[dataBuffer.readableByteCount()];
-                                            dataBuffer.read(bytes);
-                                            DataBufferUtils.release(dataBuffer);
-                                            return new String(bytes, StandardCharsets.UTF_8);
-                                        })
-                                        .reduce("", String::concat);
-                                
-                                log.info("[XSS Filter] Body - Original: {}", body);
-                                log.info("[XSS Filter] Content-Type: {}", request.getHeaders().getContentType());
+                                // 1) 모든 DataBuffer 바이트를 합침
+                                byte[] bytes = dataBuffers.stream()
+                                        .map(DataBuffer::asByteBuffer)
+                                        .collect(() -> ByteBuffer.allocate(dataBuffers.stream().mapToInt(DataBuffer::readableByteCount).sum()),
+                                                ByteBuffer::put,
+                                                ByteBuffer::put)
+                                        .array();
+
+                                dataBuffers.forEach(DataBufferUtils::release); // 안전하게 해제
+
+                                String body = new String(bytes, StandardCharsets.UTF_8);
                                 String sanitizedBody = sanitizeBody(body, request);
-                                log.info("[XSS Filter] Body - Sanitized: {}", sanitizedBody);
-                                DataBuffer buffer = exchange.getResponse().bufferFactory()
-                                        .wrap(sanitizedBody.getBytes(StandardCharsets.UTF_8));
+                                byte[] sanitizedBytes = sanitizedBody.getBytes(StandardCharsets.UTF_8);
+
+                                DataBuffer buffer = exchange.getResponse().bufferFactory().wrap(sanitizedBytes);
                                 return Flux.just(buffer);
                             });
                 }
             };
 
-            return chain.filter(exchange.mutate().request(decorator).build());
+            ServerHttpRequest filteredRequest = decorator.mutate()
+                    .headers(httpHeaders -> httpHeaders.remove("Content-Length"))
+                    .build();
+
+            return chain.filter(exchange.mutate().request(filteredRequest).build());
         };
     }
 
@@ -106,14 +111,14 @@ public class XssProtectionFilter extends AbstractGatewayFilterFactory<XssProtect
 
     String sanitizeBody(String body, ServerHttpRequest request) {
         if (body == null || body.isEmpty()) return body;
-        
+
         MediaType contentType = request.getHeaders().getContentType();
         if (MediaType.APPLICATION_JSON.isCompatibleWith(contentType)) {
             return sanitizeJsonBody(body);
         } else if (MediaType.APPLICATION_FORM_URLENCODED.isCompatibleWith(contentType)) {
             return sanitizeFormBody(body);
         }
-        
+
         return sanitizeXss(body);
     }
 
@@ -140,8 +145,8 @@ public class XssProtectionFilter extends AbstractGatewayFilterFactory<XssProtect
                             String value = URLDecoder.decode(keyValue[1], StandardCharsets.UTF_8);
                             String sanitizedValue = sanitizeXss(value);
                             log.debug("[XSS Filter] Form field '{}': '{}' -> '{}'", key, value, sanitizedValue);
-                            return URLEncoder.encode(key, StandardCharsets.UTF_8) + "=" + 
-                                   URLEncoder.encode(sanitizedValue, StandardCharsets.UTF_8);
+                            return URLEncoder.encode(key, StandardCharsets.UTF_8) + "=" +
+                                    URLEncoder.encode(sanitizedValue, StandardCharsets.UTF_8);
                         }
                         return pair;
                     })
@@ -157,8 +162,8 @@ public class XssProtectionFilter extends AbstractGatewayFilterFactory<XssProtect
             return objectMapper.getNodeFactory().textNode(sanitizeXss(node.asText()));
         } else if (node.isObject()) {
             ObjectNode objectNode = objectMapper.createObjectNode();
-            node.fields().forEachRemaining(entry -> 
-                objectNode.set(entry.getKey(), sanitizeJsonNode(entry.getValue()))
+            node.fields().forEachRemaining(entry ->
+                    objectNode.set(entry.getKey(), sanitizeJsonNode(entry.getValue()))
             );
             return objectNode;
         } else if (node.isArray()) {
