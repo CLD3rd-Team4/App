@@ -82,7 +82,13 @@ external:
     tmap:
       url: https://apis.openapi.sk.com
       key: '{cipher}55383efce5fcfdaa80d7dc994be4a2ad55bd53efdbda26656eb3e3e42f646c328f267271a9062bed9aaba790a6ed668133da6d2d5a33d2ee0bc4839d160fc25b'
-
+      
+# AWS/Bedrock 
+aws:
+  region: us-east-1
+bedrock:
+  model-id: anthropic.claude-3-sonnet-20240229-v1:0
+  
 # Actuator/Prometheus 
 management:
   endpoints:
