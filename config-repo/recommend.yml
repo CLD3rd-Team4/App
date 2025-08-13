@@ -35,10 +35,12 @@ spring:
           max-idle: ${REDIS_POOL_MAX_IDLE:16}
           min-idle: ${REDIS_POOL_MIN_IDLE:4}
           max-wait: ${REDIS_POOL_MAX_WAIT:3000ms}
-
-  # Kafka
+# Kafka
   kafka:
-    bootstrap-servers: ${MSK_BOOTSTRAP_SERVERS}
+    bootstrap-servers: >
+      b-1.mapzipdevmain.0u4z0i.c4.kafka.ap-northeast-2.amazonaws.com:9092,
+      b-2.mapzipdevmain.0u4z0i.c4.kafka.ap-northeast-2.amazonaws.com:9092,
+      b-3.mapzipdevmain.0u4z0i.c4.kafka.ap-northeast-2.amazonaws.com:9092
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -49,6 +51,7 @@ spring:
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       group-id: recommend-service
       auto-offset-reset: earliest
+
 
   cloud:
     kubernetes:
