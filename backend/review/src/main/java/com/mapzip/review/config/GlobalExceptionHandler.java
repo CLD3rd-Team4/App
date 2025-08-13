@@ -131,6 +131,66 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 인증/권한 관련 예외
+     */
+    @ExceptionHandler(SecurityException.class)
+    public ResponseEntity<ErrorResponse> handleSecurityException(
+            SecurityException ex, HttpServletRequest request) {
+        
+        logger.warn("Security error at {}: {}", request.getRequestURI(), ex.getMessage());
+        
+        ErrorResponse errorResponse = new ErrorResponse(
+            HttpStatus.FORBIDDEN.value(),
+            "Access Denied",
+            ex.getMessage(),
+            request.getRequestURI()
+        );
+        
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
+    }
+
+    /**
+     * 비즈니스 로직 예외 (IllegalArgumentException 등)
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalArgumentException(
+            IllegalArgumentException ex, HttpServletRequest request) {
+        
+        logger.warn("Invalid argument at {}: {}", request.getRequestURI(), ex.getMessage());
+        
+        ErrorResponse errorResponse = new ErrorResponse(
+            HttpStatus.BAD_REQUEST.value(),
+            "Invalid Argument",
+            ex.getMessage(),
+            request.getRequestURI()
+        );
+        
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+    }
+
+    /**
+     * 리소스를 찾을 수 없음
+     */
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalStateException(
+            IllegalStateException ex, HttpServletRequest request) {
+        
+        logger.warn("Resource not found at {}: {}", request.getRequestURI(), ex.getMessage());
+        
+        HttpStatus status = ex.getMessage().contains("찾을 수 없습니다") ? 
+            HttpStatus.NOT_FOUND : HttpStatus.BAD_REQUEST;
+        
+        ErrorResponse errorResponse = new ErrorResponse(
+            status.value(),
+            status == HttpStatus.NOT_FOUND ? "Not Found" : "Bad Request",
+            ex.getMessage(),
+            request.getRequestURI()
+        );
+        
+        return ResponseEntity.status(status).body(errorResponse);
+    }
+
+    /**
      * 일반적인 런타임 예외
      */
     @ExceptionHandler(RuntimeException.class)

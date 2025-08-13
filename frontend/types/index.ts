@@ -145,3 +145,54 @@ export interface CreateReviewResponse {
   message: string
   success: boolean
 }
+
+export interface GetUserReviewsResponse {
+  success: boolean
+  data: Review[]
+  totalCount: number
+  currentPage: number
+  totalPages: number
+  hasNext: boolean
+}
+
+export interface GetReviewResponse {
+  success: boolean
+  data: Review
+}
+
+export interface UpdateReviewRequest {
+  restaurantId: string
+  reviewId: string
+  rating: number
+  content: string
+  reviewImages?: string[]
+}
+
+export interface UpdateReviewResponse {
+  success: boolean
+  message: string
+  data: Review
+}
+
+export interface PendingReviewDetail {
+  id: string
+  placeName: string
+  addressName: string
+  placeUrl?: string
+  scheduledTime: string
+}
+
+export interface GetPendingReviewDetailResponse {
+  success: boolean
+  data: PendingReviewDetail
+}
+
+export interface DeleteReviewResponse {
+  success: boolean
+  message: string
+}
+
+export interface DeletePendingReviewResponse {
+  success: boolean
+  message: string
+}

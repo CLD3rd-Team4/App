@@ -24,67 +24,58 @@ export default function useSchedule() {
     }
   }, [])
 
+  const deselectSchedule = useCallback(() => {
+    setSelectedSchedule(null);
+    localStorage.removeItem("scheduleSelected");
+  }, []);
+
   const loadSelectedSchedule = useCallback(async () => {
+    setIsLoading(true);
     try {
-      setIsLoading(true)
-      const response = await recommendApi.getActiveScheduleSummary()
+      const response = await recommendApi.getActiveScheduleSummary();
       if (response && response.schedule) {
-        setSelectedSchedule(response.schedule)
+        setSelectedSchedule(response.schedule);
       } else {
-        setSelectedSchedule(null)
-        localStorage.removeItem("scheduleSelected")
+        // TTL이 만료되었거나 선택된 스케줄이 없는 경우, 로컬 상태를 동기화합니다.
+        deselectSchedule();
       }
     } catch (error) {
-      console.error("선택된 스케줄 요약 로드 실패:", error)
-      setSelectedSchedule(null)
-      localStorage.removeItem("scheduleSelected")
+      console.error("선택된 스케줄 요약 로드 실패:", error);
+      deselectSchedule(); // 에러 발생 시에도 상태를 초기화합니다.
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }, [])
+  }, [deselectSchedule]);
 
   useEffect(() => {
-    const scheduleSelected = localStorage.getItem("scheduleSelected") === "true"
+    const scheduleSelected = localStorage.getItem("scheduleSelected") === "true";
     if (scheduleSelected) {
-      loadSelectedSchedule()
+      loadSelectedSchedule();
     } else {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }, [loadSelectedSchedule])
+  }, [loadSelectedSchedule]);
 
   const selectSchedule = async (scheduleId: string) => {
-    setIsProcessing(true)
+    setIsProcessing(true);
     try {
-      // TODO: 추천 서버 준비 완료 시 아래 API 호출 주석 해제 필요
-      // await recommendApi.selectAndGetSummary(scheduleId)
-
-      // 테스트를 위한 임시 로직: API 호출 없이 성공한 것으로 간주하고 다음 단계로 진행
-      console.log(`[TEST] Schedule selection simulation for ID: ${scheduleId}`)
-      
-      localStorage.setItem("scheduleSelected", "true")
-      router.push("/recommendations")
+      // 백엔드에 선택 사실을 알려 Valkey 상태 등을 업데이트하게 합니다.
+      await recommendApi.selectAndGetSummary(scheduleId);
+      // 프론트엔드 UI를 위해 localStorage에 플래그를 저장합니다.
+      localStorage.setItem("scheduleSelected", "true");
     } catch (error) {
-      console.error("스케줄 선택 및 처리 실패:", error)
-      alert("스케줄 처리에 실패했습니다. 잠시 후 다시 시도해주세요.")
-      // 에러 발생 시 localStorage에 값이 남지 않도록 처리
-      localStorage.removeItem("scheduleSelected")
+      console.error("스케줄 선택 처리 실패:", error);
+      alert("스케줄 선택 처리에 실패했습니다.");
+      localStorage.removeItem("scheduleSelected");
     } finally {
-      setIsProcessing(false)
+      setIsProcessing(false);
     }
-  }
-
-  const deselectSchedule = () => {
-    setSelectedSchedule(null)
-    localStorage.removeItem("scheduleSelected")
-    router.push("/")
-    router.refresh()
-  }
+  };
 
   const createSchedule = async (scheduleData: SchedulePayload) => {
     setIsProcessing(true)
     try {
       const response = await scheduleApi.createSchedule(scheduleData)
-      // API 응답으로 받은 scheduleId와 요청 시 사용된 scheduleData를 결합하여 완전한 Schedule 객체를 만듭니다.
       const newSchedule: Schedule = {
         id: response.scheduleId,
         ...scheduleData,
@@ -107,19 +98,16 @@ export default function useSchedule() {
         ...scheduleData,
       };
 
-      const updatedScheduleDetail = await scheduleApi.updateSchedule(scheduleToUpdate);
+      await scheduleApi.updateSchedule(scheduleToUpdate);
       
-      // 상태를 업데이트하여 UI에 즉시 반영
       setSchedules((prev) => 
         prev.map((s) => (s.id === scheduleId ? { ...s, ...scheduleData } : s))
       );
 
-      // 선택된 스케줄 정보도 업데이트 (선택된 상태였다면)
       if (selectedSchedule?.id === scheduleId) {
         setSelectedSchedule(prev => prev ? { ...prev, ...scheduleData, id: scheduleId } : null);
       }
 
-      alert("스케줄이 업데이트되었습니다.");
       router.push("/schedule");
 
     } catch (error) {
@@ -136,7 +124,11 @@ export default function useSchedule() {
       await scheduleApi.deleteSchedule(scheduleId)
       setSchedules((prev) => prev.filter((s) => s.id !== scheduleId))
       if (selectedSchedule?.id === scheduleId) {
-        deselectSchedule()
+        // 선택 해제 시에는 deselectSchedule 콜백을 사용합니다.
+        const freshDeselect = deselectSchedule;
+        freshDeselect();
+        router.push("/");
+        router.refresh();
       }
     } catch (error) {
       console.error("스케줄 삭제 실패:", error)

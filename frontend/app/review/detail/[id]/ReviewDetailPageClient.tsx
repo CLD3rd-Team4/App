@@ -41,7 +41,7 @@ export default function ReviewDetailPageClient() {
         
         // 현재는 reviewId만 있으므로 getUserReviews에서 해당 리뷰를 찾는 방식 사용
         const userReviews = await reviewApi.getUserReviews(1, 100); // 많은 수 조회
-        const targetReview = userReviews.data?.find((r: any) => r.reviewId === params.id || r.id === params.id);
+        const targetReview = userReviews.data?.find((r: any) => r.id === params.id);
         
         if (!targetReview) {
           setError("리뷰를 찾을 수 없습니다.");
@@ -50,10 +50,10 @@ export default function ReviewDetailPageClient() {
         
         // 실제 API 데이터 구조에 맞게 변환
         const reviewData = {
-          id: targetReview.reviewId || targetReview.id,
+          id: targetReview.id,
           restaurantId: targetReview.restaurantId,
           restaurantName: targetReview.restaurantName || "식당",
-          address: targetReview.restaurantAddress || targetReview.address || "주소 정보 없음",
+          address: targetReview.restaurantAddress || "주소 정보 없음",
           rating: targetReview.rating || 0,
           visitDate: targetReview.visitDate || targetReview.createdAt?.split('T')[0] || "",
           review: targetReview.content || "",

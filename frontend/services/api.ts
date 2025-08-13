@@ -3,7 +3,22 @@
 const API_BASE_URL = "https://api.mapzip.shop";
 
 // 타입 임포트 추가
-import type { OCRResult, CreateReviewRequest, CreateReviewResponse, User, LocationData, Schedule } from "@/types";
+import type { 
+  OCRResult, 
+  CreateReviewRequest, 
+  CreateReviewResponse, 
+  GetUserReviewsResponse,
+  GetReviewResponse,
+  UpdateReviewRequest,
+  UpdateReviewResponse,
+  GetPendingReviewDetailResponse,
+  DeleteReviewResponse,
+  DeletePendingReviewResponse,
+  PendingReviewDetail,
+  User, 
+  LocationData, 
+  Schedule 
+} from "@/types";
 import api from '@/lib/interceptor';
 
 // 커스텀 에러 클래스
@@ -21,31 +36,16 @@ export class APIError extends Error {
 
 // axios 인터셉터를 통해 공통 헤더는 자동으로 처리되므로 해당 함수 제거
 
-// API 함수들
-export const authApi = {
-  login: async (provider: string): Promise<User> => {
-    // TODO: 실제 API 연동
-    console.log(`${provider}로 로그인 시도`);
-    return {
-      id: "1",
-      name: "테스트 사용자",
-      email: "test@example.com",
-      provider: provider,
-    };
-  },
-
-  logout: async () => {
-    // TODO: 실제 API 연동
-    console.log("로그아웃");
-    return;
-  },
-}
 
 // Helper function to map schedule response
 const mapScheduleResponse = (scheduleData: any) => {
   if (!scheduleData) return null;
-  const { scheduleId, ...rest } = scheduleData;
-  return { id: scheduleId, ...rest };
+  // 백엔드 응답 필드 (scheduleId 또는 id)에 유연하게 대응
+  if (scheduleData.scheduleId && !scheduleData.id) {
+    const { scheduleId, ...rest } = scheduleData;
+    return { id: scheduleId, ...rest };
+  }
+  return scheduleData;
 };
 
 export const scheduleApi = {
@@ -502,7 +502,7 @@ export const reviewApi = {
   },
 
   // 사용자 리뷰 목록 조회 (JWT 토큰에서 userId 자동 추출)
-  getUserReviews: async (page: number = 1, size: number = 10): Promise<any> => {
+  getUserReviews: async (page: number = 1, size: number = 10): Promise<GetUserReviewsResponse> => {
     try {
       const response = await api.get('/review/user', {
         params: { page, size }
@@ -544,12 +544,13 @@ export const reviewApi = {
   },
 
   // 미작성 리뷰 삭제
-  deletePendingReview: async (restaurantId: string, scheduledTime: string): Promise<void> => {
+  deletePendingReview: async (restaurantId: string, scheduledTime: string): Promise<DeletePendingReviewResponse> => {
     try {
       // DELETE /review/pending/{restaurantId}?scheduledTime={scheduledTime}
-      await api.delete(`/review/pending/${restaurantId}`, {
+      const response = await api.delete(`/review/pending/${restaurantId}`, {
         params: { scheduledTime },
       });
+      return response.data;
     } catch (error: any) {
       if (error instanceof APIError) {
         throw error;
@@ -566,7 +567,7 @@ export const reviewApi = {
   },
 
   // 특정 미작성 리뷰 상세 조회
-  getPendingReviewDetail: async (restaurantId: string, scheduledTime: string): Promise<any> => {
+  getPendingReviewDetail: async (restaurantId: string, scheduledTime: string): Promise<GetPendingReviewDetailResponse> => {
     try {
       // GET /review/pending/{restaurantId}/detail?scheduledTime={scheduledTime}
       const response = await api.get(`/review/pending/${restaurantId}/detail`, {
@@ -574,7 +575,7 @@ export const reviewApi = {
       });
 
       // 응답 구조: { success: true, data: {...} }
-      return response.data?.data;
+      return response.data;
     } catch (error: any) {
       if (error instanceof APIError) {
         throw error;
@@ -591,10 +592,11 @@ export const reviewApi = {
   },
 
   // 작성된 리뷰 삭제
-  deleteReview: async (restaurantId: string, reviewId: string): Promise<void> => {
+  deleteReview: async (restaurantId: string, reviewId: string): Promise<DeleteReviewResponse> => {
     try {
       // DELETE /review/{restaurantId}/{reviewId}
-      await api.delete(`/review/${restaurantId}/${reviewId}`);
+      const response = await api.delete(`/review/${restaurantId}/${reviewId}`);
+      return response.data;
     } catch (error: any) {
       if (error instanceof APIError) {
         throw error;
@@ -611,13 +613,13 @@ export const reviewApi = {
   },
 
   // 특정 리뷰 상세 조회
-  getReview: async (restaurantId: string, reviewId: string): Promise<any> => {
+  getReview: async (restaurantId: string, reviewId: string): Promise<GetReviewResponse> => {
     try {
       // GET /review/{restaurantId}/{reviewId}
       const response = await api.get(`/review/${restaurantId}/${reviewId}`);
       
       // 응답 구조: { success: true, data: {...} }
-      return response.data?.data;
+      return response.data;
     } catch (error: any) {
       if (error instanceof APIError) {
         throw error;
@@ -638,7 +640,7 @@ export const reviewApi = {
     rating: number;
     content: string;
     reviewImages?: string[];
-  }): Promise<any> => {
+  }): Promise<UpdateReviewResponse> => {
     try {
       const formData = new FormData();
       

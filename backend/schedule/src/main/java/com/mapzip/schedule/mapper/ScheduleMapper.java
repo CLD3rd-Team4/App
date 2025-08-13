@@ -6,7 +6,7 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.mapzip.schedule.entity.MealTimeSlot;
 import com.mapzip.schedule.entity.Schedule;
-import com.mapzip.schedule.entity.SelectedRestaurant;
+
 import com.mapzip.schedule.grpc.*;
 import com.mapzip.schedule.repository.MealTimeSlotRepository;
 
@@ -136,6 +136,8 @@ public class ScheduleMapper {
         if (companions != null) {
             builder.addAllCompanions(companions);
         }
+
+        builder.setScheduleId(schedule.getId()); // scheduleId 설정 추가
 
         return builder.build();
     }
