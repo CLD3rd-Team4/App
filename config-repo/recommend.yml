@@ -38,9 +38,9 @@ spring:
 spring:
   kafka:
     bootstrap-servers: >
-      b-1.mapzipdevmain.0u4z0i.c4.kafka.ap-northeast-2.amazonaws.com:9092,
-      b-2.mapzipdevmain.0u4z0i.c4.kafka.ap-northeast-2.amazonaws.com:9092,
-      b-3.mapzipdevmain.0u4z0i.c4.kafka.ap-northeast-2.amazonaws.com:9092
+      b-1.mapzipdevmain.0u4z0i.c4.kafka.ap-northeast-2.amazonaws.com:9098,
+      b-2.mapzipdevmain.0u4z0i.c4.kafka.ap-northeast-2.amazonaws.com:9098,
+      b-3.mapzipdevmain.0u4z0i.c4.kafka.ap-northeast-2.amazonaws.com:9098
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -55,7 +55,7 @@ spring:
       security.protocol: SASL_SSL
       sasl.mechanism: OAUTHBEARER
       sasl.jaas.config: software.amazon.msk.auth.iam.IAMLoginModule required;
-      sasl.client.callback.handler.class: software.amazon.msk.auth.iam.IAMClientCallbackHandler
+      sasl.client.callback.handler.class: software.amazon.msk.auth.iam.IAMClientCallbackHandle
 
 
   cloud:
