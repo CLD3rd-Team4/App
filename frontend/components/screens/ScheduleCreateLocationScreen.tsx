@@ -318,6 +318,7 @@ export default function ScheduleCreateLocationScreen({
                   size="sm"
                   variant="ghost"
                   className="p-2 text-blue-600 hover:bg-blue-50 mr-2"
+                  disabled={(formData?.waypoints?.length || 0) >= 3}
                 >
                   <Plus className="w-4 h-4" />
                 </Button>
