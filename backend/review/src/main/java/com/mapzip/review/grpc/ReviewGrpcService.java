@@ -432,6 +432,58 @@ public class ReviewGrpcService extends ReviewServiceGrpc.ReviewServiceImplBase {
             responseObserver.onError(e);
         }
     }
+
+    @Override
+    public void getPendingReviewDetail(ReviewProto.GetPendingReviewDetailRequest request,
+                                     StreamObserver<ReviewProto.GetPendingReviewDetailResponse> responseObserver) {
+        try {
+            logger.info("Getting pending review detail for restaurant: {}, scheduledTime: {}", 
+                       request.getRestaurantId(), request.getScheduledTime());
+            
+            // 현재 사용자 ID 추출
+            String userId = getCurrentUserId();
+            
+            // ReviewService에서 미작성 리뷰 상세 조회
+            Optional<PendingReviewEntity> pendingReview = reviewService.getPendingReviewDetail(
+                    userId, request.getScheduledTime(), request.getRestaurantId());
+            
+            if (pendingReview.isPresent()) {
+                PendingReviewEntity pending = pendingReview.get();
+                
+                ReviewProto.ReviewPlaceInfo placeInfo = ReviewProto.ReviewPlaceInfo.newBuilder()
+                        .setId(pending.getRestaurantId())
+                        .setPlaceName(pending.getPlaceName() != null ? pending.getPlaceName() : "")
+                        .setAddressName(pending.getAddressName() != null ? pending.getAddressName() : "")
+                        .setPlaceUrl(pending.getPlaceUrl() != null ? pending.getPlaceUrl() : "")
+                        .setScheduledTime(pending.getScheduledTime() != null ? pending.getScheduledTime() : "")
+                        .build();
+                
+                ReviewProto.GetPendingReviewDetailResponse response = 
+                        ReviewProto.GetPendingReviewDetailResponse.newBuilder()
+                                .setData(placeInfo)
+                                .setSuccess(true)
+                                .setMessage("미작성 리뷰 상세 조회 성공")
+                                .build();
+                
+                responseObserver.onNext(response);
+                responseObserver.onCompleted();
+                
+            } else {
+                ReviewProto.GetPendingReviewDetailResponse errorResponse = 
+                        ReviewProto.GetPendingReviewDetailResponse.newBuilder()
+                                .setSuccess(false)
+                                .setMessage("미작성 리뷰를 찾을 수 없습니다.")
+                                .build();
+                
+                responseObserver.onNext(errorResponse);
+                responseObserver.onCompleted();
+            }
+            
+        } catch (Exception e) {
+            logger.error("Error getting pending review detail", e);
+            responseObserver.onError(Status.INTERNAL.withDescription("미작성 리뷰 조회 실패: " + e.getMessage()).asRuntimeException());
+        }
+    }
     
     private String getCurrentUserId() {
         // GrpcHeaderInterceptor에서 설정한 Context에서 사용자 ID 추출

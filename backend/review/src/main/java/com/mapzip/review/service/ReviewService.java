@@ -38,7 +38,7 @@ public class ReviewService {
     private final PendingReviewRepository pendingReviewRepository;
     private final OcrService ocrService;
     private final S3Service s3Service;
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final RedisTemplate<String, Object> valkeyTemplate;
     private final ObjectMapper objectMapper;
     
     @Autowired
@@ -52,7 +52,7 @@ public class ReviewService {
         this.pendingReviewRepository = pendingReviewRepository;
         this.ocrService = ocrService;
         this.s3Service = s3Service;
-        this.redisTemplate = redisTemplate;
+        this.valkeyTemplate = redisTemplate;
         this.objectMapper = objectMapper;
     }
     
@@ -486,25 +486,27 @@ public class ReviewService {
             String key = "places_for_review:" + userId;
             
             // 기존 데이터 삭제 후 새로운 데이터 저장
-            redisTemplate.delete(key);
+            valkeyTemplate.delete(key);
             
             // 각 식당 정보를 JSON으로 변환하여 저장
             for (int i = 0; i < places.size(); i++) {
                 ReviewProto.ReviewPlaceInfo place = places.get(i);
-                String placeJson = String.format(
-                    "{\"id\":\"%s\",\"placeName\":\"%s\",\"addressName\":\"%s\",\"placeUrl\":\"%s\",\"scheduledTime\":\"%s\"}",
+                
+                // ObjectMapper를 사용한 안전한 JSON 생성
+                PlaceData placeData = new PlaceData(
                     place.getId(),
-                    place.getPlaceName().replace("\"", "\\\""),
-                    place.getAddressName().replace("\"", "\\\""),
+                    place.getPlaceName(),
+                    place.getAddressName(),
                     place.getPlaceUrl(),
                     place.getScheduledTime()
                 );
                 
-                redisTemplate.opsForList().rightPush(key, placeJson);
+                String placeJson = objectMapper.writeValueAsString(placeData);
+                valkeyTemplate.opsForList().rightPush(key, placeJson);
             }
             
             // TTL 설정 (7일)
-            redisTemplate.expire(key, java.time.Duration.ofDays(7));
+            valkeyTemplate.expire(key, java.time.Duration.ofDays(7));
             
             logger.info("Successfully stored {} places for user: {}", places.size(), userId);
             
@@ -524,7 +526,7 @@ public class ReviewService {
         
         try {
             String key = "places_for_review:" + userId;
-            List<Object> placesData = redisTemplate.opsForList().range(key, 0, -1);
+            List<Object> placesData = valkeyTemplate.opsForList().range(key, 0, -1);
             
             if (placesData == null || placesData.isEmpty()) {
                 logger.info("No places found for user: {}", userId);
@@ -535,19 +537,15 @@ public class ReviewService {
             for (Object placeData : placesData) {
                 try {
                     String placeJson = placeData.toString();
-                    // 간단한 JSON 파싱 (실제로는 Jackson 등을 사용하는 것이 좋음)
-                    String id = extractJsonValue(placeJson, "id");
-                    String placeName = extractJsonValue(placeJson, "placeName");
-                    String addressName = extractJsonValue(placeJson, "addressName");
-                    String placeUrl = extractJsonValue(placeJson, "placeUrl");
-                    String scheduledTime = extractJsonValue(placeJson, "scheduledTime");
+                    // ObjectMapper를 사용한 안전한 JSON 파싱
+                    PlaceData parsedPlace = objectMapper.readValue(placeJson, PlaceData.class);
                     
                     ReviewProto.ReviewPlaceInfo place = ReviewProto.ReviewPlaceInfo.newBuilder()
-                            .setId(id)
-                            .setPlaceName(placeName)
-                            .setAddressName(addressName)
-                            .setPlaceUrl(placeUrl)
-                            .setScheduledTime(scheduledTime)
+                            .setId(parsedPlace.getId() != null ? parsedPlace.getId() : "")
+                            .setPlaceName(parsedPlace.getPlaceName() != null ? parsedPlace.getPlaceName() : "")
+                            .setAddressName(parsedPlace.getAddressName() != null ? parsedPlace.getAddressName() : "")
+                            .setPlaceUrl(parsedPlace.getPlaceUrl() != null ? parsedPlace.getPlaceUrl() : "")
+                            .setScheduledTime(parsedPlace.getScheduledTime() != null ? parsedPlace.getScheduledTime() : "")
                             .build();
                     
                     places.add(place);
@@ -620,18 +618,40 @@ public class ReviewService {
     }
     
     /**
-     * 간단한 JSON 값 추출 유틸리티 메서드
-     * 실제 운영에서는 Jackson ObjectMapper 사용 권장
+     * Redis에 저장되는 식당 정보 데이터 클래스
      */
-    private String extractJsonValue(String json, String key) {
-        String pattern = "\"" + key + "\":\"([^\"]*)\""; 
-        java.util.regex.Pattern regex = java.util.regex.Pattern.compile(pattern);
-        java.util.regex.Matcher matcher = regex.matcher(json);
+    public static class PlaceData {
+        private String id;
+        private String placeName;
+        private String addressName;
+        private String placeUrl;
+        private String scheduledTime;
         
-        if (matcher.find()) {
-            return matcher.group(1);
+        public PlaceData() {}
+        
+        public PlaceData(String id, String placeName, String addressName, String placeUrl, String scheduledTime) {
+            this.id = id;
+            this.placeName = placeName;
+            this.addressName = addressName;
+            this.placeUrl = placeUrl;
+            this.scheduledTime = scheduledTime;
         }
-        return "";
+        
+        // Getters and Setters
+        public String getId() { return id; }
+        public void setId(String id) { this.id = id; }
+        
+        public String getPlaceName() { return placeName; }
+        public void setPlaceName(String placeName) { this.placeName = placeName; }
+        
+        public String getAddressName() { return addressName; }
+        public void setAddressName(String addressName) { this.addressName = addressName; }
+        
+        public String getPlaceUrl() { return placeUrl; }
+        public void setPlaceUrl(String placeUrl) { this.placeUrl = placeUrl; }
+        
+        public String getScheduledTime() { return scheduledTime; }
+        public void setScheduledTime(String scheduledTime) { this.scheduledTime = scheduledTime; }
     }
     
     // === 미작성 리뷰 관리 메서드들 ===

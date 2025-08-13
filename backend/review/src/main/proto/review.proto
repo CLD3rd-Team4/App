@@ -78,7 +78,7 @@ service ReviewService {
     // 특정 미작성 리뷰 상세 조회
     rpc GetPendingReviewDetail(GetPendingReviewDetailRequest) returns (GetPendingReviewDetailResponse) {
         option (google.api.http) = {
-            get: "/review/pending/{restaurant_id}"
+            get: "/review/pending/{restaurant_id}/detail"
         };
     };
     

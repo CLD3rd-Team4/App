@@ -3,7 +3,22 @@
 const API_BASE_URL = "https://api.mapzip.shop";
 
 // 타입 임포트 추가
-import type { OCRResult, CreateReviewRequest, CreateReviewResponse, User, LocationData, Schedule } from "@/types";
+import type { 
+  OCRResult, 
+  CreateReviewRequest, 
+  CreateReviewResponse, 
+  GetUserReviewsResponse,
+  GetReviewResponse,
+  UpdateReviewRequest,
+  UpdateReviewResponse,
+  GetPendingReviewDetailResponse,
+  DeleteReviewResponse,
+  DeletePendingReviewResponse,
+  PendingReviewDetail,
+  User, 
+  LocationData, 
+  Schedule 
+} from "@/types";
 import api from '@/lib/interceptor';
 
 // 커스텀 에러 클래스
@@ -493,7 +508,7 @@ export const reviewApi = {
   },
 
   // 사용자 리뷰 목록 조회 (JWT 토큰에서 userId 자동 추출)
-  getUserReviews: async (page: number = 1, size: number = 10): Promise<any> => {
+  getUserReviews: async (page: number = 1, size: number = 10): Promise<GetUserReviewsResponse> => {
     try {
       const response = await api.get('/review/user', {
         params: { page, size }
@@ -535,12 +550,13 @@ export const reviewApi = {
   },
 
   // 미작성 리뷰 삭제
-  deletePendingReview: async (restaurantId: string, scheduledTime: string): Promise<void> => {
+  deletePendingReview: async (restaurantId: string, scheduledTime: string): Promise<DeletePendingReviewResponse> => {
     try {
       // DELETE /review/pending/{restaurantId}?scheduledTime={scheduledTime}
-      await api.delete(`/review/pending/${restaurantId}`, {
+      const response = await api.delete(`/review/pending/${restaurantId}`, {
         params: { scheduledTime },
       });
+      return response.data;
     } catch (error: any) {
       if (error instanceof APIError) {
         throw error;
@@ -557,7 +573,7 @@ export const reviewApi = {
   },
 
   // 특정 미작성 리뷰 상세 조회
-  getPendingReviewDetail: async (restaurantId: string, scheduledTime: string): Promise<any> => {
+  getPendingReviewDetail: async (restaurantId: string, scheduledTime: string): Promise<GetPendingReviewDetailResponse> => {
     try {
       // GET /review/pending/{restaurantId}/detail?scheduledTime={scheduledTime}
       const response = await api.get(`/review/pending/${restaurantId}/detail`, {
@@ -565,7 +581,7 @@ export const reviewApi = {
       });
 
       // 응답 구조: { success: true, data: {...} }
-      return response.data?.data;
+      return response.data;
     } catch (error: any) {
       if (error instanceof APIError) {
         throw error;
@@ -582,10 +598,11 @@ export const reviewApi = {
   },
 
   // 작성된 리뷰 삭제
-  deleteReview: async (restaurantId: string, reviewId: string): Promise<void> => {
+  deleteReview: async (restaurantId: string, reviewId: string): Promise<DeleteReviewResponse> => {
     try {
       // DELETE /review/{restaurantId}/{reviewId}
-      await api.delete(`/review/${restaurantId}/${reviewId}`);
+      const response = await api.delete(`/review/${restaurantId}/${reviewId}`);
+      return response.data;
     } catch (error: any) {
       if (error instanceof APIError) {
         throw error;
@@ -602,13 +619,13 @@ export const reviewApi = {
   },
 
   // 특정 리뷰 상세 조회
-  getReview: async (restaurantId: string, reviewId: string): Promise<any> => {
+  getReview: async (restaurantId: string, reviewId: string): Promise<GetReviewResponse> => {
     try {
       // GET /review/{restaurantId}/{reviewId}
       const response = await api.get(`/review/${restaurantId}/${reviewId}`);
       
       // 응답 구조: { success: true, data: {...} }
-      return response.data?.data;
+      return response.data;
     } catch (error: any) {
       if (error instanceof APIError) {
         throw error;
@@ -629,7 +646,7 @@ export const reviewApi = {
     rating: number;
     content: string;
     reviewImages?: string[];
-  }): Promise<any> => {
+  }): Promise<UpdateReviewResponse> => {
     try {
       const formData = new FormData();
       

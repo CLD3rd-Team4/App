@@ -21,6 +21,7 @@
 #               "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
 #               proto_descriptor: "/etc/envoy/proto.pb"
 #               services: 
+#                 - "com.mapzip.review.ReviewService" # review 서비스 추가
 #                 - "schedule.ScheduleService"
 #               print_options:
 #                 add_whitespace: true
@@ -46,17 +47,41 @@
 #               domains: ["*"]
 #               cors:
 #                 allow_origin_string_match:
-#                   - prefix: "*"
-#                 allow_headers: "*"
-#                 allow_methods: "*"
+#                   - exact: "https://www.mapzip.shop"
+#                   - exact: "https://mapzip.shop"
+#                   - exact: "http://localhost:3000" # 로컬 개발용
+#                 allow_headers: "content-type, x-user-id, authorization"
+#                 allow_methods: "GET, POST, PUT, DELETE, OPTIONS"
 #               routes:
-#               - match:
-#                   prefix: "/"
+#               - match: { prefix: "/review" } # review 서비스 라우트
+#                 route:
+#                   cluster: review_service_cluster
+#                   timeout: 60s
+#               - match: { prefix: "/schedule" } # schedule 서비스 라우트
 #                 route:
 #                   cluster: schedule_service_cluster
 #                   timeout: 60s
-
+#
 #   clusters:
+#   - name: review_service_cluster # review 서비스 클러스터 추가
+#     connect_timeout: 5s
+#     type: LOGICAL_DNS
+#     typed_extension_protocol_options:
+#       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+#         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+#         explicit_http_config:
+#           http2_protocol_options: {}
+#     lb_policy: ROUND_ROBIN
+#     load_assignment:
+#       cluster_name: review_service_cluster
+#       endpoints:
+#       - lb_endpoints:
+#         - endpoint:
+#             address:
+#               socket_address:
+#                 address: host.docker.internal
+#                 port_value: 50051 # review gRPC 포트
+#
 #   - name: schedule_service_cluster
 #     connect_timeout: 5s
 #     type: LOGICAL_DNS
