@@ -44,8 +44,12 @@ export const authApi = {
 // Helper function to map schedule response
 const mapScheduleResponse = (scheduleData: any) => {
   if (!scheduleData) return null;
-  const { scheduleId, ...rest } = scheduleData;
-  return { id: scheduleId, ...rest };
+  // 백엔드 응답 필드 (scheduleId 또는 id)에 유연하게 대응
+  if (scheduleData.scheduleId && !scheduleData.id) {
+    const { scheduleId, ...rest } = scheduleData;
+    return { id: scheduleId, ...rest };
+  }
+  return scheduleData;
 };
 
 export const scheduleApi = {
