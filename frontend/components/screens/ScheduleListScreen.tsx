@@ -58,37 +58,31 @@ export default function ScheduleListScreen() {
     return () => clearTimeout(timer)
   }, [isPopupOpen, currentPopup])
 
-  const handleScheduleSelect = async (schedule: Schedule) => {
+  const handleScheduleSelect = (schedule: Schedule) => {
     if (!schedule || !schedule.id) return
 
+    // 팝업을 먼저 띄우고, 백그라운드에서 상태 처리를 시작합니다.
     setIsPopupOpen(true)
     setSelectedScheduleForPopup(schedule)
     
-    try {
-      // 1. 선택한 스케줄의 전체 상세 정보를 가져옵니다.
-      const detailResponse = await scheduleApi.getScheduleDetail(schedule.id);
+    // 타임라인 생성을 위해 상세 정보를 가져옵니다.
+    scheduleApi.getScheduleDetail(schedule.id).then(detailResponse => {
       const fullSchedule = detailResponse.schedule;
-
-      if (!fullSchedule) {
-        alert("스케줄 상세 정보를 불러오는 데 실패했습니다.");
-        closePopup();
-        return;
+      if (fullSchedule) {
+        const items = generateTimelineItems(fullSchedule);
+        setTimelineItems(items);
+        setCurrentPopup("processing");
+      } else {
+        throw new Error("Timeline generation failed: full schedule not found.");
       }
-
-      // 2. 상세 정보로 타임라인을 생성합니다.
-      const items = generateTimelineItems(fullSchedule);
-      setTimelineItems(items);
-      setCurrentPopup("processing");
-
-      // 3. 백그라운드에서 추천 서버에 ID를 보내 처리를 시작합니다.
-      // 실제 API 호출은 팝업 플로우와 연계하여 처리 (예: 팝업 완료 후 호출)
-      // await selectSchedule(schedule.id)
-
-    } catch (error) {
+    }).catch(error => {
       console.error("Error fetching schedule details for popup:", error);
       alert("스케줄 정보를 준비하는 중 오류가 발생했습니다.");
       closePopup();
-    }
+    });
+
+    // 실제 스케줄 선택 로직을 즉시 호출합니다.
+    selectSchedule(schedule.id);
   }
 
   const handleScheduleEdit = (schedule: Schedule) => {
