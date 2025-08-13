@@ -194,9 +194,9 @@
 				<version>0.6.1</version>
 				<configuration>
 					<protocArtifact>
-						com.google.protobuf:protoc:3.25.3:exe:osx-aarch_64</protocArtifact>
+						com.google.protobuf:protoc:3.25.3:exe:${os.detected.classifier}</protocArtifact>
 					<pluginArtifact>
-						io.grpc:protoc-gen-grpc-java:1.63.0:exe:osx-aarch_64</pluginArtifact>
+						io.grpc:protoc-gen-grpc-java:1.63.0:exe:${os.detected.classifier}</pluginArtifact>
 				</configuration>
 				<executions>
 					<execution>
