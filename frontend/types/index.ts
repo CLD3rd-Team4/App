@@ -80,7 +80,9 @@ export interface Restaurant {
   rating?: number
   distance?: string
   image?: string
-  addressName?: string
+  addressName?: string // 주소 정보
+  placeUrl?: string      
+
 }
 
 export interface VisitedRestaurant {

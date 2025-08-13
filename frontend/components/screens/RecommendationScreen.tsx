@@ -1,12 +1,59 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Star, ChevronDown, ChevronUp } from "lucide-react"
 import useSchedule from "@/hooks/useSchedule"
 import type { Restaurant } from "@/types"
+import api from "@/lib/interceptor"
 
+// ==== 서버 proto에 맞춘 응답 타입 ====
+type ApiPlace = {
+  id: string
+  placeName: string
+  reason?: string
+  distance?: string
+  scheduledTime?: string
+  mealType?: number // 0=식사, 1=간식
+  placeUrl?: string
+  addressName?: string
+  averageRating?: number
+  representativeReview?: string
+  image?: string
+}
+
+type ApiSlot = { slotId: string; places: ApiPlace[] }
+type GetResultsResponse = {
+  slotRecommendations: ApiSlot[]
+  status: "OK" | "PENDING" | "ERROR"
+  message?: string
+}
+type SubmitPlace = {
+  slotId: string;
+  mealType: number;           // 0=식사, 1=간식
+  scheduledTime: string;      // "오후 01:30" 그대로 OK
+  id: string;
+  placeName: string;
+  reason?: string;
+  distance?: string;
+  addressName?: string;
+  placeUrl?: string;
+  averageRating?: number;
+  representativeReview?: string;
+};
+type SubmitRequest = {
+  userId: string;
+  scheduleId: string;
+  selectedPlaces: SubmitPlace[];
+};
+
+// ==== 목 파라미터(요청에만 사용) ====
+const USE_MOCK_IDS = true // 실서버 전환 시 false
+const MOCK_USER_ID = "user123"
+const MOCK_SCHEDULE_ID = "schedule123"
+
+// ==== 화면용 타입 ====
 interface MealSection {
   id: string
   title: string
@@ -17,255 +64,222 @@ interface MealSection {
   previousSelection?: Restaurant
 }
 
-// 목데이터 - 백엔드 연동 전 테스트용
-const MOCK_RESTAURANTS: Restaurant[] = [
-  {
-    id: "1",
-    placeName: "맛있는 한식당",
-    description: "전통 한식 전문점으로 정갈한 반찬과 깔끔한 맛",
-    aiReason: "사용자의 비건 요구사항에 맞는 다양한 채식 메뉴 제공",
-    rating: 4.2,
-    distance: "1.2km",
-    image: "/placeholder.svg?height=80&width=80",
-  },
-  {
-    id: "2",
-    placeName: "건강한 샐러드바",
-    description: "신선한 채소와 건강식으로 유명한 샐러드 전문점",
-    aiReason: "비건 친화적인 메뉴와 신선한 재료 사용",
-    rating: 4.5,
-    distance: "0.8km",
-    image: "/placeholder.svg?height=80&width=80",
-  },
-  {
-    id: "3",
-    placeName: "이탈리안 파스타",
-    description: "수제 파스타와 정통 이탈리아 요리 전문점",
-    aiReason: "비건 파스타 옵션과 다양한 채식 메뉴 보유",
-    rating: 4.0,
-    distance: "2.1km",
-    image: "/placeholder.svg?height=80&width=80",
-  },
-  {
-    id: "4",
-    placeName: "카페 브런치",
-    description: "분위기 좋은 브런치 카페, 디저트와 커피가 맛있음",
-    aiReason: "간식 시간에 적합한 비건 디저트와 음료 제공",
-    rating: 4.3,
-    distance: "1.5km",
-    image: "/placeholder.svg?height=80&width=80",
-  },
-  {
-    id: "5",
-    placeName: "아시안 퓨전",
-    description: "아시아 각국의 요리를 현대적으로 재해석한 퓨전 레스토랑",
-    aiReason: "다양한 채식 아시아 요리와 건강한 재료 사용",
-    rating: 4.1,
-    distance: "1.8km",
-    image: "/placeholder.svg?height=80&width=80",
-  },
-  {
-    id: "6",
-    placeName: "디저트 하우스",
-    description: "수제 디저트와 케이크 전문점, 달콤한 간식의 천국",
-    aiReason: "비건 디저트 옵션과 간식 시간에 완벽한 메뉴",
-    rating: 4.4,
-    distance: "1.0km",
-    image: "/placeholder.svg?height=80&width=80",
-  },
-  {
-    id: "7",
-    placeName: "해산물 전문점",
-    description: "신선한 해산물과 회를 전문으로 하는 레스토랑",
-    aiReason: "지역 특산물을 활용한 신선한 해산물 메뉴",
-    rating: 4.6,
-    distance: "2.3km",
-    image: "/placeholder.svg?height=80&width=80",
-  },
-  {
-    id: "8",
-    placeName: "고기구이 전문점",
-    description: "숯불구이와 한우 전문점, 고품질 육류 제공",
-    aiReason: "고품질 한우와 숯불구이의 깊은 맛",
-    rating: 4.7,
-    distance: "1.9km",
-    image: "/placeholder.svg?height=80&width=80",
-  },
-  {
-    id: "9",
-    placeName: "중식당",
-    description: "정통 중화요리와 딤섬을 맛볼 수 있는 중식당",
-    aiReason: "다양한 중화요리와 합리적인 가격",
-    rating: 4.2,
-    distance: "1.4km",
-    image: "/placeholder.svg?height=80&width=80",
-  },
-]
+// ==== 헬퍼 ====
+const mealTypeToLabel = (t: number): "식사" | "간식" => (t === 0 ? "식사" : "간식")
+const sectionTitle = (label: "식사" | "간식", idx: number) =>
+  label === "식사" ? `식사${idx}` : `간식${idx}`
 
-// 목데이터 - 이전 선택 테스트용
-const MOCK_PREVIOUS_SELECTIONS = {
-  "meal-1": {
-    id: "prev-1",
-    placeName: "이전에 선택한 한식당",
-    description: "지난번에 선택했던 맛있는 한식당",
-    aiReason: "이전 방문 기록을 바탕으로 한 추천",
-    rating: 4.3,
-    distance: "1.1km",
-    image: "/placeholder.svg?height=80&width=80",
-  },
-  "snack-1": {
-    id: "prev-2",
-    placeName: "이전 선택 카페",
-    description: "지난번에 선택했던 브런치 카페",
-    aiReason: "이전 선택 기록을 바탕으로 한 추천",
-    rating: 4.1,
-    distance: "0.9km",
-    image: "/placeholder.svg?height=80&width=80",
-  },
-}
+const toRestaurant = (p: ApiPlace): Restaurant => ({
+  id: p.id,
+  placeName: p.placeName,
+  description: p.representativeReview || p.reason || "추천 사유 없음",
+  aiReason: p.reason || "",
+  rating: p.averageRating,
+  distance: p.distance || "",
+  addressName: p.addressName,
+  image: p.image || "/placeholder.svg?height=80&width=80",
+  // @ts-ignore
+  placeUrl: p.placeUrl,
+})
 
 export default function RecommendationScreen() {
   const router = useRouter()
   const { selectedSchedule } = useSchedule()
+
+  // state
   const [mealSections, setMealSections] = useState<MealSection[]>([])
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
-  const [selectedRestaurants, setSelectedRestaurants] = useState<{ [key: string]: Restaurant }>({})
+  const [selectedRestaurants, setSelectedRestaurants] = useState<Record<string, Restaurant>>({})
   const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => {
-    loadRecommendations()
-  }, [])
-
-  const loadRecommendations = async () => {
+  // 데이터 로드
+  const loadRecommendations = useCallback(async () => {
     try {
       setIsLoading(true)
 
-      // 목데이터 - 백엔드 연동 시 selectedSchedule.targetMealTimes 사용
-      const targetMealTimes = [
-        { type: "식사" as const, time: "12:00" },
-        { type: "식사" as const, time: "18:00" },
-        { type: "간식" as const, time: "15:00" },
-      ]
+      const params = USE_MOCK_IDS
+        ? { userId: MOCK_USER_ID, scheduleId: MOCK_SCHEDULE_ID }
+        : { scheduleId: selectedSchedule?.id }
 
-      if (targetMealTimes.length === 0) {
-        console.error("목표 식사 시간이 설정되지 않았습니다.")
-        setIsLoading(false)
+      const { data } = await api.get<GetResultsResponse>("/recommend/result", {
+        params,
+        headers: { "Cache-Control": "no-cache" },
+      })
+
+      if (!data?.slotRecommendations?.length || data.status === "PENDING") {
+        setMealSections([])
+        setExpandedSections(new Set())
         return
       }
 
-      // 목데이터 사용 - 백엔드 연동 시 주석 처리하고 아래 주석 해제
-      const allRestaurants = MOCK_RESTAURANTS
+      // 첫 place 기준 정렬 (시간 → 식사우선)
+      const slots = [...data.slotRecommendations].sort((a, b) => {
+        const af = a.places?.[0]
+        const bf = b.places?.[0]
+        const t = (af?.scheduledTime ?? "").localeCompare(bf?.scheduledTime ?? "")
+        if (t !== 0) return t
+        const am = af?.mealType ?? 0
+        const bm = bf?.mealType ?? 0
+        return am - bm
+      })
 
-      // 목표 식사 시간을 기반으로 섹션 생성
-      const sections: MealSection[] = []
+      let mealIdx = 1
+      let snackIdx = 1
 
-      // 식사와 간식을 시간순으로 정렬하여 섹션 생성
-      const sortedMeals = targetMealTimes.sort((a, b) => a.time.localeCompare(b.time))
+      const sections: MealSection[] = slots.map((slot) => {
+        const first = slot.places?.[0]
+        const label = mealTypeToLabel(first?.mealType ?? 0)
+        const idx = label === "식사" ? mealIdx++ : snackIdx++
+        const id = slot.slotId ?? `${label === "식사" ? "meal" : "snack"}-${idx}`
+        const restaurants: Restaurant[] = (slot.places || []).map(toRestaurant)
 
-      let mealCount = 1
-      let snackCount = 1
-
-      sortedMeals.forEach((meal, index) => {
-        // 각 섹션마다 다른 식당 3개씩 할당
-        const startIndex = (index * 3) % allRestaurants.length
-        const sectionRestaurants = [
-          allRestaurants[startIndex],
-          allRestaurants[(startIndex + 1) % allRestaurants.length],
-          allRestaurants[(startIndex + 2) % allRestaurants.length],
-        ]
-
-        if (meal.type === "식사") {
-          const sectionId = `meal-${mealCount}`
-          sections.push({
-            id: sectionId,
-            title: `식사${mealCount}`,
-            type: "식사",
-            index: mealCount,
-            time: meal.time,
-            restaurants: sectionRestaurants,
-            previousSelection: MOCK_PREVIOUS_SELECTIONS[sectionId as keyof typeof MOCK_PREVIOUS_SELECTIONS],
-          })
-          mealCount++
-        } else {
-          const sectionId = `snack-${snackCount}`
-          sections.push({
-            id: sectionId,
-            title: `간식${snackCount}`,
-            type: "간식",
-            index: snackCount,
-            time: meal.time,
-            restaurants: sectionRestaurants,
-            previousSelection: MOCK_PREVIOUS_SELECTIONS[sectionId as keyof typeof MOCK_PREVIOUS_SELECTIONS],
-          })
-          snackCount++
+        return {
+          id,
+          title: sectionTitle(label, idx),
+          type: label,
+          index: idx,
+          time: first?.scheduledTime ?? "",
+          restaurants,
+          previousSelection: undefined,
         }
       })
 
       setMealSections(sections)
-
-      // 기본적으로 모든 섹션을 접힌 상태로 시작
       setExpandedSections(new Set())
-    } catch (error) {
-      console.error("추천 결과 로드 실패:", error)
+    } catch (e) {
+      console.error("추천 결과 로드 실패:", e)
+      setMealSections([])
+      setExpandedSections(new Set())
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [selectedSchedule])
 
-  const toggleSection = (sectionId: string) => {
-    const newExpanded = new Set(expandedSections)
-    if (newExpanded.has(sectionId)) {
-      newExpanded.delete(sectionId)
-    } else {
-      newExpanded.add(sectionId)
-    }
-    setExpandedSections(newExpanded)
-  }
+  useEffect(() => {
+    loadRecommendations()
+  }, [loadRecommendations])
 
-  const handleRestaurantSelect = (sectionId: string, restaurant: Restaurant) => {
-    setSelectedRestaurants((prev) => ({
-      ...prev,
-      [sectionId]: restaurant,
-    }))
-  }
+  // UI 핸들러들 — 전부 "컴포넌트 내부"에 있어야 함
+  const toggleSection = useCallback((sectionId: string) => {
+    setExpandedSections((prev) => {
+      const next = new Set(prev)
+      next.has(sectionId) ? next.delete(sectionId) : next.add(sectionId)
+      return next
+    })
+  }, [])
+
+  const handleRestaurantSelect = useCallback((sectionId: string, restaurant: Restaurant) => {
+    setSelectedRestaurants((prev) => ({ ...prev, [sectionId]: restaurant }))
+  }, [])
 
   const formatTime = (time: string) => {
-    const [hour, minute] = time.split(":")
-    const h = Number.parseInt(hour)
-    const period = h >= 12 ? "오후" : "오전"
-    const displayHour = h === 0 ? 12 : h > 12 ? h - 12 : h
-    return `${period} ${displayHour}:${minute}`
+    if (!time) return ""
+    if (/^(오전|오후)\s?\d{1,2}:\d{2}$/.test(time)) return time
+    if (/^\d{1,2}:\d{2}$/.test(time)) {
+      const [hour, minute] = time.split(":")
+      const h = Number.parseInt(hour, 10)
+      const period = h >= 12 ? "오후" : "오전"
+      const displayHour = h === 0 ? 12 : h > 12 ? h - 12 : h
+      return `${period} ${displayHour}:${minute}`
+    }
+    return time
   }
 
-  // 모든 섹션에서 선택이 완료되었는지 확인
-  const isAllSectionsSelected = () => {
-    return mealSections.every((section) => selectedRestaurants[section.id])
-  }
+  const isAllSectionsSelected = useCallback(() => {
+    return mealSections.every((section) => !!selectedRestaurants[section.id])
+  }, [mealSections, selectedRestaurants])
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
     if (!isAllSectionsSelected()) {
-      alert("모든 식사/간식 시간에 대해 식당을 선택해주세요.")
-      return
+      alert("모든 식사/간식 시간에 대해 식당을 선택해주세요.");
+      return;
     }
 
-    const selectedList = Object.entries(selectedRestaurants).map(([sectionId, restaurant]) => ({
-      sectionId,
-      restaurant,
-    }))
+    const selectedPlaces: SubmitPlace[] = mealSections.map(sec => {
+      const r = selectedRestaurants[sec.id];
+      if (!r) return null as any;
 
-    // 목데이터 테스트용 - 로컬스토리지에 직접 저장
-    const mockSchedule = {
-      id: "mock-1",
-      title: "테스트 스케줄",
-      selectedRestaurants: selectedList,
-      selectedRestaurant: selectedList[0].restaurant,
+      return {
+        // ★ 서버 slotId 우선 사용 (없으면 UI id를 백업으로)
+        slotId: (sec as any).originSlotId || sec.id,
+        mealType: sec.type === "식사" ? 0 : 1,
+        scheduledTime: sec.time,
+        id: r.id,
+        placeName: r.placeName,
+        reason: r.aiReason || r.description || "",
+        distance: r.distance || "",
+        addressName: (r as any).addressName || "",
+        placeUrl: (r as any).placeUrl || "",
+        averageRating: r.rating ?? 0,
+        representativeReview: r.description || ""
+      };
+    }).filter(Boolean);
+
+    // ⚠️ userId/scheduleId는 실제 값으로 맞춰주세요 (지금은 목 예시)
+    const payload: SubmitRequest = {
+      userId: "user123",
+      scheduleId: "schedule456",
+      selectedPlaces
+    };
+
+    try {
+      const res = await api.post("/recommend/submit", payload);
+      let mealIdx = 1, snackIdx = 1;
+
+      // payload의 selectedPlaces를 요약 UI에서 쓰는 Restaurant로 변환
+      const toRestaurantFromSubmit = (p: SubmitPlace): Restaurant => ({
+        id: p.id,
+        placeName: p.placeName,
+        description: p.representativeReview || p.reason || "",
+        aiReason: p.reason || "",
+        rating: p.averageRating,
+        distance: p.distance,
+        image: "/placeholder.svg?height=80&width=80",
+        // 타입 확장 필드들(있으면 요약에서 활용 가능)
+        // @ts-ignore
+        addressName: p.addressName,
+        // @ts-ignore
+        placeUrl: p.placeUrl,
+      });
+
+      const selectedRestaurantsForSummary = payload.selectedPlaces.map(p => ({
+        sectionId: p.mealType === 0 ? `meal-${mealIdx++}` : `snack-${snackIdx++}`,
+        restaurant: toRestaurantFromSubmit(p),
+      }));
+
+      const targetMealTimes = payload.selectedPlaces.map(p => ({
+        type: (p.mealType === 0 ? "식사" : "간식") as "식사" | "간식",
+        time: p.scheduledTime,
+      }));
+
+      const summary = {
+        id: payload.scheduleId,
+        title: "나의 스케줄",
+        selectedRestaurants: selectedRestaurantsForSummary,
+        selectedRestaurant: selectedRestaurantsForSummary[0]?.restaurant,
+        targetMealTimes,
+      };
+
+      //  로컬 저장 후 홈(=요약화면)으로 이동
+      localStorage.setItem("selectedSchedule", JSON.stringify(summary));
+      localStorage.setItem("scheduleSelected", "true"); // HomePage에서 요약화면 분기
+
+// 🔧 [로컬 전용] 인증 상태 강제
+if (process.env.NODE_ENV !== "production") {
+  localStorage.setItem("isLoggedIn", "true");          // HomePage의 로그인 체크에 사용
+  // useAuth가 토큰/유저정보를 본다면 함께 넣어줘 (프로젝트에 맞게 키 이름 맞추기)
+  localStorage.setItem("accessToken", "dev-mock-token");
+  localStorage.setItem("user", JSON.stringify({ id: "dev", name: "로컬테스트" }));
+}
+      alert("선택을 저장했습니다.");
+      router.push("/");
+    } catch (e: any) {
+      console.error("submit 실패:", e?.response?.data || e);
+      alert("저장 중 오류가 발생했습니다.");
     }
-    localStorage.setItem("selectedSchedule", JSON.stringify(mockSchedule))
+  };
 
-    console.log("선택된 식당들:", selectedList) // 디버깅용
-    router.push("/")
-  }
-
+  // 렌더
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
       <div className="bg-white p-4 shadow-sm flex items-center justify-between sticky top-0 z-10">
@@ -312,7 +326,6 @@ export default function RecommendationScreen() {
 
               {mealSections.map((section) => (
                 <div key={section.id} className="bg-white rounded-lg shadow-sm border">
-                  {/* 토글 헤더 */}
                   <button
                     onClick={() => toggleSection(section.id)}
                     className="w-full p-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
@@ -343,11 +356,9 @@ export default function RecommendationScreen() {
                     </div>
                   </button>
 
-                  {/* 토글 내용 */}
                   {expandedSections.has(section.id) && (
                     <div className="px-4 pb-4 border-t bg-gray-50">
                       <div className="space-y-3 pt-4">
-                        {/* 이전 선택된 식당 표시 */}
                         {section.previousSelection && (
                           <div className="bg-green-50 p-4 rounded-lg border-2 border-green-200">
                             <div className="flex items-center gap-2 mb-3">
@@ -372,7 +383,7 @@ export default function RecommendationScreen() {
                                   <div className="flex items-center gap-4">
                                     {section.previousSelection.rating && (
                                       <div className="flex items-center">
-                                        <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                                        <Star className="w-4 h-4" />
                                         <span className="text-sm ml-1 font-medium">
                                           {section.previousSelection.rating}
                                         </span>
@@ -383,7 +394,6 @@ export default function RecommendationScreen() {
                                     </span>
                                   </div>
                                 </div>
-                                {/* 이전 선택 식당 선택 버튼 추가 */}
                                 <Button
                                   onClick={() => handleRestaurantSelect(section.id, section.previousSelection!)}
                                   size="sm"
@@ -393,59 +403,46 @@ export default function RecommendationScreen() {
                                       : "bg-blue-500 hover:bg-blue-600 text-white"
                                   }`}
                                 >
-                                  {selectedRestaurants[section.id]?.id === section.previousSelection!.id
-                                    ? "✓ 선택됨"
-                                    : "다시 선택"}
+                                  {selectedRestaurants[section.id]?.id === section.previousSelection!.id ? "✓ 선택됨" : "다시 선택"}
                                 </Button>
                               </div>
                             </div>
                           </div>
                         )}
 
-                        {/* 새로운 추천 식당 목록 (카드형) */}
                         <div className="space-y-3">
                           <h4 className="font-medium text-gray-800">새로운 추천</h4>
                           {section.restaurants.map((restaurant) => (
                             <div
                               key={restaurant.id}
                               className={`bg-white border rounded-lg p-4 hover:border-blue-200 transition-all ${
-                                selectedRestaurants[section.id]?.id === restaurant.id
-                                  ? "border-blue-500 bg-blue-50"
-                                  : ""
+                                selectedRestaurants[section.id]?.id === restaurant.id ? "border-blue-500 bg-blue-50" : ""
                               }`}
                             >
                               <div className="flex items-start gap-4">
-                                {/* 음식점 이미지 */}
                                 <img
                                   src={restaurant.image || "/placeholder.svg?height=80&width=80&query=restaurant"}
                                   alt={restaurant.placeName}
                                   className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
                                 />
-
                                 <div className="flex-1 min-w-0">
                                   {/* 이름 */}
                                   <h3 className="font-semibold text-lg mb-1">{restaurant.placeName}</h3>
 
                                   {/* 한줄평 */}
                                   <p className="text-sm text-gray-600 mb-2">{restaurant.description}</p>
-
-                                  {/* AI 추천 이유 */}
                                   <p className="text-sm text-blue-600 mb-3">{restaurant.aiReason}</p>
-
-                                  {/* 별점과 거리 */}
                                   <div className="flex items-center justify-between mb-3">
                                     <div className="flex items-center gap-4">
                                       {restaurant.rating && (
                                         <div className="flex items-center">
-                                          <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                                          <Star className="w-4 h-4" />
                                           <span className="text-sm ml-1 font-medium">{restaurant.rating}</span>
                                         </div>
                                       )}
                                       <span className="text-sm text-gray-500">거리: {restaurant.distance}</span>
                                     </div>
                                   </div>
-
-                                  {/* 선택 버튼 */}
                                   <Button
                                     onClick={() => handleRestaurantSelect(section.id, restaurant)}
                                     size="sm"
@@ -468,7 +465,6 @@ export default function RecommendationScreen() {
                 </div>
               ))}
 
-              {/* 선택 상태 요약 */}
               {Object.keys(selectedRestaurants).length > 0 && (
                 <div className="bg-blue-50 p-4 rounded-lg">
                   <h3 className="font-medium mb-2">선택된 식당</h3>

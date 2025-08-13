@@ -45,48 +45,56 @@ function RecommendationReadyPopup({ onConfirm }: { onConfirm: () => void }) {
 
 export default function ScheduleSummaryScreen() {
   const router = useRouter()
-  const { selectedSchedule, isLoading, isProcessing, updateSchedule, deselectSchedule } = useSchedule()
-  const [showRecommendationPopup, setShowRecommendationPopup] = useState(false)
+  const { selectedSchedule, isLoading, isProcessing, updateSchedule /*, deselectSchedule */ } = useSchedule()
+
+  // ⭐ localStorage → 훅 상태로 즉시 하이드레이트
+  const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => {
-    if (!isLoading && !selectedSchedule) {
-        deselectSchedule();
-        router.push("/");
+    try {
+      const raw = localStorage.getItem("selectedSchedule")
+      if (raw) {
+        const parsed = JSON.parse(raw) as Schedule
+        const id = parsed.id || "local-summary"
+        updateSchedule(id, parsed)
+      }
+    } catch (e) {
+      console.error("Failed to hydrate selectedSchedule from localStorage:", e)
+    } finally {
+      setHydrated(true)
     }
-  }, [isLoading, selectedSchedule, deselectSchedule, router]);
+  }, [updateSchedule])
 
   const handleUpdate = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          const { latitude, longitude } = position.coords;
-          alert(`현재 위치: 위도 ${latitude}, 경도 ${longitude}`);
-          
+          const { latitude, longitude } = position.coords
+          alert(`현재 위치: 위도 ${latitude}, 경도 ${longitude}`)
           // TODO: 추천 서버가 준비되면, 이 위치 정보를 사용하여 추천을 업데이트합니다.
         },
         (error) => {
-          let errorMessage = "위치 정보를 가져오는 데 실패했습니다.";
+          let errorMessage = "위치 정보를 가져오는 데 실패했습니다."
           switch (error.code) {
             case error.PERMISSION_DENIED:
-              errorMessage = "위치 정보 접근 권한이 거부되었습니다. 설정에서 권한을 허용해주세요.";
-              break;
+              errorMessage = "위치 정보 접근 권한이 거부되었습니다. 설정에서 권한을 허용해주세요."
+              break
             case error.POSITION_UNAVAILABLE:
-              errorMessage = "현재 위치를 파악할 수 없습니다.";
-              break;
+              errorMessage = "현재 위치를 파악할 수 없습니다."
+              break
             case error.TIMEOUT:
-              errorMessage = "위치 정보를 가져오는 데 시간이 초과되었습니다.";
-              break;
+              errorMessage = "위치 정보를 가져오는 데 시간이 초과되었습니다."
+              break
           }
-          alert(errorMessage);
+          alert(errorMessage)
         }
-      );
+      )
     } else {
-      alert("이 브라우저에서는 위치 정보 기능을 사용할 수 없습니다.");
+      alert("이 브라우저에서는 위치 정보 기능을 사용할 수 없습니다.")
     }
   }
 
   const handleRecommendationConfirm = () => {
-    setShowRecommendationPopup(false)
     router.push("/recommendations/")
   }
 
@@ -160,7 +168,7 @@ export default function ScheduleSummaryScreen() {
     return items.sort((a, b) => {
       if (!a.time || !b.time) return 0
       const toComparable = (timeStr: string) => {
-        const match = timeStr.match(/(오전|오후)\s*(\d{1,2}):(\d{2})/) // 정규식 수정
+        const match = timeStr.match(/(오전|오후)\s*(\d{1,2}):(\d{2})/)
         if (!match) return 0
         let [, period, hourStr, minuteStr] = match
         let hour = parseInt(hourStr, 10)
@@ -174,7 +182,8 @@ export default function ScheduleSummaryScreen() {
 
   const timelineItems = createTimelineItems()
 
-  if (isLoading) {
+  // ✅ 하이드레이션 또는 훅 로딩 중에는 로딩 스피너
+  if (!hydrated || isLoading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
@@ -198,9 +207,7 @@ export default function ScheduleSummaryScreen() {
               className="flex items-center gap-2 border-blue-200 text-blue-600 hover:bg-blue-50"
               disabled={isProcessing}
             >
-              <RefreshCw
-                className={`w-4 h-4 ${isProcessing ? "animate-spin" : ""}`}
-              />
+              <RefreshCw className={`w-4 h-4 ${isProcessing ? "animate-spin" : ""}`} />
               {isProcessing ? "업데이트 중..." : "추천 업데이트"}
             </Button>
           </div>
@@ -227,9 +234,7 @@ export default function ScheduleSummaryScreen() {
                     <div
                       key={index}
                       className={`flex items-center gap-3 ${
-                        item.type === "restaurant"
-                          ? "bg-orange-50 rounded-lg p-3 -mx-3"
-                          : ""
+                        item.type === "restaurant" ? "bg-orange-50 rounded-lg p-3 -mx-3" : ""
                       }`}
                     >
                       <div
@@ -265,16 +270,12 @@ export default function ScheduleSummaryScreen() {
                         {item.type === "restaurant" && (
                           <>
                             {item.description && (
-                              <p className="text-sm text-gray-600">
-                                {item.description}
-                              </p>
+                              <p className="text-sm text-gray-600">{item.description}</p>
                             )}
                             {item.rating && item.rating > 0 && (
                               <div className="flex items-center mt-1">
                                 <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                                <span className="text-sm ml-1">
-                                  {item.rating}
-                                </span>
+                                <span className="text-sm ml-1">{item.rating}</span>
                               </div>
                             )}
                           </>
@@ -290,10 +291,6 @@ export default function ScheduleSummaryScreen() {
 
         <BottomNavigation currentTab="home" />
       </div>
-
-      {showRecommendationPopup && (
-        <RecommendationReadyPopup onConfirm={handleRecommendationConfirm} />
-      )}
     </>
   )
 }

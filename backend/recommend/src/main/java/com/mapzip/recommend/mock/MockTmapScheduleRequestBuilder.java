@@ -62,6 +62,12 @@ public class MockTmapScheduleRequestBuilder {
                 .radius(800)
                 .mealType(0) // SNACK
                 .build());
+        mealSlots.add(MealSlotData.builder()
+                .slotId("slot4")
+                .scheduledTime("오후 01:40")
+                .radius(800)
+                .mealType(0) // SNACK
+                .build());
         return mealSlots;
     }
 }

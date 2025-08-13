@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import useSchedule from "@/hooks/useSchedule"
-import { scheduleApi } from "@/services/api"; // scheduleApi 임포트 추가
+import { scheduleApi } from "@/services/api" // ✅ 중복 import 정리
 import BottomNavigation from "@/components/common/BottomNavigation"
 import { Plus } from "lucide-react"
 import type { Schedule } from "@/types"
@@ -14,6 +14,9 @@ import { generateTimelineItems, TimelineItem } from "@/lib/timeline"
 
 // 팝업의 현재 상태 (메인 처리 / 추천 완료)
 type PopupType = "processing" | "recommendation_ready"
+
+// 🔧 로컬 테스트용 userId
+const DEV_USER_ID = "user123"
 
 export default function ScheduleListScreen() {
   const router = useRouter()
@@ -38,6 +41,13 @@ export default function ScheduleListScreen() {
   useEffect(() => {
     setIsClient(true)
     loadSchedules()
+
+    // ⭐ 로컬 테스트용 userId 주입 (프로덕션에서는 실행 안 됨)
+    if (process.env.NODE_ENV !== "production") {
+      try {
+        localStorage.setItem("userId", DEV_USER_ID)
+      } catch {}
+    }
   }, [loadSchedules])
 
   // 팝업 자동 진행 시뮬레이션 (API 연동 전 임시 로직)
@@ -61,28 +71,31 @@ export default function ScheduleListScreen() {
   const handleScheduleSelect = (schedule: Schedule) => {
     if (!schedule || !schedule.id) return
 
-    // 팝업을 먼저 띄우고, 백그라운드에서 상태 처리를 시작합니다.
+    // 팝업 먼저 열기
     setIsPopupOpen(true)
     setSelectedScheduleForPopup(schedule)
-    
-    // 타임라인 생성을 위해 상세 정보를 가져옵니다.
-    scheduleApi.getScheduleDetail(schedule.id).then(detailResponse => {
-      const fullSchedule = detailResponse.schedule;
-      if (fullSchedule) {
-        const items = generateTimelineItems(fullSchedule);
-        setTimelineItems(items);
-        setCurrentPopup("processing");
-      } else {
-        throw new Error("Timeline generation failed: full schedule not found.");
-      }
-    }).catch(error => {
-      console.error("Error fetching schedule details for popup:", error);
-      alert("스케줄 정보를 준비하는 중 오류가 발생했습니다.");
-      closePopup();
-    });
 
-    // 실제 스케줄 선택 로직을 즉시 호출합니다.
-    selectSchedule(schedule.id);
+    // 타임라인 생성을 위해 상세 조회
+    scheduleApi
+      .getScheduleDetail(schedule.id)
+      .then((detailResponse: any) => {
+        const fullSchedule = detailResponse?.schedule
+        if (fullSchedule) {
+          const items = generateTimelineItems(fullSchedule)
+          setTimelineItems(items)
+          setCurrentPopup("processing")
+        } else {
+          throw new Error("Timeline generation failed: full schedule not found.")
+        }
+      })
+      .catch((error: any) => {
+        console.error("Error fetching schedule details for popup:", error)
+        alert("스케줄 정보를 준비하는 중 오류가 발생했습니다.")
+        closePopup()
+      })
+
+    // 실제 스케줄 선택 로직 호출 (라우팅 등은 훅 내부 처리 가정)
+    selectSchedule(schedule.id)
   }
 
   const handleScheduleEdit = (schedule: Schedule) => {
@@ -98,11 +111,9 @@ export default function ScheduleListScreen() {
     if (!selectedScheduleForPopup?.id) return
     try {
       await selectSchedule(selectedScheduleForPopup.id)
-      // selectSchedule 내부에서 라우팅이 처리되므로, 여기서는 팝업만 닫습니다.
+      // selectSchedule 내부에서 라우팅 처리 시 여기서는 팝업만 닫기
       closePopup()
     } catch (error) {
-      // 에러 처리는 selectSchedule 훅 내부에서 이미 처리(alert)되므로 여기서는 추가 작업이 불필요할 수 있습니다.
-      // 필요 시, 여기서 추가적인 UI 피드백을 줄 수 있습니다.
       console.error("Failed to view results:", error)
     }
   }
@@ -130,7 +141,10 @@ export default function ScheduleListScreen() {
             {schedules.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-gray-600 mb-4">생성된 스케줄이 없습니다.</p>
-                <Button onClick={() => router.push("/schedule/create/")} className="bg-blue-500 hover:bg-blue-600 text-white">
+                <Button
+                  onClick={() => router.push("/schedule/create/")}
+                  className="bg-blue-500 hover:bg-blue-600 text-white"
+                >
                   첫 스케줄 만들기
                 </Button>
               </div>
@@ -140,9 +154,28 @@ export default function ScheduleListScreen() {
                   <div key={schedule.id} className="bg-white rounded-lg p-4 shadow-sm">
                     <h3 className="font-medium mb-3">{schedule.title}</h3>
                     <div className="flex gap-2">
-                      <Button onClick={() => deleteSchedule(schedule.id!)} size="sm" variant="outline" className="flex-1 text-red-600 border-red-200 hover:bg-red-50">삭제</Button>
-                      <Button onClick={() => handleScheduleEdit(schedule)} size="sm" variant="outline" className="flex-1 text-gray-700 border-gray-200 hover:bg-gray-50">수정</Button>
-                      <Button onClick={() => handleScheduleSelect(schedule)} size="sm" className="flex-1 bg-blue-500 hover:bg-blue-600 text-white" disabled={isProcessing}>
+                      <Button
+                        onClick={() => deleteSchedule(schedule.id!)}
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
+                      >
+                        삭제
+                      </Button>
+                      <Button
+                        onClick={() => handleScheduleEdit(schedule)}
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 text-gray-700 border-gray-200 hover:bg-gray-50"
+                      >
+                        수정
+                      </Button>
+                      <Button
+                        onClick={() => handleScheduleSelect(schedule)}
+                        size="sm"
+                        className="flex-1 bg-blue-500 hover:bg-blue-600 text-white"
+                        disabled={isProcessing}
+                      >
                         {isProcessing ? "처리 중..." : "선택"}
                       </Button>
                     </div>
@@ -154,7 +187,10 @@ export default function ScheduleListScreen() {
         </div>
 
         <div className="floating-action-button">
-          <Button onClick={() => router.push("/schedule/create/")} className="w-12 h-12 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center">
+          <Button
+            onClick={() => router.push("/schedule/create/")}
+            className="w-12 h-12 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center"
+          >
             <Plus className="w-5 h-5" />
           </Button>
         </div>
@@ -169,7 +205,11 @@ export default function ScheduleListScreen() {
             onClose={closePopup}
             scheduleTitle={selectedScheduleForPopup.title}
             timelineItems={timelineItems}
-            statusText={currentPopup === "processing" ? "맞춤 식당 추천 검색 중..." : "맞춤 식당 추천 완료!"}
+            statusText={
+              currentPopup === "processing"
+                ? "맞춤 식당 추천 검색 중..."
+                : "맞춤 식당 추천 완료!"
+            }
             isProcessing={currentPopup === "processing"}
           />
           <RecommendationReadyPopup
