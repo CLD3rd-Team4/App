@@ -92,7 +92,6 @@ export default function ScheduleListScreen() {
   }
 
   const handleScheduleEdit = (schedule: Schedule) => {
-    localStorage.setItem("editingSchedule", JSON.stringify(schedule))
     router.push(`/schedule/edit?id=${schedule.id}`)
   }
 

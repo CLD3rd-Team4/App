@@ -83,10 +83,6 @@ export default function ScheduleCreateScreen({ isEdit = false, initialData = nul
       // optionalDataFromChild.companions는 항상 string[] 타입이므로, 타입 검사 로직을 단순화합니다.
       const companionsArray = optionalDataFromChild.companions || [];
 
-      console.log("[DEBUG] handleOptionalComplete called.");
-      console.log("[DEBUG] isEdit:", isEdit);
-      console.log("[DEBUG] editId:", editId);
-
       const payload: SchedulePayload = {
         title: requiredData.scheduleName,
         departureTime: requiredData.departureTime,
