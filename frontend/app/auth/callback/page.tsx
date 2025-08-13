@@ -4,20 +4,20 @@ import { Suspense, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import api from '../../../lib/interceptor';
 
-// export const dynamic = 'force-dynamic';
+export const dynamic = 'force-dynamic';
 
 function KakaoCallbackInner() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const hasFetched = useRef(false); // StrictMode 중복 방지
+
+    console.log('useEffect 실행됨');
 
     useEffect(() => {
         if (hasFetched.current) return;
         hasFetched.current = true;
 
-        console.log('useEffect 실행됨');
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const code = urlParams.get('code');
+        const code = searchParams.get('code');
         if (!code) {
             router.replace('/auth/login?error=missing_code');
             return;
@@ -41,7 +41,7 @@ function KakaoCallbackInner() {
         api.post(`/auth/kakao/callback?code=${code}`)
             .then(() => router.replace('/'))
             .catch(() => router.replace('/auth/login?error=callback_failed'));
-    }, [router]);
+    }, [router, searchParams]);
 
     return <div className="text-center mt-20">로그인 처리 중입니다…</div>;
 }
