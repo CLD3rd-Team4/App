@@ -39,10 +39,6 @@ spring:
       discovery:
         enabled: true
 
-eureka:
-  client:
-    enabled: false
-
   # Kafka 
   kafka:
     bootstrap-servers: ${MSK_BOOTSTRAP_SERVERS}
@@ -56,6 +52,10 @@ eureka:
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       group-id: recommend-service
       auto-offset-reset: earliest
+
+eureka:
+  client:
+    enabled: false
 
 
 # gRPC
