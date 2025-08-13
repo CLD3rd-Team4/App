@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.mapzip.config.ConfigServerApplicationTests" tests="1" skipped="0" failures="0" errors="0" timestamp="2025-07-28T05:34:12.415Z" hostname="yeeunui-MacBookPro.local" time="0.284">
+  <properties/>
+  <testcase name="contextLoads()" classname="com.mapzip.config.ConfigServerApplicationTests" time="0.284"/>
+  <system-out><![CDATA[14:34:10.265 [Test worker] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.mapzip.config.ConfigServerApplicationTests]: ConfigServerApplicationTests does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+14:34:10.302 [Test worker] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.mapzip.config.ConfigServerApplication for test class com.mapzip.config.ConfigServerApplicationTests
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.5.3)
+
+2025-07-28T14:34:10.552+09:00  INFO 65293 --- [config-server] [    Test worker] c.m.config.ConfigServerApplicationTests  : Starting ConfigServerApplicationTests using Java 17.0.12 with PID 65293 (started by yeeun in /Users/yeeun/CE/finalproject/App/backend/config/config-server)
+2025-07-28T14:34:10.553+09:00  INFO 65293 --- [config-server] [    Test worker] c.m.config.ConfigServerApplicationTests  : No active profile set, falling back to 1 default profile: "default"
+2025-07-28T14:34:10.887+09:00  INFO 65293 --- [config-server] [    Test worker] o.s.cloud.context.scope.GenericScope     : BeanFactory id=1f0a4896-ede2-3c3b-a903-05f24376fd08
+2025-07-28T14:34:12.369+09:00  INFO 65293 --- [config-server] [    Test worker] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 5 endpoints beneath base path '/actuator'
+2025-07-28T14:34:12.398+09:00  INFO 65293 --- [config-server] [    Test worker] c.m.config.ConfigServerApplicationTests  : Started ConfigServerApplicationTests in 1.991 seconds (process running for 2.426)
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
