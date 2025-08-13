@@ -119,7 +119,6 @@ export default function useSchedule() {
         setSelectedSchedule(prev => prev ? { ...prev, ...scheduleData, id: scheduleId } : null);
       }
 
-      alert("스케줄이 업데이트되었습니다.");
       router.push("/schedule");
 
     } catch (error) {
