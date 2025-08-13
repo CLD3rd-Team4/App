@@ -43,8 +43,7 @@ eureka:
   client:
     enabled: false
 
-# Kafka 
-spring:
+  # Kafka 
   kafka:
     bootstrap-servers: ${MSK_BOOTSTRAP_SERVERS}
     producer:
