@@ -96,9 +96,13 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
 
             scheduleMapper.updateEntity(schedule, request);
 
-            if (schedule.getMealTimeSlots() != null) {
+            // 기존 MealTimeSlot을 명시적으로 삭제
+            if (schedule.getMealTimeSlots() != null && !schedule.getMealTimeSlots().isEmpty()) {
+                mealTimeSlotRepository.deleteAll(schedule.getMealTimeSlots());
                 schedule.getMealTimeSlots().clear();
             }
+
+            // 요청으로부터 새로운 MealTimeSlot 생성 및 추가
             List<com.mapzip.schedule.grpc.MealTimeSlot> mealSlotsRequest = request.getMealSlotsList();
             if (mealSlotsRequest != null && !mealSlotsRequest.isEmpty()) {
                 List<MealTimeSlot> mealTimeSlotEntities = new ArrayList<>();
