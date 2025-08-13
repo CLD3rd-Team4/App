@@ -8,7 +8,7 @@ spring:
     name: recommend
 
   datasource:
-    url: jdbc:postgresql://recommend-db.mapzip.shop:5432/recommend_db
+    url: jdbc:postgresql://recommend-db.mapzip.shop:5432/recommend_db 
     username: mapzip
     password: '{cipher}831b8fc2d97a893e91fbc1a6b04553fb81b73c4664a9a309210f8ea138c78f01'
     driver-class-name: org.postgresql.Driver
@@ -34,8 +34,7 @@ spring:
           max-idle: ${REDIS_POOL_MAX_IDLE:16}
           min-idle: ${REDIS_POOL_MIN_IDLE:4}
           max-wait: ${REDIS_POOL_MAX_WAIT:3000ms}
-# Kafka
-spring:
+
   kafka:
     bootstrap-servers: >
       b-1.mapzipdevmain.0u4z0i.c4.kafka.ap-northeast-2.amazonaws.com:9098,
@@ -55,8 +54,8 @@ spring:
       security.protocol: SASL_SSL
       sasl.mechanism: OAUTHBEARER
       sasl.jaas.config: software.amazon.msk.auth.iam.IAMLoginModule required;
-      sasl.client.callback.handler.class: software.amazon.msk.auth.iam.IAMClientCallbackHandle
-
+      sasl.client.callback.handler.class: software.amazon.msk.auth.iam.IAMClientCallbackHandler
+      ssl.endpoint.identification.algorithm: https
 
   cloud:
     kubernetes:
@@ -67,11 +66,13 @@ eureka:
   client:
     enabled: false
 
-# gRPC
+# gRPC 서버
 grpc:
   server:
     port: 9092
     reflection-service-enabled: true
+
+# 다른 서비스 gRPC 엔드포인트
 schedule:
   grpc:
     host: schedule.service-schedule.svc.cluster.local
@@ -80,7 +81,6 @@ review:
   grpc:
     host: review.service-review.svc.cluster.local
     port: 50051
-
 
 # 외부 API
 external:
