@@ -36,25 +36,6 @@ export class APIError extends Error {
 
 // axios 인터셉터를 통해 공통 헤더는 자동으로 처리되므로 해당 함수 제거
 
-// API 함수들
-export const authApi = {
-  login: async (provider: string): Promise<User> => {
-    // TODO: 실제 API 연동
-    console.log(`${provider}로 로그인 시도`);
-    return {
-      id: "1",
-      name: "테스트 사용자",
-      email: "test@example.com",
-      provider: provider,
-    };
-  },
-
-  logout: async () => {
-    // TODO: 실제 API 연동
-    console.log("로그아웃");
-    return;
-  },
-}
 
 // Helper function to map schedule response
 const mapScheduleResponse = (scheduleData: any) => {

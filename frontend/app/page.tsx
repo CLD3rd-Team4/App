@@ -1,16 +1,14 @@
 "use client"
-
 import { useEffect, useState } from "react"
 import LoginScreen from "@/components/screens/LoginScreen"
 import HomeScreen from "@/components/screens/HomeScreen"
 import ScheduleSummaryScreen from "@/components/screens/ScheduleSummaryScreen"
 import PWAInstaller from "@/components/PWAInstaller"
-import { useAuth } from "@/hooks/useAuth"
 
 export default function HomePage() {
-  const { isAuthenticated } = useAuth()
   const [isLoading, setIsLoading] = useState(true)
   const [isClient, setIsClient] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [scheduleSelected, setScheduleSelected] = useState(false)
 
   useEffect(() => {
@@ -20,20 +18,14 @@ export default function HomePage() {
   useEffect(() => {
     if (!isClient) return
 
-    const checkLoginAndSchedule = () => {
-      const isLoggedIn = localStorage.getItem("isLoggedIn")
-      if (!isLoggedIn) {
-        setIsLoading(false)
-        return
-      }
+    const loginDone = sessionStorage.getItem("kakaoLoginDone")
+    setIsLoggedIn(!!loginDone)
 
-      const isSelected = localStorage.getItem('scheduleSelected') === 'true';
-      setScheduleSelected(isSelected);
-      setIsLoading(false)
-    }
+    const isSelected = localStorage.getItem('scheduleSelected') === 'true'
+    setScheduleSelected(isSelected)
 
-    checkLoginAndSchedule()
-  }, [isClient, isAuthenticated])
+    setIsLoading(false)
+  }, [isClient])
 
   if (!isClient || isLoading) {
     return (
@@ -48,7 +40,7 @@ export default function HomePage() {
 
   return (
     <>
-      {!isAuthenticated ? (
+      {!isLoggedIn ? (
         <LoginScreen />
       ) : scheduleSelected ? (
         <ScheduleSummaryScreen />
