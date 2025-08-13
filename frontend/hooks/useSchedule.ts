@@ -53,32 +53,31 @@ export default function useSchedule() {
   }, [loadSelectedSchedule])
 
   const selectSchedule = async (scheduleId: string) => {
-    setIsProcessing(true)
+    setIsProcessing(true);
     try {
-      // TODO: 추천 서버 준비 완료 시 아래 API 호출 주석 해제 필요
-      // await recommendApi.selectAndGetSummary(scheduleId)
+      // 추천 서버에 스케줄이 선택되었음을 알립니다.
+      await recommendApi.selectAndGetSummary(scheduleId);
 
-      // 테스트를 위한 임시 로직: API 호출 없이 성공한 것으로 간주하고 다음 단계로 진행
-      console.log(`[TEST] Schedule selection simulation for ID: ${scheduleId}`)
-      
-      localStorage.setItem("scheduleSelected", "true")
-      router.push("/recommendations")
+      // 프론트엔드 UI 상태를 위해 localStorage에 플래그를 저장합니다.
+      localStorage.setItem("scheduleSelected", "true");
+
+      router.push("/recommendations");
     } catch (error) {
-      console.error("스케줄 선택 및 처리 실패:", error)
-      alert("스케줄 처리에 실패했습니다. 잠시 후 다시 시도해주세요.")
-      // 에러 발생 시 localStorage에 값이 남지 않도록 처리
-      localStorage.removeItem("scheduleSelected")
+      console.error("스케줄 선택 및 처리 실패:", error);
+      alert("스케줄 처리에 실패했습니다. 잠시 후 다시 시도해주세요.");
+      localStorage.removeItem("scheduleSelected");
     } finally {
-      setIsProcessing(false)
+      setIsProcessing(false);
     }
-  }
+  };
 
   const deselectSchedule = () => {
-    setSelectedSchedule(null)
-    localStorage.removeItem("scheduleSelected")
-    router.push("/")
-    router.refresh()
-  }
+    // TODO: 백엔드에 선택 해제를 알리는 API 호출 추가 (예: recommendApi.deselectSchedule())
+    setSelectedSchedule(null);
+    localStorage.removeItem("scheduleSelected");
+    router.push("/");
+    router.refresh();
+  };
 
   const createSchedule = async (scheduleData: SchedulePayload) => {
     setIsProcessing(true)
@@ -119,7 +118,6 @@ export default function useSchedule() {
         setSelectedSchedule(prev => prev ? { ...prev, ...scheduleData, id: scheduleId } : null);
       }
 
-      alert("스케줄이 업데이트되었습니다.");
       router.push("/schedule");
 
     } catch (error) {
