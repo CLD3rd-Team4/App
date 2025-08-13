@@ -8,14 +8,14 @@ import api from '../../../lib/interceptor';
 
 function KakaoCallbackInner() {
     const router = useRouter();
-    const searchParams = useSearchParams();
     const hasFetched = useRef(false); // StrictMode 중복 방지
 
     useEffect(() => {
         if (hasFetched.current) return;
         hasFetched.current = true;
 
-        const code = searchParams.get('code');
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
         if (!code) {
             router.replace('/auth/login?error=missing_code');
             return;
@@ -38,7 +38,7 @@ function KakaoCallbackInner() {
         api.post(`/auth/kakao/callback?code=${code}`)
             .then(() => router.replace('/'))
             .catch(() => router.replace('/auth/login?error=callback_failed'));
-    }, [router, searchParams]);
+    }, [router]);
 
     return <div className="text-center mt-20">로그인 처리 중입니다…</div>;
 }
