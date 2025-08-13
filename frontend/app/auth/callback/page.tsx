@@ -4,7 +4,7 @@ import { Suspense, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import api from '../../../lib/interceptor';
 
-export const dynamic = 'force-dynamic';
+// export const dynamic = 'force-dynamic';
 
 function KakaoCallbackInner() {
     const router = useRouter();

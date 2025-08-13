@@ -76,7 +76,7 @@ const toRestaurant = (p: ApiPlace): Restaurant => ({
   aiReason: p.reason || "",
   rating: p.averageRating,
   distance: p.distance || "",
-  addressName: p.addressName, 
+  addressName: p.addressName,
   image: p.image || "/placeholder.svg?height=80&width=80",
   // @ts-ignore
   placeUrl: p.placeUrl,
@@ -190,87 +190,86 @@ export default function RecommendationScreen() {
   }, [mealSections, selectedRestaurants])
 
   const handleComplete = async () => {
-  if (!isAllSectionsSelected()) {
-    alert("모든 식사/간식 시간에 대해 식당을 선택해주세요.");
-    return;
-  }
+    if (!isAllSectionsSelected()) {
+      alert("모든 식사/간식 시간에 대해 식당을 선택해주세요.");
+      return;
+    }
 
-  const selectedPlaces: SubmitPlace[] = mealSections.map(sec => {
-    const r = selectedRestaurants[sec.id];
-    if (!r) return null as any;
+    const selectedPlaces: SubmitPlace[] = mealSections.map(sec => {
+      const r = selectedRestaurants[sec.id];
+      if (!r) return null as any;
 
-    return {
-      // ★ 서버 slotId 우선 사용 (없으면 UI id를 백업으로)
-      slotId: (sec as any).originSlotId || sec.id,
-      mealType: sec.type === "식사" ? 0 : 1,
-      scheduledTime: sec.time,
-      id: r.id,
-      placeName: r.placeName,
-      reason: r.aiReason || r.description || "",
-      distance: r.distance || "",
-      addressName: (r as any).addressName || "",
-      placeUrl: (r as any).placeUrl || "",
-      averageRating: r.rating ?? 0,
-      representativeReview: r.description || ""
+      return {
+        // ★ 서버 slotId 우선 사용 (없으면 UI id를 백업으로)
+        slotId: (sec as any).originSlotId || sec.id,
+        mealType: sec.type === "식사" ? 0 : 1,
+        scheduledTime: sec.time,
+        id: r.id,
+        placeName: r.placeName,
+        reason: r.aiReason || r.description || "",
+        distance: r.distance || "",
+        addressName: (r as any).addressName || "",
+        placeUrl: (r as any).placeUrl || "",
+        averageRating: r.rating ?? 0,
+        representativeReview: r.description || ""
+      };
+    }).filter(Boolean);
+
+    // ⚠️ userId/scheduleId는 실제 값으로 맞춰주세요 (지금은 목 예시)
+    const payload: SubmitRequest = {
+      userId: "user123",
+      scheduleId: "schedule456",
+      selectedPlaces
     };
-  }).filter(Boolean);
 
-  // ⚠️ userId/scheduleId는 실제 값으로 맞춰주세요 (지금은 목 예시)
-  const payload: SubmitRequest = {
-    userId: "user123",
-    scheduleId: "schedule456",
-    selectedPlaces
+    try {
+      const res = await api.post("/recommend/submit", payload);
+      let mealIdx = 1, snackIdx = 1;
+
+      // payload의 selectedPlaces를 요약 UI에서 쓰는 Restaurant로 변환
+      const toRestaurantFromSubmit = (p: SubmitPlace): Restaurant => ({
+        id: p.id,
+        placeName: p.placeName,
+        description: p.representativeReview || p.reason || "",
+        aiReason: p.reason || "",
+        rating: p.averageRating,
+        distance: p.distance,
+        image: "/placeholder.svg?height=80&width=80",
+        // 타입 확장 필드들(있으면 요약에서 활용 가능)
+        // @ts-ignore
+        addressName: p.addressName,
+        // @ts-ignore
+        placeUrl: p.placeUrl,
+      });
+
+      const selectedRestaurantsForSummary = payload.selectedPlaces.map(p => ({
+        sectionId: p.mealType === 0 ? `meal-${mealIdx++}` : `snack-${snackIdx++}`,
+        restaurant: toRestaurantFromSubmit(p),
+      }));
+
+      const targetMealTimes = payload.selectedPlaces.map(p => ({
+        type: (p.mealType === 0 ? "식사" : "간식") as "식사" | "간식",
+        time: p.scheduledTime,
+      }));
+
+      const summary = {
+        id: payload.scheduleId,
+        title: "나의 스케줄",
+        selectedRestaurants: selectedRestaurantsForSummary,
+        selectedRestaurant: selectedRestaurantsForSummary[0]?.restaurant,
+        targetMealTimes,
+      };
+
+      //  로컬 저장 후 홈(=요약화면)으로 이동
+      localStorage.setItem("selectedSchedule", JSON.stringify(summary));
+      localStorage.setItem("scheduleSelected", "true"); // HomePage에서 요약화면 분기
+      alert("선택을 저장했습니다.");
+      router.push("/");
+    } catch (e: any) {
+      console.error("submit 실패:", e?.response?.data || e);
+      alert("저장 중 오류가 발생했습니다.");
+    }
   };
-
-  try {
-    const res = await api.post("/recommend/submit", payload);
-    let mealIdx = 1, snackIdx = 1;
-
-    // payload의 selectedPlaces를 요약 UI에서 쓰는 Restaurant로 변환
-    const toRestaurantFromSubmit = (p: SubmitPlace): Restaurant => ({
-      id: p.id,
-      placeName: p.placeName,
-      description: p.representativeReview || p.reason || "",
-      aiReason: p.reason || "",
-      rating: p.averageRating,
-      distance: p.distance,
-      image: "/placeholder.svg?height=80&width=80",
-      // 타입 확장 필드들(있으면 요약에서 활용 가능)
-      // @ts-ignore
-      addressName: p.addressName,
-      // @ts-ignore
-      placeUrl: p.placeUrl,
-    });
-
-    const selectedRestaurantsForSummary = payload.selectedPlaces.map(p => ({
-      sectionId: p.mealType === 0 ? `meal-${mealIdx++}` : `snack-${snackIdx++}`,
-      restaurant: toRestaurantFromSubmit(p),
-    }));
-
-    const targetMealTimes = payload.selectedPlaces.map(p => ({
-      type: (p.mealType === 0 ? "식사" : "간식") as "식사" | "간식",
-      time: p.scheduledTime,
-    }));
-
-    const summary = {
-      id: payload.scheduleId,
-      title: "나의 스케줄",
-      selectedRestaurants: selectedRestaurantsForSummary,
-      selectedRestaurant: selectedRestaurantsForSummary[0]?.restaurant,
-      targetMealTimes,
-    };
-
-    //  로컬 저장 후 홈(=요약화면)으로 이동
-    localStorage.setItem("selectedSchedule", JSON.stringify(summary));
-    localStorage.setItem("scheduleSelected", "true"); // HomePage에서 요약화면 분기
-    alert("선택을 저장했습니다.");
-    router.push("/");
-  } catch (e: any) {
-    console.error("submit 실패:", e?.response?.data || e);
-    alert("저장 중 오류가 발생했습니다.");
-  }
-};
-   
 
   // 렌더
   return (
@@ -339,9 +338,7 @@ export default function RecommendationScreen() {
                     </div>
                     <div className="flex items-center gap-2">
                       {selectedRestaurants[section.id] && (
-                        <span className="text-sm text-gray-600">
-                          {selectedRestaurants[section.id].placeName}
-                        </span>
+                        <span className="text-sm text-gray-600">{selectedRestaurants[section.id].placeName}</span>
                       )}
                       {expandedSections.has(section.id) ? (
                         <ChevronUp className="w-5 h-5 text-gray-400" />
@@ -364,7 +361,10 @@ export default function RecommendationScreen() {
                             </div>
                             <div className="flex items-start gap-3">
                               <img
-                                src={section.previousSelection.image || "/placeholder.svg?height=60&width=60&query=restaurant"}
+                                src={
+                                  section.previousSelection.image ||
+                                  "/placeholder.svg?height=60&width=60&query=restaurant"
+                                }
                                 alt={section.previousSelection.placeName}
                                 className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
                               />
@@ -418,7 +418,10 @@ export default function RecommendationScreen() {
                                   className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
                                 />
                                 <div className="flex-1 min-w-0">
+                                  {/* 이름 */}
                                   <h3 className="font-semibold text-lg mb-1">{restaurant.placeName}</h3>
+
+                                  {/* 한줄평 */}
                                   <p className="text-sm text-gray-600 mb-2">{restaurant.description}</p>
                                   <p className="text-sm text-blue-600 mb-3">{restaurant.aiReason}</p>
                                   <div className="flex items-center justify-between mb-3">

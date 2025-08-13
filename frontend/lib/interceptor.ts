@@ -2,7 +2,7 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosError } from "axios";
 
 // 1) 런타임(hostname) 기준 자동 전환
-const LOCAL_BASE = "http://localhost:8080";
+const LOCAL_BASE = "http://localhost:9090";
 const PROD_BASE  = "https://api.mapzip.shop";
 
 // 2) 빌드타임 env 가 있으면 그걸 최우선으로 사용 (선택)

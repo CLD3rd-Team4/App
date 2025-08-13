@@ -1,7 +1,7 @@
 package com.mapzip.schedule.service;
 
 import com.mapzip.schedule.config.GrpcInterceptorConfig;
-import com.fasterxml.jackson.databind.ObjectMapper;
+
 import com.mapzip.schedule.entity.MealTimeSlot;
 import com.mapzip.schedule.entity.Schedule;
 import com.mapzip.schedule.grpc.*;
@@ -29,7 +29,7 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
     private final ScheduleRepository scheduleRepository;
     private final MealTimeSlotRepository mealTimeSlotRepository;
     private final ScheduleMapper scheduleMapper;
-    private final ObjectMapper objectMapper;
+    
     private final RedisTemplate<String, String> redisTemplate;
 
     // @GrpcClient("recommend-service")
@@ -38,6 +38,13 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
     @Override
     @Transactional
     public void createSchedule(CreateScheduleRequest request, StreamObserver<CreateScheduleResponse> responseObserver) {
+        try {
+            com.google.protobuf.util.JsonFormat.Printer printer = com.google.protobuf.util.JsonFormat.printer().includingDefaultValueFields().preservingProtoFieldNames();
+            log.info("CreateSchedule Request Received (JSON):\n{}", printer.print(request));
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+            log.warn("Failed to serialize request to JSON for logging", e);
+            log.info("CreateSchedule Request Received (toString): {}", request.toString());
+        }
         try {
             String userId = GrpcInterceptorConfig.USER_ID_CONTEXT_KEY.get();
             Schedule schedule = scheduleMapper.toEntity(request);

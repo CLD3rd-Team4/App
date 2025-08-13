@@ -7,6 +7,7 @@ import useSchedule from "@/hooks/useSchedule"
 import BottomNavigation from "@/components/common/BottomNavigation"
 import { RefreshCw, Star } from "lucide-react"
 import type { Restaurant, Schedule } from "@/types"
+import { MealType } from "@/types"
 
 // 타임라인 아이템 타입을 명시적으로 정의
 type TimelineItem = {
@@ -55,8 +56,33 @@ export default function ScheduleSummaryScreen() {
   }, [isLoading, selectedSchedule, deselectSchedule, router]);
 
   const handleUpdate = () => {
-    if (!selectedSchedule || !selectedSchedule.id) return
-    updateSchedule(selectedSchedule.id)
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          alert(`현재 위치: 위도 ${latitude}, 경도 ${longitude}`);
+          
+          // TODO: 추천 서버가 준비되면, 이 위치 정보를 사용하여 추천을 업데이트합니다.
+        },
+        (error) => {
+          let errorMessage = "위치 정보를 가져오는 데 실패했습니다.";
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              errorMessage = "위치 정보 접근 권한이 거부되었습니다. 설정에서 권한을 허용해주세요.";
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMessage = "현재 위치를 파악할 수 없습니다.";
+              break;
+            case error.TIMEOUT:
+              errorMessage = "위치 정보를 가져오는 데 시간이 초과되었습니다.";
+              break;
+          }
+          alert(errorMessage);
+        }
+      );
+    } else {
+      alert("이 브라우저에서는 위치 정보 기능을 사용할 수 없습니다.");
+    }
   }
 
   const handleRecommendationConfirm = () => {
@@ -106,13 +132,13 @@ export default function ScheduleSummaryScreen() {
     })
 
     selectedSchedule.selectedRestaurants?.forEach((item) => {
-      const mealTime = selectedSchedule.targetMealTimes?.find(
-        (mt) => mt.type === (item.sectionId.includes("meal") ? "식사" : "간식")
+      const mealTime = selectedSchedule.mealSlots?.find(
+        (mt) => mt.mealType === (item.sectionId.includes("meal") ? MealType.MEAL : MealType.SNACK)
       )
       items.push({
         type: "restaurant",
-        time: mealTime?.time || "",
-        title: item.restaurant.name || "선택된 식당",
+        time: mealTime?.scheduledTime || "",
+        title: item.restaurant.placeName || "선택된 식당",
         description: item.restaurant.description || "",
         rating: item.restaurant.rating || 0,
         icon: item.sectionId.includes("meal") ? "식사" : "간식",

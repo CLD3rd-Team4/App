@@ -70,6 +70,11 @@
     "axios": "^1.11.0",
     "postcss": "^8.5",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5"
+    "typescript": "^5",
+    "postcss": "^8.5",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5",
+    "@types/axios": "^0.14.0"
+
   }
 }

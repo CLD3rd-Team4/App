@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { useRouter, useParams } from "next/navigation"
 import { ArrowLeft, Star, ChevronLeft, ChevronRight, Edit, Save, X, Plus } from "lucide-react"
+import { reviewApi, APIError } from "@/services/api"
 
 export default function ReviewDetailPageClient() {
   const router = useRouter()
@@ -18,6 +19,8 @@ export default function ReviewDetailPageClient() {
   const [editedReview, setEditedReview] = useState("")
   const [editedImages, setEditedImages] = useState<string[]>([])
   const [isClient, setIsClient] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -27,24 +30,55 @@ export default function ReviewDetailPageClient() {
   useEffect(() => {
     if (!isClient) return
 
-    // TODO: 실제 API에서 리뷰 상세 정보 가져오기
-    const mockReview = {
-      id: params.id,
-      restaurantName: "OO 음식점",
-      address: "서울시 강남구 테헤란로 123",
-      rating: 4,
-      visitDate: "2024.07.18",
-      review: "맛있었어요! 분위기도 좋고 서비스도 친절했습니다. 다음에 또 방문하고 싶어요.",
-      images: [
-        "/placeholder.svg?height=300&width=400",
-        "/placeholder.svg?height=300&width=400",
-        "/placeholder.svg?height=300&width=400",
-      ],
+    const loadReviewDetail = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
+        
+        // params.id는 실제로는 reviewId이고, restaurantId가 필요함
+        // URL 패턴을 /review/detail/{restaurantId}/{reviewId}로 변경하거나
+        // 임시로 reviewId만으로 조회 가능하도록 API 수정 필요
+        
+        // 현재는 reviewId만 있으므로 getUserReviews에서 해당 리뷰를 찾는 방식 사용
+        const userReviews = await reviewApi.getUserReviews(1, 100); // 많은 수 조회
+        const targetReview = userReviews.data?.find((r: any) => r.reviewId === params.id || r.id === params.id);
+        
+        if (!targetReview) {
+          setError("리뷰를 찾을 수 없습니다.");
+          return;
+        }
+        
+        // 실제 API 데이터 구조에 맞게 변환
+        const reviewData = {
+          id: targetReview.reviewId || targetReview.id,
+          restaurantId: targetReview.restaurantId,
+          restaurantName: targetReview.restaurantName || "식당",
+          address: targetReview.restaurantAddress || targetReview.address || "주소 정보 없음",
+          rating: targetReview.rating || 0,
+          visitDate: targetReview.visitDate || targetReview.createdAt?.split('T')[0] || "",
+          review: targetReview.content || "",
+          images: targetReview.imageUrls || [],
+          isOwner: true // getUserReviews는 본인 리뷰만 조회하므로 항상 true
+        };
+        
+        setReview(reviewData)
+        setEditedRating(reviewData.rating)
+        setEditedReview(reviewData.review)
+        setEditedImages([...reviewData.images])
+        
+      } catch (error: any) {
+        console.error("리뷰 상세 정보 로드 실패:", error)
+        if (error instanceof APIError) {
+          setError(error.message)
+        } else {
+          setError("리뷰 정보를 불러오는데 실패했습니다.")
+        }
+      } finally {
+        setIsLoading(false)
+      }
     }
-    setReview(mockReview)
-    setEditedRating(mockReview.rating)
-    setEditedReview(mockReview.review)
-    setEditedImages([...mockReview.images])
+
+    loadReviewDetail()
   }, [params.id, isClient])
 
   const handleEdit = () => {
@@ -52,22 +86,52 @@ export default function ReviewDetailPageClient() {
   }
 
   const handleSave = async () => {
+    if (!review?.restaurantId) {
+      alert("리뷰 정보가 올바르지 않습니다.");
+      return;
+    }
+
     try {
-      // TODO: 실제 수정 API 호출
-      const updatedReview = {
+      setIsLoading(true)
+      
+      // 실제 수정 API 호출
+      const updateData = {
+        rating: editedRating,
+        content: editedReview,
+        reviewImages: editedImages // 새로 추가된 이미지들
+      };
+      
+      const updatedReview = await reviewApi.updateReview(
+        review.restaurantId, 
+        review.id, 
+        updateData
+      );
+      
+      // 성공 시 UI 업데이트
+      const newReviewData = {
         ...review,
         rating: editedRating,
         review: editedReview,
         images: editedImages,
-      }
-      setReview(updatedReview)
+      };
+      
+      setReview(newReviewData)
       setIsEditing(false)
 
-      // 성공 메시지 표시 (선택사항)
       alert("리뷰가 수정되었습니다.")
-    } catch (error) {
+    } catch (error: any) {
       console.error("리뷰 수정 실패:", error)
-      alert("리뷰 수정에 실패했습니다.")
+      if (error instanceof APIError) {
+        if (error.status === 403) {
+          alert("수정 권한이 없습니다.")
+        } else {
+          alert(error.message)
+        }
+      } else {
+        alert("리뷰 수정에 실패했습니다.")
+      }
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -121,7 +185,45 @@ export default function ReviewDetailPageClient() {
     }
   }
 
-  if (!isClient || !review) {
+  if (!isClient) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">초기화 중...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">리뷰를 불러오는 중...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error}</p>
+          <button
+            onClick={() => router.push("/visited/")}
+            className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
+          >
+            뒤로 가기
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!review) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { scheduleApi, recommendApi, APIError } from "@/services/api"
-import type { Schedule } from "@/types"
+import type { Schedule, SchedulePayload } from "@/types"
 
 export default function useSchedule() {
   const router = useRouter()
@@ -55,12 +55,19 @@ export default function useSchedule() {
   const selectSchedule = async (scheduleId: string) => {
     setIsProcessing(true)
     try {
-      await recommendApi.selectAndGetSummary(scheduleId)
+      // TODO: 추천 서버 준비 완료 시 아래 API 호출 주석 해제 필요
+      // await recommendApi.selectAndGetSummary(scheduleId)
+
+      // 테스트를 위한 임시 로직: API 호출 없이 성공한 것으로 간주하고 다음 단계로 진행
+      console.log(`[TEST] Schedule selection simulation for ID: ${scheduleId}`)
+      
       localStorage.setItem("scheduleSelected", "true")
-      router.push("/")
+      router.push("/recommendations")
     } catch (error) {
       console.error("스케줄 선택 및 처리 실패:", error)
       alert("스케줄 처리에 실패했습니다. 잠시 후 다시 시도해주세요.")
+      // 에러 발생 시 localStorage에 값이 남지 않도록 처리
+      localStorage.removeItem("scheduleSelected")
     } finally {
       setIsProcessing(false)
     }
@@ -73,10 +80,15 @@ export default function useSchedule() {
     router.refresh()
   }
 
-  const createSchedule = async (scheduleData: Omit<Schedule, "id">) => {
+  const createSchedule = async (scheduleData: SchedulePayload) => {
     setIsProcessing(true)
     try {
-      const newSchedule = await scheduleApi.createSchedule(scheduleData)
+      const response = await scheduleApi.createSchedule(scheduleData)
+      // API 응답으로 받은 scheduleId와 요청 시 사용된 scheduleData를 결합하여 완전한 Schedule 객체를 만듭니다.
+      const newSchedule: Schedule = {
+        id: response.scheduleId,
+        ...scheduleData,
+      };
       setSchedules((prev) => [...prev, newSchedule])
       router.push("/schedule")
     } catch (error) {
@@ -87,15 +99,29 @@ export default function useSchedule() {
     }
   }
 
-  const updateSchedule = async (scheduleId: string) => {
+  const updateSchedule = async (scheduleId: string, scheduleData: SchedulePayload) => {
     setIsProcessing(true)
     try {
-      // This is a placeholder for the actual update logic.
-      // You might need to fetch current location and pass it to the API.
-      await scheduleApi.processSchedule(scheduleId, { type: "UPDATE" })
-      alert("스케줄이 업데이트되었습니다.")
-      // Reload the summary
-      await loadSelectedSchedule()
+      const scheduleToUpdate: Schedule = {
+        id: scheduleId,
+        ...scheduleData,
+      };
+
+      const updatedScheduleDetail = await scheduleApi.updateSchedule(scheduleToUpdate);
+      
+      // 상태를 업데이트하여 UI에 즉시 반영
+      setSchedules((prev) => 
+        prev.map((s) => (s.id === scheduleId ? { ...s, ...scheduleData } : s))
+      );
+
+      // 선택된 스케줄 정보도 업데이트 (선택된 상태였다면)
+      if (selectedSchedule?.id === scheduleId) {
+        setSelectedSchedule(prev => prev ? { ...prev, ...scheduleData, id: scheduleId } : null);
+      }
+
+      alert("스케줄이 업데이트되었습니다.");
+      router.push("/schedule");
+
     } catch (error) {
       console.error("스케줄 업데이트 실패:", error)
       alert("스케줄 업데이트에 실패했습니다.")

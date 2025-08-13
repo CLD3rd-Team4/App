@@ -7,20 +7,22 @@ spring:
     config:
       enabled: true
     gateway:
-      globalcors:
-        cors-configurations:
-          '[/**]':
-            allowedOrigins: 
-              - "https://www.mapzip.shop"
-            allowedMethods:
-              - GET
-              - POST
-              - PUT
-              - DELETE
-              - OPTIONS
-            allowedHeaders: "*"
-            allowCredentials: true
-            maxAge: 3600
+      server:
+        webflux:
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowedOrigins: 
+                  - "https://www.mapzip.shop"
+                allowedMethods:
+                  - GET
+                  - POST
+                  - PUT
+                  - DELETE
+                  - OPTIONS
+                allowedHeaders: "*"
+                allowCredentials: true
+                maxAge: 3600
 
 management:
   endpoints:

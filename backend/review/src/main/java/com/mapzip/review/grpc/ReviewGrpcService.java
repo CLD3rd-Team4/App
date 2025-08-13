@@ -96,22 +96,21 @@ public class ReviewGrpcService extends ReviewServiceGrpc.ReviewServiceImplBase {
                 return;
             }
             
-            // 요청한 사용자 ID와 인증된 사용자 ID가 일치하는지 확인
-            if (!authenticatedUserId.equals(request.getUserId())) {
-                responseObserver.onError(new StatusRuntimeException(Status.PERMISSION_DENIED.withDescription("Access denied: Cannot access other user's reviews")));
-                return;
-            }
-            
+            // Gateway에서 검증된 사용자 ID 사용 (헤더에서 추출됨)
             List<ReviewEntity> reviews = reviewService.getUserReviews(
-                    request.getUserId(), request.getPage(), request.getSize());
+                    authenticatedUserId, request.getPage(), request.getSize());
+            long totalCount = reviewService.getUserReviewsCount(authenticatedUserId);
+            
+            // 다음 페이지 존재 여부 계산
+            boolean hasNext = (request.getPage() + 1) * request.getSize() < totalCount;
             
             ReviewProto.GetUserReviewsResponse response = ReviewProto.GetUserReviewsResponse.newBuilder()
                     .addAllReviews(reviews.stream()
                             .map(this::convertToProtoReview)
                             .collect(Collectors.toList()))
-                    .setTotalCount(reviews.size())
+                    .setTotalCount((int) totalCount)  // 실제 전체 개수
                     .setCurrentPage(request.getPage())
-                    .setHasNext(false) // 간단한 구현
+                    .setHasNext(hasNext)  // 올바른 hasNext 값
                     .build();
             
             responseObserver.onNext(response);
@@ -123,34 +122,6 @@ public class ReviewGrpcService extends ReviewServiceGrpc.ReviewServiceImplBase {
         }
     }
     
-    @Override
-    public void getRestaurantReviews(ReviewProto.GetRestaurantReviewsRequest request,
-                                   StreamObserver<ReviewProto.GetRestaurantReviewsResponse> responseObserver) {
-        try {
-            List<ReviewEntity> reviews = reviewService.getRestaurantReviews(
-                    request.getRestaurantId(), request.getPage(), request.getSize());
-            
-            long totalCount = reviewService.getRestaurantReviewCount(request.getRestaurantId());
-            double averageRating = reviewService.getRestaurantAverageRating(request.getRestaurantId());
-            
-            ReviewProto.GetRestaurantReviewsResponse response = ReviewProto.GetRestaurantReviewsResponse.newBuilder()
-                    .addAllReviews(reviews.stream()
-                            .map(this::convertToProtoReview)
-                            .collect(Collectors.toList()))
-                    .setTotalCount((int) totalCount)
-                    .setCurrentPage(request.getPage())
-                    .setHasNext((request.getPage() + 1) * request.getSize() < totalCount)
-                    .setAverageRating(averageRating)
-                    .build();
-            
-            responseObserver.onNext(response);
-            responseObserver.onCompleted();
-            
-        } catch (Exception e) {
-            logger.error("Error getting restaurant reviews", e);
-            responseObserver.onError(e);
-        }
-    }
     
     @Override
     public void getReview(ReviewProto.GetReviewRequest request,
