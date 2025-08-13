@@ -3,7 +3,6 @@
 server:
   port: 8082
 
-
 spring:
   application:
     name: recommend
@@ -36,6 +35,7 @@ spring:
           min-idle: ${REDIS_POOL_MIN_IDLE:4}
           max-wait: ${REDIS_POOL_MAX_WAIT:3000ms}
 # Kafka
+spring:
   kafka:
     bootstrap-servers: >
       b-1.mapzipdevmain.0u4z0i.c4.kafka.ap-northeast-2.amazonaws.com:9092,
