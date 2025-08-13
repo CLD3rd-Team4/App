@@ -51,7 +51,8 @@ export interface Restaurant {
   rating?: number
   distance?: string
   image?: string
-  addressName?: string       // 주소 정보
+  addressName?: string // 주소 정보
+  placeUrl?: string      
   address?: string           // 하위호환용
 }
 
