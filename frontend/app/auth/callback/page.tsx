@@ -11,6 +11,8 @@ function KakaoCallbackInner() {
     const searchParams = useSearchParams();
     const hasFetched = useRef(false); // StrictMode 중복 방지
 
+    console.log('useEffect 실행됨');
+
     useEffect(() => {
         if (hasFetched.current) return;
         hasFetched.current = true;
@@ -20,6 +22,7 @@ function KakaoCallbackInner() {
             router.replace('/auth/login?error=missing_code');
             return;
         }
+        console.log('카카오 로그인 code:', code);
 
         // 이미 콜백 처리한 브라우저라면 세션 확인만
         if (sessionStorage.getItem('kakaoLoginDone')) {
@@ -33,10 +36,11 @@ function KakaoCallbackInner() {
         }
 
         // 최초 콜백 처리
-        sessionStorage.setItem('kakaoLoginDone', 'true');
-
         api.post(`/auth/kakao/callback?code=${code}`)
-            .then(() => router.replace('/'))
+            .then(() => {
+                sessionStorage.setItem('kakaoLoginDone', 'true');
+                router.replace('/')
+            })
             .catch(() => router.replace('/auth/login?error=callback_failed'));
     }, [router, searchParams]);
 

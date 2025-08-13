@@ -2,21 +2,21 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { useAuth } from "@/hooks/useAuth"
 import Logo from "@/components/common/Logo"
 
 export default function LoginScreen() {
-  const { login } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
 
   const handleKakaoLogin = async () => {
     setIsLoading(true)
     try {
-      // TODO: REST API 연동 - Kakao 로그인
-      await login("kakao")
+      const REST_API_KEY = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID!
+      const REDIRECT_URI = process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI!
+      const KAKAO_AUTH_URL = `https://kauth.kakao.com/oauth/authorize?client_id=${REST_API_KEY}&redirect_uri=${REDIRECT_URI}&response_type=code`
+  
+      window.location.href = KAKAO_AUTH_URL
     } catch (error) {
       console.error("로그인 실패:", error)
-    } finally {
       setIsLoading(false)
     }
   }
@@ -26,7 +26,7 @@ export default function LoginScreen() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-16">
           <Logo size="large" />
-          <p className="text-gray-600 mt-4">부제 적성</p>
+          <p className="text-gray-600 mt-4">스케줄 기반 맛집 추천 서비스</p>
         </div>
 
         <Button
