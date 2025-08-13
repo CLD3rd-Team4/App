@@ -263,6 +263,14 @@ export default function RecommendationScreen() {
       //  로컬 저장 후 홈(=요약화면)으로 이동
       localStorage.setItem("selectedSchedule", JSON.stringify(summary));
       localStorage.setItem("scheduleSelected", "true"); // HomePage에서 요약화면 분기
+
+// 🔧 [로컬 전용] 인증 상태 강제
+if (process.env.NODE_ENV !== "production") {
+  localStorage.setItem("isLoggedIn", "true");          // HomePage의 로그인 체크에 사용
+  // useAuth가 토큰/유저정보를 본다면 함께 넣어줘 (프로젝트에 맞게 키 이름 맞추기)
+  localStorage.setItem("accessToken", "dev-mock-token");
+  localStorage.setItem("user", JSON.stringify({ id: "dev", name: "로컬테스트" }));
+}
       alert("선택을 저장했습니다.");
       router.push("/");
     } catch (e: any) {
