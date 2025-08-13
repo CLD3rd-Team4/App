@@ -1,11 +1,10 @@
 package com.mapzip.auth.auth_service.config;
 
-import com.mapzip.auth.auth_service.filter.JwtAuthenticationFilter;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.*;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -16,55 +15,52 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.authorization.token.*;
 import org.springframework.security.web.SecurityFilterChain;
-
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.List;
-import java.util.UUID;
 
 @Configuration
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-//    @Value("${jwt.secret}")
-//    private String jwtSecret;
-
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())
+                .cors(Customizer.withDefaults()) // CORS 활성화
                 .authorizeHttpRequests(auth -> auth
+                        // 프리플라이트는 전역 허용
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        // 카카오 콜백은 비인증 허용
                         .requestMatchers(HttpMethod.POST, "/auth/kakao/callback").permitAll()
-                        .requestMatchers("/auth/token/**").permitAll() // refresh, logout
+                        // 토큰 관련 엔드포인트(리프레시/로그아웃 등)
+                        .requestMatchers("/auth/token/**").permitAll()
+                        // 헬스체크
                         .requestMatchers("/actuator/**").permitAll()
                         .anyRequest().authenticated()
                 )
-                // .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 
-//    @Bean
-//    public CorsConfigurationSource corsConfigurationSource() {
-//        CorsConfiguration config = new CorsConfiguration();
-//        config.setAllowedOrigins(List.of("http://localhost:3000")); // 프론트엔드 도메인
-//        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-//        config.setAllowedHeaders(List.of("*"));
-//        config.setAllowCredentials(true);
-//
-//        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-//        source.registerCorsConfiguration("/**", config);
-//        return source;
-//    }
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration c = new CorsConfiguration();
+        c.setAllowedOrigins(List.of(
+                "https://www.mapzip.shop", // dev
+                "http://localhost:3000"    // 로컬
+        ));
+        c.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        c.setAllowedHeaders(List.of("*"));
+        c.setAllowCredentials(true);   // 쿠키 전송 허용
+        c.setMaxAge(3600L);
 
-
-//    @Bean
-//    public JwtAuthenticationFilter jwtAuthenticationFilter() {
-//        return new JwtAuthenticationFilter(jwtSecret);
-//    }
+        UrlBasedCorsConfigurationSource s = new UrlBasedCorsConfigurationSource();
+        s.registerCorsConfiguration("/**", c);
+        return s;
+    }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -77,8 +73,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator(
-            JwtEncoder jwtEncoder) {
+    public OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator(JwtEncoder jwtEncoder) {
         OAuth2AccessTokenGenerator accessTokenGenerator = new OAuth2AccessTokenGenerator();
         OAuth2RefreshTokenGenerator refreshTokenGenerator = new OAuth2RefreshTokenGenerator();
         JwtGenerator jwtGenerator = new JwtGenerator(jwtEncoder);
