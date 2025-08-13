@@ -1,5 +1,4 @@
 "use client"
-
 import { useEffect, useState } from "react"
 import LoginScreen from "@/components/screens/LoginScreen"
 import HomeScreen from "@/components/screens/HomeScreen"
@@ -9,8 +8,8 @@ import PWAInstaller from "@/components/PWAInstaller"
 export default function HomePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isClient, setIsClient] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [scheduleSelected, setScheduleSelected] = useState(false)
-  const isLoggedIn = sessionStorage.getItem("kakaoLoginDone")
 
   useEffect(() => {
     setIsClient(true)
@@ -19,19 +18,14 @@ export default function HomePage() {
   useEffect(() => {
     if (!isClient) return
 
-    const checkLoginAndSchedule = () => {
-      if (!isLoggedIn) {
-        setIsLoading(false)
-        return
-      }
+    const loginDone = sessionStorage.getItem("kakaoLoginDone")
+    setIsLoggedIn(!!loginDone)
 
-      const isSelected = localStorage.getItem('scheduleSelected') === 'true';
-      setScheduleSelected(isSelected);
-      setIsLoading(false)
-    }
+    const isSelected = localStorage.getItem('scheduleSelected') === 'true'
+    setScheduleSelected(isSelected)
 
-    checkLoginAndSchedule()
-  }, [isClient,isLoggedIn])
+    setIsLoading(false)
+  }, [isClient])
 
   if (!isClient || isLoading) {
     return (
