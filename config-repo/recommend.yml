@@ -64,6 +64,15 @@ grpc:
   server:
     port: 9092
     reflection-service-enabled: true
+schedule:
+  grpc:
+    host: schedule.service-schedule.svc.cluster.local
+    port: 9090
+review:
+  grpc:
+    host: review.service-review.svc.cluster.local
+    port: 50051
+
 
 # 외부 API
 external:
