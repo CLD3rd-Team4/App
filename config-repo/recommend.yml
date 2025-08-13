@@ -9,7 +9,7 @@ spring:
     name: recommend
 
   datasource:
-    url: jdbc:postgresql://recommend-db.mapzip.shop:5432/mapzip_recommend
+    url: jdbc:postgresql://recommend-db.mapzip.shop:5432/recommend_db
     username: mapzip
     password: '{cipher}831b8fc2d97a893e91fbc1a6b04553fb81b73c4664a9a309210f8ea138c78f01'
     driver-class-name: org.postgresql.Driver
