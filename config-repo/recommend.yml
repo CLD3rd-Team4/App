@@ -79,10 +79,10 @@ external:
   api:
     kakao:
       url: https://dapi.kakao.com
-      key: '{cipher}e5f73fd4b6cd1e282bd91603b19d011c442d19738ed6c5c100cbc4fb7ab1155850c682aff9f016afb2329dc079c47fdbc9aec095cd232aeb23895147207e4d0a'   
+      key: '{cipher}5e6799bfe52a76fc8362127264c67899155e5aa6c2294b727ed94aca80e20cec6903d90dd40647a792c4bea4ff29f82fd757a8c5f29e35cda3728c6cc1a38283'   
     tmap:
       url: https://apis.openapi.sk.com
-      key: '{cipher}55383efce5fcfdaa80d7dc994be4a2ad55bd53efdbda26656eb3e3e42f646c328f267271a9062bed9aaba790a6ed668133da6d2d5a33d2ee0bc4839d160fc25b'
+      key: '{cipher}93a42bb0a5f441413c827ee80d726b09915682372d7dde466a57567901c02d52e495c5897b35fdcd98c3a2b272188990c539491a7d085b1722e6fef577426914'
       
 # AWS/Bedrock 
 aws:
