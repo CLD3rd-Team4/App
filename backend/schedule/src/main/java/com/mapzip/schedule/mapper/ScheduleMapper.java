@@ -137,6 +137,8 @@ public class ScheduleMapper {
             builder.addAllCompanions(companions);
         }
 
+        builder.setScheduleId(schedule.getId()); // scheduleId 설정 추가
+
         return builder.build();
     }
 

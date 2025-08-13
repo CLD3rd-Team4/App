@@ -38,9 +38,6 @@ export const generateTimelineItems = (schedule: Schedule): TimelineItem[] => {
   if (schedule.waypoints) {
     intermediatePoints.push(...schedule.waypoints.map(w => ({...w, sortTime: w.arrivalTime || '00:00', itemType: 'waypoint'})));
   }
-  if (schedule.mealSlots) {
-    intermediatePoints.push(...schedule.mealSlots.map(m => ({...m, sortTime: m.scheduledTime, itemType: 'meal_slot'})));
-  }
 
   // TODO: 더 정확한 시간 포맷 파싱 및 정렬 로직 필요
   intermediatePoints.sort((a, b) => a.sortTime.localeCompare(b.sortTime));

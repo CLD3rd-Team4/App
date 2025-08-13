@@ -56,10 +56,33 @@ export default function ScheduleSummaryScreen() {
   }, [isLoading, selectedSchedule, deselectSchedule, router]);
 
   const handleUpdate = () => {
-    if (!selectedSchedule || !selectedSchedule.id) return
-    // 수정 페이지로 이동시키기 위해 localStorage에 데이터 저장
-    localStorage.setItem("editingSchedule", JSON.stringify(selectedSchedule));
-    router.push(`/schedule/edit?id=${selectedSchedule.id}`);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          alert(`현재 위치: 위도 ${latitude}, 경도 ${longitude}`);
+          
+          // TODO: 추천 서버가 준비되면, 이 위치 정보를 사용하여 추천을 업데이트합니다.
+        },
+        (error) => {
+          let errorMessage = "위치 정보를 가져오는 데 실패했습니다.";
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              errorMessage = "위치 정보 접근 권한이 거부되었습니다. 설정에서 권한을 허용해주세요.";
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMessage = "현재 위치를 파악할 수 없습니다.";
+              break;
+            case error.TIMEOUT:
+              errorMessage = "위치 정보를 가져오는 데 시간이 초과되었습니다.";
+              break;
+          }
+          alert(errorMessage);
+        }
+      );
+    } else {
+      alert("이 브라우저에서는 위치 정보 기능을 사용할 수 없습니다.");
+    }
   }
 
   const handleRecommendationConfirm = () => {
