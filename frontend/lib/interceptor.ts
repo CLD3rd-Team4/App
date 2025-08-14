@@ -94,6 +94,7 @@ api.interceptors.response.use(
         }
 
         if (status === 401 && data?.error === "TOKEN_INVALID") {
+            sessionStorage.removeItem("kakaoLoginDone")
             alert("인증되지 않은 사용자입니다. 로그인해주세요.")
             window.location.href = "/login.html"
             return Promise.reject(error)
