@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import { scheduleApi, recommendApi } from "@/services/api"
 import type { Schedule, SchedulePayload } from "@/types"
 
-// 훅 외부에서 실행되는 순수 함수: 초기 선택 상태를 동기적으로 결정합니다.
 const getInitialSelectionStatus = (): boolean => {
   if (typeof window === "undefined") {
     return false;
@@ -13,10 +12,8 @@ const getInitialSelectionStatus = (): boolean => {
   try {
     const item = localStorage.getItem("scheduleSelected");
     if (!item) return false;
-
     const parsed = JSON.parse(item);
-    const isExpired = Date.now() - parsed.timestamp > 24 * 60 * 60 * 1000; // 24시간
-    
+    const isExpired = Date.now() - parsed.timestamp > 24 * 60 * 60 * 1000;
     return parsed.value === true && !isExpired;
   } catch (e) {
     return false;
@@ -29,7 +26,7 @@ export default function useSchedule() {
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [isSelected, setIsSelected] = useState<boolean>(getInitialSelectionStatus);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false); // 초기 로딩은 HomePage에서 제어
 
   const deselectAndClear = useCallback(() => {
     console.log("--- 디버그: 스케줄 상태와 localStorage를 초기화합니다. ---");
@@ -38,58 +35,38 @@ export default function useSchedule() {
     setIsSelected(false);
   }, []);
 
-  // 컴포넌트 마운트 시 단 한 번만 실행되는 최종 초기화 로직
-  useEffect(() => {
-    const initialize = async () => {
-      console.log("--- 디버그: 마운트 이펙트 시작 (단 한번 실행) ---");
-      setIsLoading(true);
+  const checkInitialSelection = useCallback(async () => {
+    console.log("--- 디버그: HomePage에서 초기화 함수 실행. ---");
+    setIsLoading(true);
+    let finalIsSelected = getInitialSelectionStatus();
 
-      let finalIsSelected = getInitialSelectionStatus();
-      console.log(`--- 디버그: localStorage 초기 상태: ${finalIsSelected} ---`);
-
-      // 로컬 상태가 유효하지 않으면 (없거나, 만료되었으면) 서버(Valkey)와 동기화
-      if (!finalIsSelected) {
-        try {
-          console.log("--- 디버그: 로컬 상태 무효. Valkey와 동기화 시도... ---");
-          const statusResponse = await scheduleApi.getSelectionStatus();
-          finalIsSelected = statusResponse.isSelected;
-          console.log(`--- 디버그: Valkey 조회 결과: ${finalIsSelected} ---`);
-          localStorage.setItem('scheduleSelected', JSON.stringify({ value: finalIsSelected, timestamp: Date.now() }));
-        } catch (e) {
-          console.error("--- 디버그: Valkey 상태 조회 실패. ---", e);
-          finalIsSelected = false; // 에러 시 false로 간주
-        }
+    if (!finalIsSelected) {
+      try {
+        const statusResponse = await scheduleApi.getSelectionStatus();
+        finalIsSelected = statusResponse.isSelected;
+        localStorage.setItem('scheduleSelected', JSON.stringify({ value: finalIsSelected, timestamp: Date.now() }));
+      } catch (e) {
+        finalIsSelected = false;
       }
+    }
 
-      // 모든 확인 절차 후, 최종적으로 선택된 상태라면 실제 데이터 로드
-      if (finalIsSelected) {
-        try {
-          console.log("--- 디버그: 최종 상태 '선택됨'. 추천 서버에서 데이터 로딩... ---");
-          const summaryResponse = await recommendApi.getActiveScheduleSummary();
-          if (summaryResponse && summaryResponse.schedule) {
-            console.log("--- 디버그: 데이터 로딩 성공. ---");
-            setSelectedSchedule(summaryResponse.schedule);
-            setIsSelected(true); // 상태 확정
-          } else {
-            console.log("--- 디버그: 추천 서버에 데이터 없음. 최종 초기화. ---");
-            deselectAndClear();
-          }
-        } catch (e) {
-          console.error("--- 디버그: 추천 서버 데이터 요청 실패. 최종 초기화. ---", e);
+    if (finalIsSelected) {
+      try {
+        const summaryResponse = await recommendApi.getActiveScheduleSummary();
+        if (summaryResponse && summaryResponse.schedule) {
+          setSelectedSchedule(summaryResponse.schedule);
+          setIsSelected(true);
+        } else {
           deselectAndClear();
         }
-      } else {
-        // 최종적으로 선택되지 않은 상태라면 모든 것을 초기화
+      } catch (e) {
         deselectAndClear();
       }
-      
-      console.log("--- 디버그: 초기화 로직 종료. ---");
-      setIsLoading(false);
-    };
-
-    initialize();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // 의존성 배열을 비워 무한 루프를 방지합니다.
+    } else {
+      deselectAndClear();
+    }
+    setIsLoading(false);
+  }, [deselectAndClear]);
 
   const loadSchedules = useCallback(async () => {
     setIsLoading(true);
@@ -180,5 +157,6 @@ export default function useSchedule() {
     createSchedule,
     updateSchedule,
     deleteSchedule,
+    checkInitialSelection, // 초기화 함수 내보내기
   }
 }

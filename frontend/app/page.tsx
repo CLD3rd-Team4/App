@@ -13,10 +13,13 @@ export default function HomePage() {
 
   // isSelected: 동기적으로 localStorage를 확인한 현재 선택 "상태"
   // isLoading: 비동기 데이터(스케줄 객체) 로딩 "과정"
-  const { isSelected, isLoading } = useSchedule();
+  const { isSelected, isLoading, checkInitialSelection } = useSchedule();
 
   useEffect(() => {
     setIsClient(true)
+    // HomePage가 마운트될 때만 초기 선택 상태를 확인하고 동기화합니다.
+    checkInitialSelection();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
