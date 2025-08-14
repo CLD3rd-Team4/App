@@ -64,9 +64,7 @@ export default function ScheduleListScreen() {
   // ===== 추천 트리거 =====
   const triggerRecommendRequest = async (scheduleId: string) => {
     try {
-      await api.post("/recommend/request", null, {
-        params: { scheduleId }
-      })
+      await api.post("/recommend/request", { scheduleId })
     } catch (e) {
       console.error("POST /recommend/request failed:", e)
       // 실패여도 폴링으로 대기 UX 유지
@@ -82,8 +80,7 @@ export default function ScheduleListScreen() {
       if (!active) return
       try {
         const res = await api.get<GetResultsResponse>("/recommend/result", {
-          params: { userId, scheduleId },
-          headers: { "Cache-Control": "no-cache" },
+          params: { userId, scheduleId }
         })
 
         if (res.data.status === "OK") {
