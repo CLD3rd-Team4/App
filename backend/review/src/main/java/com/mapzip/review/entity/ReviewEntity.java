@@ -136,7 +136,7 @@ public class ReviewEntity {
     }
 
     @DynamoDbAttribute("created_at")
-    @DynamoDbSecondarySortKey(indexNames = {"UserIdIndex", "RatingIndex"})
+    @DynamoDbSecondarySortKey(indexNames = {"UserIdIndex"})
     public Instant getCreatedAt() {
         return createdAt;
     }
