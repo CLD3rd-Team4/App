@@ -10,11 +10,12 @@ import useSchedule from "@/hooks/useSchedule"
 export default function HomePage() {
   const router = useRouter()
   const [isClient, setIsClient] = useState(false)
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
   
-  const { selectedSchedule, isLoading: isScheduleLoading, loadSelectedSchedule } = useSchedule();
+  // useSchedule provides all necessary state
+  const { selectedSchedule, isLoading, loadSelectedSchedule } = useSchedule();
 
   useEffect(() => {
+    // This effect runs once on mount to confirm we are on the client
     setIsClient(true)
   }, [])
 
@@ -26,15 +27,19 @@ export default function HomePage() {
       router.push('/auth/login')
       return
     }
-    
-    setIsLoggedIn(true)
-    loadSelectedSchedule(); 
 
-  }, [isClient, loadSelectedSchedule, router])
+    // If the hook initializes with a schedule from localStorage,
+    // we must verify its status with the server.
+    if (selectedSchedule) {
+      loadSelectedSchedule();
+    }
+    // No need for an else, as the initial state of the hook handles the no-selection case.
 
-  const isLoading = !isClient || isScheduleLoading;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isClient, router]) // We only want this to run once when the client is ready
 
-  if (isLoading) {
+  // The initial render on the server or before the client is ready can be a loader
+  if (!isClient) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
@@ -45,15 +50,16 @@ export default function HomePage() {
     )
   }
 
+  // After the client is ready, we can check for login status
+  const loginDone = sessionStorage.getItem("kakaoLoginDone")
+  if (!loginDone) {
+    return <LoginScreen />;
+  }
+
+  // Now, the main logic based on the hook's state
   return (
     <>
-      {!isLoggedIn ? (
-        <LoginScreen />
-      ) : selectedSchedule ? (
-        <ScheduleSummaryScreen />
-      ) : (
-        <HomeScreen />
-      )}
+      {selectedSchedule ? <ScheduleSummaryScreen /> : <HomeScreen />}
       <PWAInstaller />
     </>
   )
