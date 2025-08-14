@@ -1,6 +1,5 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import useSchedule from "@/hooks/useSchedule"
@@ -21,49 +20,9 @@ type TimelineItem = {
   restaurant?: Restaurant
 }
 
-function RecommendationReadyPopup({ onConfirm }: { onConfirm: () => void }) {
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-sm mx-4">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-2xl">🍽️</span>
-          </div>
-          <h3 className="text-lg font-medium mb-2">추천 결과 준비 완료!</h3>
-          <p className="text-gray-600 mb-4">맞춤형 식당 추천이 준비되었습니다.</p>
-          <Button
-            onClick={onConfirm}
-            className="w-full bg-blue-500 hover:bg-blue-600 text-white"
-          >
-            추천 결과 보기
-          </Button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export default function ScheduleSummaryScreen() {
   const router = useRouter()
-  const { selectedSchedule, isLoading, isProcessing, updateSchedule /*, deselectSchedule */ } = useSchedule()
-
-  // ⭐ localStorage → 훅 상태로 즉시 하이드레이트
-  const [hydrated, setHydrated] = useState(false)
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("selectedSchedule")
-      if (raw) {
-        const parsed = JSON.parse(raw) as Schedule
-        const id = parsed.id || "local-summary"
-        updateSchedule(id, parsed)
-      }
-    } catch (e) {
-      console.error("Failed to hydrate selectedSchedule from localStorage:", e)
-    } finally {
-      setHydrated(true)
-    }
-  }, [updateSchedule])
+  const { selectedSchedule, isLoading, isProcessing } = useSchedule()
 
   const handleUpdate = () => {
     if (navigator.geolocation) {
@@ -71,7 +30,6 @@ export default function ScheduleSummaryScreen() {
         (position) => {
           const { latitude, longitude } = position.coords
           alert(`현재 위치: 위도 ${latitude}, 경도 ${longitude}`)
-          // TODO: 추천 서버가 준비되면, 이 위치 정보를 사용하여 추천을 업데이트합니다.
         },
         (error) => {
           let errorMessage = "위치 정보를 가져오는 데 실패했습니다."
@@ -92,10 +50,6 @@ export default function ScheduleSummaryScreen() {
     } else {
       alert("이 브라우저에서는 위치 정보 기능을 사용할 수 없습니다.")
     }
-  }
-
-  const handleRecommendationConfirm = () => {
-    router.push("/recommendations/")
   }
 
   const formatTime = (time: string) => {
@@ -182,8 +136,7 @@ export default function ScheduleSummaryScreen() {
 
   const timelineItems = createTimelineItems()
 
-  // ✅ 하이드레이션 또는 훅 로딩 중에는 로딩 스피너
-  if (!hydrated || isLoading) {
+  if (isLoading || !selectedSchedule) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
