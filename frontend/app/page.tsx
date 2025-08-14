@@ -1,11 +1,12 @@
 "use client"
 import { useEffect, useState } from "react"
-import LoginScreen from "@/components/screens/LoginScreen"
+import { useRouter } from "next/navigation"
 import HomeScreen from "@/components/screens/HomeScreen"
 import ScheduleSummaryScreen from "@/components/screens/ScheduleSummaryScreen"
 import PWAInstaller from "@/components/PWAInstaller"
 
 export default function HomePage() {
+  const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
   const [isClient, setIsClient] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -19,13 +20,17 @@ export default function HomePage() {
     if (!isClient) return
 
     const loginDone = sessionStorage.getItem("kakaoLoginDone")
-    setIsLoggedIn(!!loginDone)
-
+    if (!loginDone) {
+      router.push('/auth/login')
+      return
+    }
+    
+    setIsLoggedIn(true)
     const isSelected = localStorage.getItem('scheduleSelected') === 'true'
     setScheduleSelected(isSelected)
 
     setIsLoading(false)
-  }, [isClient])
+  }, [isClient, router])
 
   if (!isClient || isLoading) {
     return (
@@ -40,9 +45,7 @@ export default function HomePage() {
 
   return (
     <>
-      {!isLoggedIn ? (
-        <LoginScreen />
-      ) : scheduleSelected ? (
+      {scheduleSelected ? (
         <ScheduleSummaryScreen />
       ) : (
         <HomeScreen />
