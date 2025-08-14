@@ -65,8 +65,7 @@ export default function ScheduleListScreen() {
   const triggerRecommendRequest = async (scheduleId: string) => {
     try {
       await api.post("/recommend/request", null, {
-        params: { scheduleId },
-        headers: { "Cache-Control": "no-cache" },
+        params: { scheduleId }
       })
     } catch (e) {
       console.error("POST /recommend/request failed:", e)
