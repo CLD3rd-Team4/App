@@ -148,12 +148,9 @@ public class CacheConfig {
         cacheConfigurations.put("recommendationReviews", defaultConfig
                 .entryTtl(Duration.ofSeconds(getRecommendationTtl())));
         
-        // 단일 리뷰 캐시 (null 값 허용)
-        cacheConfigurations.put("singleReview", RedisCacheConfiguration.defaultCacheConfig()
-                .entryTtl(Duration.ofMinutes(15)) // 15분 TTL
-                .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
-                .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(new GenericJackson2JsonRedisSerializer()))
-                .disableCachingNullValues(false)); // null 값 허용
+        // 단일 리뷰 캐시 (null 값 허용하지 않음 - @Cacheable의 unless 조건으로 처리)
+        cacheConfigurations.put("singleReview", defaultConfig
+                .entryTtl(Duration.ofMinutes(15))); // 15분 TTL
 
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig)
