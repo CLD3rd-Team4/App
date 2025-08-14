@@ -141,4 +141,5 @@ review:
     restaurant-reviews-ttl: ${CACHE_RESTAURANT_REVIEWS_TTL:14400}  # 4시간
     review-stats-ttl: ${CACHE_REVIEW_STATS_TTL:43200}      # 12시간
     ocr-results-ttl: ${CACHE_OCR_RESULTS_TTL:172800}       # 48시간 (운영환경 증가)
-    recommendation-ttl: ${CACHE_RECOMMENDATION_TTL:21600}   # 6시간 #ttl
+    recommendation-ttl: ${CACHE_RECOMMENDATION_TTL:21600}   # 6시간 #ttl #재배포
+    
