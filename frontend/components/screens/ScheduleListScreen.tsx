@@ -128,7 +128,12 @@ export default function ScheduleListScreen() {
       const selectedScheduleData = await selectSchedule(schedule.id) 
 
       // 타임라인 생성을 위해 선택된 스케줄 데이터 사용
-      setTimelineItems(generateTimelineItems(selectedScheduleData || schedule))
+      if (selectedScheduleData) { // 반환된 스케줄 데이터가 있을 경우에만 타임라인 생성
+        setTimelineItems(generateTimelineItems(selectedScheduleData))
+      } else {
+        // 반환값이 null이면, 선택 실패로 간주하고 타임라인을 비웁니다.
+        setTimelineItems(generateTimelineItems(schedule)) // 또는 기본 스케줄 정보로 표시
+      }
 
       // 추천 트리거
       triggerRecommendRequest(schedule.id)
