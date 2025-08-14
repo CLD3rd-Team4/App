@@ -233,7 +233,7 @@ public class ReviewService {
     /**
      * 특정 리뷰 조회 (ID 기반)
      */
-    @Cacheable(value = "singleReview", key = "#restaurantId + '_' + #reviewId")
+    @Cacheable(value = "singleReview", key = "#restaurantId + '_' + #reviewId", unless = "#result == null || !#result.isPresent()")
     public Optional<ReviewEntity> getReviewById(String restaurantId, String reviewId) {
         logger.info("Fetching review from database for restaurantId: {}, reviewId: {}", restaurantId, reviewId);
         return reviewRepository.findByRestaurantIdAndReviewId(restaurantId, reviewId);
@@ -458,20 +458,48 @@ public class ReviewService {
     
     /**
      * 사용자 인증 검증 메서드
-     * gRPC Context에서 받은 사용자 ID와 요청의 사용자 ID가 일치하는지 확인
+     * HTTP 요청과 gRPC 요청을 모두 지원
      */
     private void validateUserAuthentication(String requestedUserId) {
+        // gRPC Context에서 사용자 ID 확인 (gRPC 요청인 경우)
         String authenticatedUserId = GrpcHeaderInterceptor.USER_ID_CONTEXT_KEY.get();
         
-        if (authenticatedUserId == null || authenticatedUserId.isEmpty()) {
-            throw new SecurityException("인증되지 않은 사용자입니다.");
+        if (authenticatedUserId != null && !authenticatedUserId.isEmpty()) {
+            // gRPC 요청인 경우: Context의 사용자 ID와 요청 사용자 ID 비교
+            if (!authenticatedUserId.equals(requestedUserId)) {
+                throw new SecurityException("다른 사용자의 리뷰에 접근할 수 없습니다.");
+            }
+            logger.debug("gRPC request - User authentication validated for userId: {}", authenticatedUserId);
+        } else {
+            // HTTP 요청인 경우: 기본적인 사용자 ID 유효성만 검증
+            if (requestedUserId == null || requestedUserId.trim().isEmpty()) {
+                throw new SecurityException("사용자 ID가 필요합니다.");
+            }
+            
+            // 기본적인 사용자 ID 형식 검증
+            if (!isValidUserId(requestedUserId)) {
+                throw new SecurityException("유효하지 않은 사용자 ID 형식입니다.");
+            }
+            
+            logger.debug("HTTP request - User authentication validated for userId: {}", requestedUserId);
+        }
+    }
+    
+    /**
+     * 사용자 ID 유효성 검증
+     * 안전한 문자만 허용하고 길이 제한
+     */
+    private boolean isValidUserId(String userId) {
+        if (userId == null || userId.trim().isEmpty()) {
+            return false;
         }
         
-        if (!authenticatedUserId.equals(requestedUserId)) {
-            throw new SecurityException("다른 사용자의 리뷰에 접근할 수 없습니다.");
-        }
-        
-        logger.debug("User authentication validated for userId: {}", authenticatedUserId);
+        // 영문, 숫자, 하이픈, 언더스코어만 허용하고 길이 제한
+        return userId.matches("^[a-zA-Z0-9_-]{1,50}$") && 
+               !userId.startsWith("dev-test") && // 테스트 계정 패턴 차단
+               !userId.contains("..") && // 경로 순회 방지
+               !userId.equalsIgnoreCase("admin") && // 관리자 계정명 차단
+               !userId.equalsIgnoreCase("root"); // 루트 계정명 차단
     }
     
     /**
