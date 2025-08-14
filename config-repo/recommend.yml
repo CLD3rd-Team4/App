@@ -36,9 +36,14 @@ spring:
 
   kafka:
     bootstrap-servers: >
-      b-1.mapzipdevmain.0u4z0i.c4.kafka.ap-northeast-2.amazonaws.com:9092,
-      b-2.mapzipdevmain.0u4z0i.c4.kafka.ap-northeast-2.amazonaws.com:9092,
-      b-3.mapzipdevmain.0u4z0i.c4.kafka.ap-northeast-2.amazonaws.com:9092
+      b-1.mapzipdevmain.0u4z0i.c4.kafka.ap-northeast-2.amazonaws.com:9094,
+      b-2.mapzipdevmain.0u4z0i.c4.kafka.ap-northeast-2.amazonaws.com:9094,
+      b-3.mapzipdevmain.0u4z0i.c4.kafka.ap-northeast-2.amazonaws.com:9094
+    security:
+      protocol: SSL
+    ssl:
+      trust-store-type: JKS
+      endpoint-identification-algorithm: ""
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -49,6 +54,10 @@ spring:
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       group-id: recommend-service
       auto-offset-reset: earliest
+      session-timeout-ms: 30000
+      heartbeat-interval-ms: 10000
+      request-timeout-ms: 60000
+      retry-backoff-ms: 1000
 
   cloud:
     kubernetes:
