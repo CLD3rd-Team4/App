@@ -26,14 +26,14 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}  # AUTH 비활성화됨
       database: ${REDIS_DATABASE:0}
-      timeout: ${REDIS_TIMEOUT:3000ms}
+      timeout: ${REDIS_TIMEOUT:1000ms}
       ssl: false
       lettuce:
         pool:
-          max-active: ${REDIS_POOL_MAX_ACTIVE:16}
-          max-idle: ${REDIS_POOL_MAX_IDLE:16}
-          min-idle: ${REDIS_POOL_MIN_IDLE:4}
-          max-wait: ${REDIS_POOL_MAX_WAIT:3000ms}
+          max-active: ${REDIS_POOL_MAX_ACTIVE:8}
+          max-idle: ${REDIS_POOL_MAX_IDLE:8}
+          min-idle: ${REDIS_POOL_MIN_IDLE:2}
+          max-wait: ${REDIS_POOL_MAX_WAIT:1000ms}
           
   # 캐시 설정
   cache:
@@ -141,4 +141,5 @@ review:
     restaurant-reviews-ttl: ${CACHE_RESTAURANT_REVIEWS_TTL:14400}  # 4시간
     review-stats-ttl: ${CACHE_REVIEW_STATS_TTL:43200}      # 12시간
     ocr-results-ttl: ${CACHE_OCR_RESULTS_TTL:172800}       # 48시간 (운영환경 증가)
-    recommendation-ttl: ${CACHE_RECOMMENDATION_TTL:21600}   # 6시간 #ttl
+    recommendation-ttl: ${CACHE_RECOMMENDATION_TTL:21600}   # 6시간 #ttl #재배포
+    
