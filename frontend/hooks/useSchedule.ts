@@ -25,7 +25,7 @@ export default function useSchedule() {
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSelected, setIsSelected] = useState<boolean>(getInitialSelectionStatus);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true); // 초기 로딩 상태는 true로 시작
 
   const deselectAndClear = useCallback(() => {
     localStorage.removeItem("scheduleSelected");
@@ -33,42 +33,47 @@ export default function useSchedule() {
     setIsSelected(false);
   }, []);
 
-  const initializeHomepage = useCallback(async () => {
-    setIsLoading(true);
-    let finalIsSelected = getInitialSelectionStatus();
+  // HomePage가 마운트될 때 단 한번만 실행되는 초기화 로직
+  useEffect(() => {
+    const initialize = async () => {
+      setIsLoading(true);
+      let finalIsSelected = getInitialSelectionStatus();
 
-    if (!finalIsSelected) {
-      try {
-        const statusResponse = await scheduleApi.getSelectionStatus();
-        finalIsSelected = statusResponse.isSelected;
-        if(finalIsSelected) localStorage.setItem('scheduleSelected', JSON.stringify({ value: true, timestamp: Date.now() }));
-      } catch (e) { finalIsSelected = false; }
-    }
+      if (!finalIsSelected) {
+        try {
+          const statusResponse = await scheduleApi.getSelectionStatus();
+          finalIsSelected = statusResponse.isSelected;
+          if(finalIsSelected) localStorage.setItem('scheduleSelected', JSON.stringify({ value: true, timestamp: Date.now() }));
+        } catch (e) { finalIsSelected = false; }
+      }
 
-    if (finalIsSelected) {
-      setIsSelected(true);
-      try {
-        const summaryResponse = await recommendApi.getActiveScheduleSummary();
-        if (summaryResponse && summaryResponse.schedule) {
-          setSelectedSchedule(summaryResponse.schedule);
-        } else {
+      if (finalIsSelected) {
+        setIsSelected(true);
+        try {
+          const summaryResponse = await recommendApi.getActiveScheduleSummary();
+          if (summaryResponse && summaryResponse.schedule) {
+            setSelectedSchedule(summaryResponse.schedule);
+          } else {
+            setSelectedSchedule(null);
+          }
+        } catch (e) {
           setSelectedSchedule(null);
         }
-      } catch (e) {
-        setSelectedSchedule(null);
+      } else {
+        deselectAndClear();
       }
-    } else {
-      deselectAndClear();
-    }
-    setIsLoading(false);
-  }, [deselectAndClear]);
+      setIsLoading(false);
+    };
+
+    initialize();
+  }, [deselectAndClear]); // deselectAndClear는 useCallback으로 감싸져 있어 한번만 실행됨을 보장
 
   const selectSchedule = useCallback(async (scheduleId: string): Promise<Schedule | null> => {
     setIsProcessing(true);
     try {
       const response = await recommendApi.selectAndGetSummary(scheduleId);
       if (response && response.schedule) {
-        localStorage.setItem("scheduleSelected", JSON.stringify({ value: true, timestamp: Date.now(), id: scheduleId }));
+        localStorage.setItem("scheduleSelected", JSON.stringify({ value: true, timestamp: Date.now() }));
         setSelectedSchedule(response.schedule);
         setIsSelected(true);
         return response.schedule;
@@ -97,7 +102,6 @@ export default function useSchedule() {
   return {
     schedules, selectedSchedule, isLoading, isProcessing, isSelected,
     loadSchedules, deselectSchedule, createSchedule, updateSchedule, deleteSchedule,
-    initializeHomepage, // HomePage에서만 사용
     selectSchedule,
     triggerRecommendRequest,
   }

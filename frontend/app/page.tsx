@@ -11,12 +11,11 @@ export default function HomePage() {
   const router = useRouter()
   const [isClient, setIsClient] = useState(false)
 
-  const { isSelected, isLoading, initializeHomepage } = useSchedule();
+  // useSchedule 훅이 모든 상태와 로딩 로직을 책임집니다.
+  const { isSelected, isLoading } = useSchedule();
 
   useEffect(() => {
     setIsClient(true);
-    initializeHomepage();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -27,7 +26,7 @@ export default function HomePage() {
     }
   }, [isClient, router]);
 
-  // 초기 동기화 로딩 상태를 표시합니다.
+  // useSchedule의 isLoading 상태를 신뢰하여 로딩 화면을 표시합니다.
   if (!isClient || isLoading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -44,7 +43,7 @@ export default function HomePage() {
     return <LoginScreen />;
   }
 
-  // 동기화가 끝난 후의 isSelected 상태에 따라 최종 화면을 보여줍니다.
+  // useSchedule의 isSelected 상태에 따라 최종 화면을 보여줍니다.
   return (
     <>
       {isSelected ? <ScheduleSummaryScreen /> : <HomeScreen />}
