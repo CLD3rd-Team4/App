@@ -52,8 +52,24 @@ public class XssProtectionFilter extends AbstractGatewayFilterFactory<XssProtect
 
                 if (query != null) {
                     log.info("[XSS Filter] GET Query - Original: {}", query);
-                    String sanitizedQuery = sanitizeXss(query);
+
+                    // 안전하게 각 파라미터별로 sanitize
+                    String sanitizedQuery = Arrays.stream(query.split("&"))
+                            .map(param -> {
+                                String[] kv = param.split("=", 2);
+                                if (kv.length == 2) {
+                                    String key = kv[0];
+                                    String value = URLDecoder.decode(kv[1], StandardCharsets.UTF_8);
+                                    String sanitizedValue = sanitizeXss(value);
+                                    return URLEncoder.encode(key, StandardCharsets.UTF_8) + "=" +
+                                            URLEncoder.encode(sanitizedValue, StandardCharsets.UTF_8);
+                                }
+                                return param;
+                            })
+                            .collect(Collectors.joining("&"));
+
                     log.info("[XSS Filter] GET Query - Sanitized: {}", sanitizedQuery);
+
                     URI newUri = UriComponentsBuilder.fromUri(originalUri)
                             .replaceQuery(sanitizedQuery)
                             .build()
