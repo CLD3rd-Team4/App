@@ -143,7 +143,7 @@ export default function ScheduleSummaryScreen() {
 
   const timelineItems = createTimelineItems()
 
-  if (isLoading || !selectedSchedule) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
