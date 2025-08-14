@@ -210,5 +210,6 @@ export default function useSchedule() {
     createSchedule,
     updateSchedule,
     deleteSchedule,
+    loadSelectedSchedule, // Add loadSelectedSchedule here
   }
 }
