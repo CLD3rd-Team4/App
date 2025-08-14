@@ -280,6 +280,7 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
             }
 
             boolean isSelected = redisTemplate.hasKey("user:" + userId + ":selected");
+            log.info("사용자 '{}'의 스케줄 선택 상태 플래그를 조회했습니다: {}", userId, isSelected); // Added log
             IsScheduleSelectedResponse response = IsScheduleSelectedResponse.newBuilder()
                     .setIsSelected(isSelected)
                     .build();
