@@ -32,15 +32,24 @@ export default function useSchedule() {
   const loadSelectedSchedule = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await recommendApi.getActiveScheduleSummary();
-      if (response && response.schedule) {
-        setSelectedSchedule(response.schedule);
+      // 1. schedule-service에 Valkey 선택 상태 플래그를 먼저 확인합니다.
+      const selectionStatusResponse = await scheduleApi.getSelectionStatus();
+      
+      if (selectionStatusResponse.isSelected) {
+        // 2. schedule-service의 플래그가 true이면, recommend-service에 상세 요약 정보를 요청합니다.
+        const response = await recommendApi.getActiveScheduleSummary();
+        if (response && response.schedule) {
+          setSelectedSchedule(response.schedule);
+        } else {
+          // recommend-service에서 스케줄을 찾지 못하면, 로컬 상태를 초기화합니다.
+          deselectSchedule();
+        }
       } else {
-        // TTL이 만료되었거나 선택된 스케줄이 없는 경우, 로컬 상태를 동기화합니다.
+        // 3. schedule-service의 플래그가 false이면, 로컬 상태를 초기화합니다.
         deselectSchedule();
       }
     } catch (error) {
-      console.error("선택된 스케줄 요약 로드 실패:", error);
+      console.error("선택된 스케줄 로드 및 동기화 실패:", error);
       deselectSchedule(); // 에러 발생 시에도 상태를 초기화합니다.
     } finally {
       setIsLoading(false);
