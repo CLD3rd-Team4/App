@@ -1,8 +1,12 @@
 package com.mapzip.auth.auth_service.config;
 
+import com.nimbusds.jose.jwk.OctetSequenceKey;
+import com.nimbusds.jose.jwk.JWKSet;
+import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -80,6 +84,15 @@ public class SecurityConfig {
         OAuth2RefreshTokenGenerator refreshTokenGenerator = new OAuth2RefreshTokenGenerator();
         JwtGenerator jwtGenerator = new JwtGenerator(jwtEncoder);
         return new DelegatingOAuth2TokenGenerator(jwtGenerator, accessTokenGenerator, refreshTokenGenerator);
+    }
+
+    @Bean
+    public JWKSource<SecurityContext> jwkSource(@Value("${jwt.secret}") String jwtSecret) {
+        OctetSequenceKey hmacKey = new OctetSequenceKey.Builder(jwtSecret.getBytes())
+                .keyID("auth-hmac-key")
+                .build();
+        JWKSet jwkSet = new JWKSet(hmacKey);
+        return new ImmutableJWKSet<>(jwkSet);
     }
 
     @Bean
