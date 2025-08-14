@@ -23,11 +23,11 @@ type TimelineItem = {
 
 export default function ScheduleSummaryScreen() {
   const router = useRouter()
-  const { selectedSchedule, isLoading, isProcessing, loadSelectedScheduleData } = useSchedule()
+  const { selectedSchedule, isLoading, isProcessing, loadActiveSchedule } = useSchedule()
 
   useEffect(() => {
     // 이 컴포넌트가 렌더링되면, 스스로 데이터를 로드합니다.
-    loadSelectedScheduleData();
+    loadActiveSchedule();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

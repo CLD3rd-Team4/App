@@ -123,22 +123,20 @@ export default function ScheduleListScreen() {
     setIsPopupOpen(true)
 
     try {
-      // 실제 스케줄 선택 로직 호출 (Valkey 저장 및 localStorage 업데이트)
-      // 이 호출이 성공하면 useSchedule 훅 내부에서 selectedSchedule 상태가 업데이트됩니다.
+      // 1. 스케줄 선택 및 상태 업데이트
       const selectedScheduleData = await selectSchedule(schedule.id) 
 
-      // 타임라인 생성을 위해 선택된 스케줄 데이터 사용
-      if (selectedScheduleData) { // 반환된 스케줄 데이터가 있을 경우에만 타임라인 생성
+      // 2. 타임라인 생성
+      if (selectedScheduleData) {
         setTimelineItems(generateTimelineItems(selectedScheduleData))
       } else {
-        // 반환값이 null이면, 선택 실패로 간주하고 타임라인을 비웁니다.
-        setTimelineItems(generateTimelineItems(schedule)) // 또는 기본 스케줄 정보로 표시
+        setTimelineItems(generateTimelineItems(schedule))
       }
 
-      // 추천 트리거
+      // 3. 추천 분석 요청
       triggerRecommendRequest(schedule.id)
 
-      // 결과 폴링 시작 (userId는 로컬에서 목/혹은 게이트웨이 주입)
+      // 4. 결과 폴링 시작
       const userId =
         (typeof window !== "undefined" && (localStorage.getItem("userId") || DEV_USER_ID)) ||
         DEV_USER_ID

@@ -334,17 +334,20 @@ export const recommendApi = {
     }
   },
 
-  // 현재 선택된 스케줄의 요약 정보를 가져오는 API (가상)
+  // 현재 선택된 스케줄의 요약 정보를 가져오는 API
   getActiveScheduleSummary: async () => {
-    // 실제 아키텍처:
-    // 1. 프론트엔드는 이 함수를 호출해 API 게이트웨이의 엔드포인트(예: /recommendations/summary/active)를 호출합니다.
-    // 2. 게이트웨이는 요청을 recommend 서비스로 라우팅합니다.
-    // 3. recommend 서비스는 schedule 서비스 DB에서 is_selected가 true인 스케줄을 찾고, 없으면 null을 반환합니다.
-    // 4. 스케줄이 있으면, 해당 스케줄의 최종 "요약 정보"를 찾아 프론트엔드에 반환합니다. (캐시 또는 DB에서 조회)
-    console.log("[가상 API] recommend 서비스에 현재 활성화된 스케줄 요약 요청");
+    console.log("[API] 추천 서버에 최종 요약 결과 요청");
+    // ScheduleListScreen의 폴링 로직과 동일한 엔드포인트를 호출하여 일관성을 맞춥니다.
+    // userId와 scheduleId는 인터셉터 또는 서버 로직에서 처리될 것으로 가정합니다.
+    const response = await api.get("/recommend/result");
+    const data = response.data;
 
-    // 개발 단계에서는 임시로 비어있는 응답을 반환합니다.
-    return Promise.resolve({ schedule: null });
+    // getRecommendResult와 유사하게, 실제 스케줄 객체를 반환하도록 처리합니다.
+    const scheduleData = data.schedule ? data.schedule : data;
+    if (scheduleData && Object.keys(scheduleData).length > 0) {
+      return { schedule: mapScheduleResponse(scheduleData) };
+    }
+    return { schedule: null };
   },
 
   // 특정 스케줄 ID에 대한 요약 정보를 가져오는 API (가상)
