@@ -196,5 +196,5 @@ message IsScheduleSelectedRequest {
 }
 
 message IsScheduleSelectedResponse {
-  bool is_selected = 1;
+  bool isSelected = 1;
 }
