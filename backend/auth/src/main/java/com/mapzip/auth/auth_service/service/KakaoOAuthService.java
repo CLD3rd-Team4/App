@@ -54,6 +54,8 @@ public class KakaoOAuthService {
 
         // JWT access token 생성
         Instant now = Instant.now();
+        log.debug("JWT 토큰 생성 시작 - kakaoId: {}, nickname: {}", kakaoUserInfo.kakaoId(), kakaoUserInfo.nickname());
+        
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .subject(kakaoUserInfo.kakaoId().toString())
                 .issuedAt(now)
@@ -61,9 +63,14 @@ public class KakaoOAuthService {
                 .claim("kakaoId", kakaoUserInfo.kakaoId().toString())
                 .claim("nickname", kakaoUserInfo.nickname())
                 .build();
-
+        
+        log.debug("JWT Claims 생성 완료: {}", claims.getClaims());
+        
         String accessToken = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
+        log.debug("JWT 토큰 생성 완료 - 토큰 길이: {}, 알고리즘: HS256", accessToken.length());
+        
         String refreshToken = UUID.randomUUID().toString();
+        log.debug("Refresh 토큰 생성 완료: {}", refreshToken);
 
         System.out.println("accessToken & refreshToken 생성");
 
@@ -132,6 +139,8 @@ public class KakaoOAuthService {
                 .orElseThrow(() -> new IllegalArgumentException("사용자 정보 없음"));
 
         Instant now = Instant.now();
+        log.debug("JWT 토큰 재발급 시작 - kakaoId: {}, nickname: {}", kakaoId, user.getNickname());
+        
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .subject(kakaoId)
                 .issuedAt(now)
@@ -139,8 +148,11 @@ public class KakaoOAuthService {
                 .claim("kakaoId", kakaoId)
                 .claim("nickname", user.getNickname())
                 .build();
-
+        
+        log.debug("JWT Claims 재생성 완료: {}", claims.getClaims());
+        
         String newAccessToken = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
+        log.debug("JWT 토큰 재발급 완료 - 토큰 길이: {}", newAccessToken.length());
         return new TokenResponseDto(newAccessToken, refreshToken);
     }
 
