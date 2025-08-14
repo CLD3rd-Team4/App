@@ -80,6 +80,7 @@ api.interceptors.response.use(
             isRefreshing = false
             onRefreshFailed(e)
             alert("세션이 만료되었습니다. 다시 로그인해주세요.")
+            sessionStorage.removeItem("kakaoLoginDone")
             window.location.href = "/login.html"
             return Promise.reject(e)
             }
