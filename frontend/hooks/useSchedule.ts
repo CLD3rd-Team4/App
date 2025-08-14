@@ -50,24 +50,34 @@ export default function useSchedule() {
   }, []);
 
   const loadSelectedSchedule = useCallback(async () => {
+    console.log("--- DEBUG: loadSelectedSchedule started ---");
     setIsLoading(true);
     try {
       const selectionStatusResponse = await scheduleApi.getSelectionStatus();
+      console.log("--- DEBUG: Valkey status from server:", selectionStatusResponse.isSelected);
+
       if (selectionStatusResponse.isSelected) {
+        console.log("--- DEBUG: Valkey status is true. Fetching from recommend-server... ---");
         const response = await recommendApi.getActiveScheduleSummary();
+        console.log("--- DEBUG: recommend-server response:", response);
+
         if (response && response.schedule) {
+          console.log("--- DEBUG: Successfully loaded schedule. Updating state. ---");
           setSelectedSchedule(response.schedule);
           localStorage.setItem("scheduleSelected", JSON.stringify({ schedule: response.schedule, timestamp: Date.now() }));
         } else {
-          deselectSchedule();
+          console.log("--- DEBUG: recommend-server has no schedule. Deletion logic is now commented out. ---");
+          // deselectSchedule();
         }
       } else {
+        console.log("--- DEBUG: Valkey status is false. Deletion logic is now commented out. ---");
         deselectSchedule();
       }
     } catch (error) {
-      console.error("선택된 스케줄 로드 및 동기화 실패:", error);
-      deselectSchedule();
+      console.error("--- DEBUG: Error during loadSelectedSchedule. Deletion logic is now commented out. ---", error);
+      // deselectSchedule();
     } finally {
+      console.log("--- DEBUG: loadSelectedSchedule finished ---");
       setIsLoading(false);
     }
   }, [deselectSchedule]);
