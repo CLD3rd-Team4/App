@@ -1,6 +1,5 @@
 server:
   port: 8080
-  forward-headers-strategy: framework
 
 spring:
   application:
@@ -11,17 +10,11 @@ spring:
     username: "{cipher}8fe5ea8cbe4b0df0e727b44fa8c26685ce7f3da4582b182f819d6227b39bcfc3"
     password: "{cipher}0d2c58800d8867c9281668fcd5f0314eda2fbfe5d3a5518273bff4ba163d2054"
     driver-class-name: org.postgresql.Driver
-    hikari:
-      connection-timeout: 10000
 
   jpa:
-    open-in-view: false
     hibernate:
       ddl-auto: update
     show-sql: true
-    properties:
-      hibernate:
-        format_sql: false
 
   cloud:
     kubernetes:
@@ -43,32 +36,17 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,httpexchanges,threaddump,refresh
+        include: health,info
   endpoint:
     health:
       show-details: always
       probes:
         enabled: true
-    httpexchanges:
-      enabled: true
-    threaddump:
-      enabled: true
   health:
     readiness-state:
       enabled: true
     liveness-state:
       enabled: true
-
-logging:
-  level:
-    root: INFO
-    org.springframework.web: DEBUG
-    org.springframework.security: DEBUG
-    org.springframework.web.client: DEBUG
-    org.springframework.web.reactive.function.client.ExchangeFunctions: TRACE
-    reactor.netty: DEBUG
-    org.hibernate.SQL: DEBUG
-    org.springframework.data.redis: DEBUG
 
 jwt:
   secret: "{cipher}e6748d8b7f4ecf1019e4ff7508e1aec7c8086d4b1c63317d844bf6265438abf0619aa20d71617c5be93aae71f0ff4ad67bafcea41389f55c51715ebf6bf4d972"
