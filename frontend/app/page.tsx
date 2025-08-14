@@ -1,15 +1,18 @@
 "use client"
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import LoginScreen from "@/components/screens/LoginScreen"
 import HomeScreen from "@/components/screens/HomeScreen"
 import ScheduleSummaryScreen from "@/components/screens/ScheduleSummaryScreen"
 import PWAInstaller from "@/components/PWAInstaller"
+import useSchedule from "@/hooks/useSchedule"
 
 export default function HomePage() {
-  const [isLoading, setIsLoading] = useState(true)
+  const router = useRouter()
   const [isClient, setIsClient] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [scheduleSelected, setScheduleSelected] = useState(false)
+  
+  const { selectedSchedule, isLoading: isScheduleLoading, loadSelectedSchedule } = useSchedule();
 
   useEffect(() => {
     setIsClient(true)
@@ -19,15 +22,19 @@ export default function HomePage() {
     if (!isClient) return
 
     const loginDone = sessionStorage.getItem("kakaoLoginDone")
-    setIsLoggedIn(!!loginDone)
+    if (!loginDone) {
+      router.push('/auth/login')
+      return
+    }
+    
+    setIsLoggedIn(true)
+    loadSelectedSchedule(); 
 
-    const isSelected = localStorage.getItem('scheduleSelected') === 'true'
-    setScheduleSelected(isSelected)
+  }, [isClient, loadSelectedSchedule, router])
 
-    setIsLoading(false)
-  }, [isClient])
+  const isLoading = !isClient || isScheduleLoading;
 
-  if (!isClient || isLoading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
@@ -42,7 +49,7 @@ export default function HomePage() {
     <>
       {!isLoggedIn ? (
         <LoginScreen />
-      ) : scheduleSelected ? (
+      ) : selectedSchedule ? (
         <ScheduleSummaryScreen />
       ) : (
         <HomeScreen />

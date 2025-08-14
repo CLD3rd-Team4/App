@@ -10,14 +10,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.oauth2.jwt.JwtClaimsSet;
-import org.springframework.security.oauth2.jwt.JwtEncoder;
-import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
 
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
+import java.util.Date;
 import java.util.UUID;
 
 @Service
@@ -28,7 +27,6 @@ public class KakaoOAuthService {
     private final UserRepository userRepository;
     private final RefreshTokenService refreshTokenService;
     private final WebClient webClient;
-    private final JwtEncoder jwtEncoder;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -41,6 +39,9 @@ public class KakaoOAuthService {
     @Value("${kakao.client-secret:}")
     private String clientSecret;
 
+    @Value("${jwt.secret}")
+    private String jwtSecret;
+
     public TokenResponseDto loginWithKakao(String code) {
         System.out.println("loginWithKakao service 진입");
         String kakaoAccessToken = getKakaoAccessToken(code);
@@ -52,18 +53,22 @@ public class KakaoOAuthService {
                         .nickname(kakaoUserInfo.nickname())
                         .build()));
 
-        // JWT access token 생성
-        Instant now = Instant.now();
-        JwtClaimsSet claims = JwtClaimsSet.builder()
-                .subject(kakaoUserInfo.kakaoId().toString())
-                .issuedAt(now)
-                .expiresAt(now.plus(1, ChronoUnit.HOURS))
+        // JJWT로 JWT 토큰 생성
+        log.debug("JWT 토큰 생성 시작 - kakaoId: {}, nickname: {}", kakaoUserInfo.kakaoId(), kakaoUserInfo.nickname());
+        
+        String accessToken = Jwts.builder()
+                .setSubject(kakaoUserInfo.kakaoId().toString())
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + 3600000)) // 1시간
                 .claim("kakaoId", kakaoUserInfo.kakaoId().toString())
                 .claim("nickname", kakaoUserInfo.nickname())
-                .build();
-
-        String accessToken = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
+                .signWith(Keys.hmacShaKeyFor(jwtSecret.getBytes()), SignatureAlgorithm.HS256)
+                .compact();
+        
+        log.debug("JWT 토큰 생성 완료 - 토큰 길이: {}, 알고리즘: HS256", accessToken.length());
+        
         String refreshToken = UUID.randomUUID().toString();
+        log.debug("Refresh 토큰 생성 완료: {}", refreshToken);
 
         System.out.println("accessToken & refreshToken 생성");
 
@@ -131,16 +136,18 @@ public class KakaoOAuthService {
         AppUser user = userRepository.findByKakaoId(Long.valueOf(kakaoId))
                 .orElseThrow(() -> new IllegalArgumentException("사용자 정보 없음"));
 
-        Instant now = Instant.now();
-        JwtClaimsSet claims = JwtClaimsSet.builder()
-                .subject(kakaoId)
-                .issuedAt(now)
-                .expiresAt(now.plus(1, ChronoUnit.HOURS))
+        log.debug("JWT 토큰 재발급 시작 - kakaoId: {}, nickname: {}", kakaoId, user.getNickname());
+        
+        String newAccessToken = Jwts.builder()
+                .setSubject(kakaoId)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + 3600000))
                 .claim("kakaoId", kakaoId)
                 .claim("nickname", user.getNickname())
-                .build();
-
-        String newAccessToken = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
+                .signWith(Keys.hmacShaKeyFor(jwtSecret.getBytes()), SignatureAlgorithm.HS256)
+                .compact();
+        
+        log.debug("JWT 토큰 재발급 완료 - 토큰 길이: {}", newAccessToken.length());
         return new TokenResponseDto(newAccessToken, refreshToken);
     }
 
