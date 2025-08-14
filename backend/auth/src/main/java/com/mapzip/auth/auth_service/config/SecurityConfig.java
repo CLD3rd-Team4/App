@@ -19,6 +19,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.boot.actuate.web.exchanges.InMemoryHttpExchangeRepository;
+import org.springframework.boot.actuate.web.exchanges.HttpExchangeRepository;
 
 import java.util.List;
 
@@ -83,5 +85,12 @@ public class SecurityConfig {
     @Bean
     public JwtEncoder jwtEncoder(JWKSource<SecurityContext> jwkSource) {
         return new NimbusJwtEncoder(jwkSource);
+    }
+
+    @Bean
+    public HttpExchangeRepository httpExchangeRepository() {
+        InMemoryHttpExchangeRepository repo = new InMemoryHttpExchangeRepository();
+        repo.setCapacity(1000); // 보관 개수
+        return repo;
     }
 }
