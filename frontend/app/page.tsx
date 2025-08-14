@@ -1,16 +1,18 @@
 "use client"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import LoginScreen from "@/components/screens/LoginScreen"
 import HomeScreen from "@/components/screens/HomeScreen"
 import ScheduleSummaryScreen from "@/components/screens/ScheduleSummaryScreen"
 import PWAInstaller from "@/components/PWAInstaller"
+import useSchedule from "@/hooks/useSchedule"
 
 export default function HomePage() {
   const router = useRouter()
-  const [isLoading, setIsLoading] = useState(true)
   const [isClient, setIsClient] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [scheduleSelected, setScheduleSelected] = useState(false)
+  
+  const { selectedSchedule, isLoading: isScheduleLoading, loadSelectedSchedule } = useSchedule();
 
   useEffect(() => {
     setIsClient(true)
@@ -26,13 +28,13 @@ export default function HomePage() {
     }
     
     setIsLoggedIn(true)
-    const isSelected = localStorage.getItem('scheduleSelected') === 'true'
-    setScheduleSelected(isSelected)
+    loadSelectedSchedule(); 
 
-    setIsLoading(false)
-  }, [isClient, router])
+  }, [isClient, loadSelectedSchedule, router])
 
-  if (!isClient || isLoading) {
+  const isLoading = !isClient || isScheduleLoading;
+
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
@@ -45,7 +47,9 @@ export default function HomePage() {
 
   return (
     <>
-      {scheduleSelected ? (
+      {!isLoggedIn ? (
+        <LoginScreen />
+      ) : selectedSchedule ? (
         <ScheduleSummaryScreen />
       ) : (
         <HomeScreen />
