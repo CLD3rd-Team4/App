@@ -26,14 +26,14 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}  # AUTH 비활성화됨
       database: ${REDIS_DATABASE:0}
-      timeout: ${REDIS_TIMEOUT:3000ms}
+      timeout: ${REDIS_TIMEOUT:1000ms}
       ssl: false
       lettuce:
         pool:
-          max-active: ${REDIS_POOL_MAX_ACTIVE:16}
-          max-idle: ${REDIS_POOL_MAX_IDLE:16}
-          min-idle: ${REDIS_POOL_MIN_IDLE:4}
-          max-wait: ${REDIS_POOL_MAX_WAIT:3000ms}
+          max-active: ${REDIS_POOL_MAX_ACTIVE:8}
+          max-idle: ${REDIS_POOL_MAX_IDLE:8}
+          min-idle: ${REDIS_POOL_MIN_IDLE:2}
+          max-wait: ${REDIS_POOL_MAX_WAIT:1000ms}
           
   # 캐시 설정
   cache:
