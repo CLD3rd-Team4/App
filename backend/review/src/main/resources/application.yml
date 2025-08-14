@@ -53,5 +53,5 @@ logging:
     com.mapzip.review: ${LOG_LEVEL:INFO}
     org.springframework.cache: ${LOG_LEVEL:INFO}
     org.springframework.data.redis: ${LOG_LEVEL:INFO}
-    org.springframework.boot.actuate: DEBUG
+    org.springframework.boot.actuate: INFO
     root: INFO
