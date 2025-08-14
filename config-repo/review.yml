@@ -131,7 +131,7 @@ review:
     confidence-threshold: ${OCR_CONFIDENCE_THRESHOLD:0.6}
     max-retry-attempts: ${OCR_MAX_RETRY:3}
   image:
-    max-file-size: ${IMAGE_MAX_SIZE:10MB}
+    max-file-size: ${IMAGE_MAX_SIZE:10485760}  # 10MB in bytes
     allowed-formats: ${IMAGE_ALLOWED_FORMATS:jpg,jpeg,png,webp}
   pagination:
     default-size: ${PAGINATION_DEFAULT_SIZE:20}
