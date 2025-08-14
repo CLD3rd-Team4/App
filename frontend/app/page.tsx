@@ -1,16 +1,17 @@
 "use client"
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import LoginScreen from "@/components/screens/LoginScreen"
 import HomeScreen from "@/components/screens/HomeScreen"
 import ScheduleSummaryScreen from "@/components/screens/ScheduleSummaryScreen"
 import PWAInstaller from "@/components/PWAInstaller"
-import useSchedule from "@/hooks/useSchedule" // useSchedule 훅 임포트
+import useSchedule from "@/hooks/useSchedule"
 
 export default function HomePage() {
+  const router = useRouter()
   const [isClient, setIsClient] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   
-  // useSchedule 훅을 사용하여 selectedSchedule 상태와 로딩 상태를 관리
   const { selectedSchedule, isLoading: isScheduleLoading, loadSelectedSchedule } = useSchedule();
 
   useEffect(() => {
@@ -21,17 +22,19 @@ export default function HomePage() {
     if (!isClient) return
 
     const loginDone = sessionStorage.getItem("kakaoLoginDone")
-    setIsLoggedIn(!!loginDone)
-
-    // loadSelectedSchedule()를 호출하여 선택된 스케줄 로딩을 트리거
+    if (!loginDone) {
+      router.push('/auth/login')
+      return
+    }
+    
+    setIsLoggedIn(true)
     loadSelectedSchedule(); 
 
-  }, [isClient, loadSelectedSchedule]) // loadSelectedSchedule를 의존성 배열에 추가
+  }, [isClient, loadSelectedSchedule, router])
 
-  // 로컬 로딩 상태와 훅의 로딩 상태를 결합
   const isLoading = !isClient || isScheduleLoading;
 
-  if (isLoading) { // 결합된 로딩 상태 사용
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
@@ -46,7 +49,7 @@ export default function HomePage() {
     <>
       {!isLoggedIn ? (
         <LoginScreen />
-      ) : selectedSchedule ? ( // 훅에서 가져온 selectedSchedule 사용
+      ) : selectedSchedule ? (
         <ScheduleSummaryScreen />
       ) : (
         <HomeScreen />

@@ -1,8 +1,13 @@
 package com.mapzip.auth.auth_service.config;
 
+import com.nimbusds.jose.jwk.OctetSequenceKey;
+import com.nimbusds.jose.jwk.JWKSet;
+import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -19,11 +24,14 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.boot.actuate.web.exchanges.InMemoryHttpExchangeRepository;
+import org.springframework.boot.actuate.web.exchanges.HttpExchangeRepository;
 
 import java.util.List;
 
 @Configuration
 @RequiredArgsConstructor
+@Slf4j
 public class SecurityConfig {
 
     @Bean
@@ -81,7 +89,28 @@ public class SecurityConfig {
     }
 
     @Bean
+    public JWKSource<SecurityContext> jwkSource(@Value("${jwt.secret}") String jwtSecret) {
+        log.info("JWT HMAC 키 생성 시작 - 알고리즘: HS256, 키 길이: {} bytes", jwtSecret.getBytes().length);
+        
+        OctetSequenceKey hmacKey = new OctetSequenceKey.Builder(jwtSecret.getBytes())
+                .keyID("auth-hmac-key")
+                .build();
+        
+        log.info("JWT HMAC 키 생성 완료 - keyID: {}", hmacKey.getKeyID());
+        
+        JWKSet jwkSet = new JWKSet(hmacKey);
+        return new ImmutableJWKSet<>(jwkSet);
+    }
+
+    @Bean
     public JwtEncoder jwtEncoder(JWKSource<SecurityContext> jwkSource) {
         return new NimbusJwtEncoder(jwkSource);
+    }
+
+    @Bean
+    public HttpExchangeRepository httpExchangeRepository() {
+        InMemoryHttpExchangeRepository repo = new InMemoryHttpExchangeRepository();
+        repo.setCapacity(1000); // 보관 개수
+        return repo;
     }
 }
