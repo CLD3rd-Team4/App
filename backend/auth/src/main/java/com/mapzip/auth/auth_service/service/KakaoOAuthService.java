@@ -43,7 +43,6 @@ public class KakaoOAuthService {
     private String jwtSecret;
 
     public TokenResponseDto loginWithKakao(String code) {
-        System.out.println("loginWithKakao service 진입");
         String kakaoAccessToken = getKakaoAccessToken(code);
         KakaoUserInfo kakaoUserInfo = getKakaoUserInfo(kakaoAccessToken);
 
@@ -53,9 +52,6 @@ public class KakaoOAuthService {
                         .nickname(kakaoUserInfo.nickname())
                         .build()));
 
-        // JJWT로 JWT 토큰 생성
-        log.debug("JWT 토큰 생성 시작 - kakaoId: {}, nickname: {}", kakaoUserInfo.kakaoId(), kakaoUserInfo.nickname());
-        
         String accessToken = Jwts.builder()
                 .setSubject(kakaoUserInfo.kakaoId().toString())
                 .setIssuedAt(new Date())
@@ -65,12 +61,7 @@ public class KakaoOAuthService {
                 .signWith(Keys.hmacShaKeyFor(jwtSecret.getBytes()), SignatureAlgorithm.HS256)
                 .compact();
         
-        log.debug("JWT 토큰 생성 완료 - 토큰 길이: {}, 알고리즘: HS256", accessToken.length());
-        
         String refreshToken = UUID.randomUUID().toString();
-        log.debug("Refresh 토큰 생성 완료: {}", refreshToken);
-
-        System.out.println("accessToken & refreshToken 생성");
 
         refreshTokenService.save(refreshToken, kakaoUserInfo.kakaoId().toString());
 
@@ -93,7 +84,7 @@ public class KakaoOAuthService {
                 .onStatus(
                         status -> status.isError(),
                         clientResponse -> clientResponse.bodyToMono(String.class).map(body -> {
-                            System.out.println("카카오 응답 에러: " + body);
+                            log.info("kakao 응답 오류");
                             return new RuntimeException("카카오 응답 오류: " + body);
                         })
                 )
@@ -135,8 +126,6 @@ public class KakaoOAuthService {
         // JWT 재발급 시 nickname 포함
         AppUser user = userRepository.findByKakaoId(Long.valueOf(kakaoId))
                 .orElseThrow(() -> new IllegalArgumentException("사용자 정보 없음"));
-
-        log.debug("JWT 토큰 재발급 시작 - kakaoId: {}, nickname: {}", kakaoId, user.getNickname());
         
         String newAccessToken = Jwts.builder()
                 .setSubject(kakaoId)
@@ -146,8 +135,7 @@ public class KakaoOAuthService {
                 .claim("nickname", user.getNickname())
                 .signWith(Keys.hmacShaKeyFor(jwtSecret.getBytes()), SignatureAlgorithm.HS256)
                 .compact();
-        
-        log.debug("JWT 토큰 재발급 완료 - 토큰 길이: {}", newAccessToken.length());
+
         return new TokenResponseDto(newAccessToken, refreshToken);
     }
 

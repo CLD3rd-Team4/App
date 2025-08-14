@@ -10,13 +10,16 @@ import useSchedule from "@/hooks/useSchedule"
 export default function HomePage() {
   const router = useRouter()
   const [isClient, setIsClient] = useState(false)
-  
-  // useSchedule provides all necessary state
-  const { selectedSchedule, isLoading, loadSelectedSchedule } = useSchedule();
+
+  // isSelected: 동기적으로 localStorage를 확인한 현재 선택 "상태"
+  // isLoading: 비동기 데이터(스케줄 객체) 로딩 "과정"
+  const { isSelected, isLoading, checkInitialSelection } = useSchedule();
 
   useEffect(() => {
-    // This effect runs once on mount to confirm we are on the client
     setIsClient(true)
+    // HomePage가 마운트될 때만 초기 선택 상태를 확인하고 동기화합니다.
+    checkInitialSelection();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -25,20 +28,10 @@ export default function HomePage() {
     const loginDone = sessionStorage.getItem("kakaoLoginDone")
     if (!loginDone) {
       router.push('/auth/login')
-      return
     }
+  }, [isClient, router])
 
-    // If the hook initializes with a schedule from localStorage,
-    // we must verify its status with the server.
-    if (selectedSchedule) {
-      loadSelectedSchedule();
-    }
-    // No need for an else, as the initial state of the hook handles the no-selection case.
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isClient, router]) // We only want this to run once when the client is ready
-
-  // The initial render on the server or before the client is ready can be a loader
+  // 클라이언트가 아니면 아무것도 렌더링하지 않거나 기본 로더를 보여줍니다.
   if (!isClient) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -50,16 +43,17 @@ export default function HomePage() {
     )
   }
 
-  // After the client is ready, we can check for login status
+  // 로그인 여부 확인
   const loginDone = sessionStorage.getItem("kakaoLoginDone")
   if (!loginDone) {
     return <LoginScreen />;
   }
 
-  // Now, the main logic based on the hook's state
+  // isSelected 값에 따라 동기적으로 화면을 결정합니다.
+  // 데이터 로딩(isLoading)은 ScheduleSummaryScreen 내부에서 처리됩니다.
   return (
     <>
-      {selectedSchedule ? <ScheduleSummaryScreen /> : <HomeScreen />}
+      {isSelected ? <ScheduleSummaryScreen /> : <HomeScreen />}
       <PWAInstaller />
     </>
   )

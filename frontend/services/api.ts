@@ -274,7 +274,7 @@ export const scheduleApi = {
   getSelectionStatus: async (): Promise<{ isSelected: boolean }> => {
     try {
       const response = await api.get("/schedule/selectedStatus");
-      return { isSelected: response.data.is_selected };
+      return { isSelected: response.data.isSelected };
     } catch (error: any) {
       console.error("스케줄 선택 상태 조회 실패:", error);
       if (error.response) {
