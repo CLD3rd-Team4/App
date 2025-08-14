@@ -11,11 +11,11 @@ export default function HomePage() {
   const router = useRouter()
   const [isClient, setIsClient] = useState(false)
 
-  const { isSelected, isLoading, checkAndSyncSelection } = useSchedule();
+  const { isSelected, isLoading, initializeHomepage } = useSchedule();
 
   useEffect(() => {
     setIsClient(true);
-    checkAndSyncSelection();
+    initializeHomepage();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -27,6 +27,7 @@ export default function HomePage() {
     }
   }, [isClient, router]);
 
+  // 초기 동기화 로딩 상태를 표시합니다.
   if (!isClient || isLoading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -43,6 +44,7 @@ export default function HomePage() {
     return <LoginScreen />;
   }
 
+  // 동기화가 끝난 후의 isSelected 상태에 따라 최종 화면을 보여줍니다.
   return (
     <>
       {isSelected ? <ScheduleSummaryScreen /> : <HomeScreen />}

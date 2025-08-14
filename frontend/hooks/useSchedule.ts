@@ -25,7 +25,7 @@ export default function useSchedule() {
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSelected, setIsSelected] = useState<boolean>(getInitialSelectionStatus);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const deselectAndClear = useCallback(() => {
     localStorage.removeItem("scheduleSelected");
@@ -33,10 +33,10 @@ export default function useSchedule() {
     setIsSelected(false);
   }, []);
 
-  // HomePage에서만 사용하는 초기화 함수
-  const checkAndSyncSelection = useCallback(async () => {
+  const initializeHomepage = useCallback(async () => {
     setIsLoading(true);
     let finalIsSelected = getInitialSelectionStatus();
+
     if (!finalIsSelected) {
       try {
         const statusResponse = await scheduleApi.getSelectionStatus();
@@ -44,27 +44,22 @@ export default function useSchedule() {
         if(finalIsSelected) localStorage.setItem('scheduleSelected', JSON.stringify({ value: true, timestamp: Date.now() }));
       } catch (e) { finalIsSelected = false; }
     }
-    setIsSelected(finalIsSelected);
-    if (!finalIsSelected) {
-        setSelectedSchedule(null);
-    }
-    setIsLoading(false);
-  }, []);
 
-  // ScheduleSummaryScreen에서 사용하는 데이터 로딩 함수
-  const loadActiveSchedule = useCallback(async () => {
-    setIsLoading(true);
-    try {
+    if (finalIsSelected) {
+      setIsSelected(true);
+      try {
         const summaryResponse = await recommendApi.getActiveScheduleSummary();
         if (summaryResponse && summaryResponse.schedule) {
           setSelectedSchedule(summaryResponse.schedule);
         } else {
-          // 데이터가 없으면 선택 상태를 해제합니다.
-          deselectAndClear();
+          setSelectedSchedule(null);
         }
       } catch (e) {
-        deselectAndClear();
+        setSelectedSchedule(null);
       }
+    } else {
+      deselectAndClear();
+    }
     setIsLoading(false);
   }, [deselectAndClear]);
 
@@ -102,9 +97,8 @@ export default function useSchedule() {
   return {
     schedules, selectedSchedule, isLoading, isProcessing, isSelected,
     loadSchedules, deselectSchedule, createSchedule, updateSchedule, deleteSchedule,
-    checkAndSyncSelection, // HomePage용
-    selectSchedule, // ScheduleListScreen용
-    triggerRecommendRequest, // ScheduleListScreen용
-    loadActiveSchedule, // ScheduleSummaryScreen용
+    initializeHomepage, // HomePage에서만 사용
+    selectSchedule,
+    triggerRecommendRequest,
   }
 }
