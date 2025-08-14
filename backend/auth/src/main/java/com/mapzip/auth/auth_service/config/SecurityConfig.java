@@ -6,6 +6,7 @@ import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -30,6 +31,7 @@ import java.util.List;
 
 @Configuration
 @RequiredArgsConstructor
+@Slf4j
 public class SecurityConfig {
 
     @Bean
@@ -88,9 +90,14 @@ public class SecurityConfig {
 
     @Bean
     public JWKSource<SecurityContext> jwkSource(@Value("${jwt.secret}") String jwtSecret) {
+        log.info("JWT HMAC 키 생성 시작 - 알고리즘: HS256, 키 길이: {} bytes", jwtSecret.getBytes().length);
+        
         OctetSequenceKey hmacKey = new OctetSequenceKey.Builder(jwtSecret.getBytes())
                 .keyID("auth-hmac-key")
                 .build();
+        
+        log.info("JWT HMAC 키 생성 완료 - keyID: {}", hmacKey.getKeyID());
+        
         JWKSet jwkSet = new JWKSet(hmacKey);
         return new ImmutableJWKSet<>(jwkSet);
     }
