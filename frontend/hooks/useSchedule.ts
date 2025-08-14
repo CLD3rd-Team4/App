@@ -108,17 +108,27 @@ export default function useSchedule() {
     }
   }, [loadSelectedSchedule]);
 
-  const selectSchedule = async (scheduleId: string) => {
+  const selectSchedule = async (scheduleId: string): Promise<Schedule | null> => {
     setIsProcessing(true);
     try {
-      // 백엔드에 선택 사실을 알려 Valkey 상태 등을 업데이트하게 합니다.
-      await recommendApi.selectAndGetSummary(scheduleId);
-      // 프론트엔드 UI를 위해 localStorage에 플래그를 저장합니다.
+      // 백엔드에 선택 사실을 알려 Valkey 상태 등을 업데이트하게 합니다。
+      const response = await recommendApi.selectAndGetSummary(scheduleId);
+      // 프론트엔드 UI를 위해 localStorage에 플래그를 저장합니다。
       localStorage.setItem("scheduleSelected", JSON.stringify({ value: true, timestamp: Date.now() }));
+      
+      if (response && response.schedule) {
+        setSelectedSchedule(response.schedule); // Update internal state
+        return response.schedule; // Return the schedule object
+      } else {
+        console.error("selectAndGetSummary did not return a schedule.");
+        localStorage.removeItem("scheduleSelected"); // Clear local storage if no schedule returned
+        return null;
+      }
     } catch (error) {
       console.error("스케줄 선택 처리 실패:", error);
       alert("스케줄 선택 처리에 실패했습니다.");
       localStorage.removeItem("scheduleSelected");
+      return null; // Return null on error
     } finally {
       setIsProcessing(false);
     }
