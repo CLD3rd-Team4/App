@@ -88,7 +88,6 @@ public class ReviewEntity {
     }
 
     // 평점 기반 GSI를 위한 카테고리 필드 추가
-    @DynamoDbSecondaryPartitionKey(indexNames = "RatingIndex")
     @DynamoDbAttribute("rating_category")
     public String getRatingCategory() {
         if (rating == null) return "RATING_0";
