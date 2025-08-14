@@ -157,38 +157,8 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
     @Transactional(readOnly = true)
     public void getScheduleDetail(GetScheduleDetailRequest request, StreamObserver<GetScheduleDetailResponse> responseObserver) {
         try {
-            String scheduleId = request.getScheduleId();
-            Schedule schedule = scheduleRepository.findById(scheduleId)
-                    .orElseThrow(() -> new IllegalArgumentException("스케줄을 찾을 수 없습니다."));
-
-            String userId = GrpcInterceptorConfig.USER_ID_CONTEXT_KEY.get();
-            if (userId == null || userId.isEmpty()) {
-                responseObserver.onError(io.grpc.Status.UNAUTHENTICATED
-                        .withDescription("사용자 ID를 확인할 수 없습니다.")
-                        .asRuntimeException());
-                return;
-            }
-            
-            if (!schedule.getUserId().equals(userId)) {
-                responseObserver.onError(io.grpc.Status.PERMISSION_DENIED
-                        .withDescription("해당 스케줄에 접근할 권한이 없습니다.")
-                        .asRuntimeException());
-                return;
-            }
-
-            // 스케줄 조회 시, 해당 사용자의 선택 상태를 Valkey에 24시간 TTL로 저장
-            try {
-                redisTemplate.opsForValue().set("user:" + userId + ":selected", "true", 24, TimeUnit.HOURS);
-                log.info("사용자 '{}'의 스케줄 선택 상태를 저장했습니다.", userId);
-            } catch (Exception e) {
-                log.error("Valkey에 스케줄 선택 상태 저장 중 오류 발생", e);
-                // Valkey 오류가 핵심 기능에 영향을 주지 않도록 에러를 던지지 않고 로그만 남깁니다.
-            }
-
-            GetScheduleDetailResponse.ScheduleDetail detail = scheduleMapper.toDetail(schedule);
-            GetScheduleDetailResponse response = GetScheduleDetailResponse.newBuilder()
-                    .setSchedule(detail)
-                    .build();
+            // Call the internal helper for pure detail retrieval
+            GetScheduleDetailResponse response = getScheduleDetailInternal(request.getScheduleId());
             responseObserver.onNext(response);
             responseObserver.onCompleted();
         } catch (IllegalArgumentException e) {
@@ -200,6 +170,68 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
                     .withDescription("스케줄 상세 정보 조회 중 오류가 발생했습니다: " + e.getMessage())
                     .asRuntimeException());
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void selectSchedule(SelectScheduleRequest request, StreamObserver<GetScheduleDetailResponse> responseObserver) {
+        try {
+            String scheduleId = request.getScheduleId();
+            String userId = GrpcInterceptorConfig.USER_ID_CONTEXT_KEY.get();
+
+            if (userId == null || userId.isEmpty()) {
+                responseObserver.onError(io.grpc.Status.UNAUTHENTICATED
+                        .withDescription("사용자 ID를 확인할 수 없습니다.")
+                        .asRuntimeException());
+                return;
+            }
+
+            // Save selection state to Valkey
+            try {
+                redisTemplate.opsForValue().set("user:" + userId + ":selected", "true", 24, TimeUnit.HOURS);
+                log.info("사용자 '{}'의 스케줄 선택 상태를 저장했습니다.", userId);
+            } catch (Exception e) {
+                log.error("Valkey에 스케줄 선택 상태 저장 중 오류 발생", e);
+                // Valkey 오류가 핵심 기능에 영향을 주지 않도록 에러를 던지지 않고 로그만 남깁니다.
+            }
+
+            // Call the internal helper for detail retrieval
+            GetScheduleDetailResponse response = getScheduleDetailInternal(scheduleId);
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+        } catch (IllegalArgumentException e) {
+            responseObserver.onError(io.grpc.Status.NOT_FOUND
+                    .withDescription(e.getMessage())
+                    .asRuntimeException());
+        } catch (Exception e) {
+            responseObserver.onError(io.grpc.Status.INTERNAL
+                    .withDescription("스케줄 상세 정보 조회 중 오류가 발생했습니다: " + e.getMessage())
+                    .asRuntimeException());
+        }
+    }
+
+    // Private helper method for pure schedule detail retrieval
+    private GetScheduleDetailResponse getScheduleDetailInternal(String scheduleId) {
+        Schedule schedule = scheduleRepository.findById(scheduleId)
+                .orElseThrow(() -> new IllegalArgumentException("스케줄을 찾을 수 없습니다."));
+
+        String userId = GrpcInterceptorConfig.USER_ID_CONTEXT_KEY.get();
+        if (userId == null || userId.isEmpty()) {
+            throw io.grpc.Status.UNAUTHENTICATED
+                    .withDescription("사용자 ID를 확인할 수 없습니다.")
+                    .asRuntimeException();
+        }
+        
+        if (!schedule.getUserId().equals(userId)) {
+            throw io.grpc.Status.PERMISSION_DENIED
+                    .withDescription("해당 스케줄에 접근할 권한이 없습니다.")
+                    .asRuntimeException();
+        }
+
+        GetScheduleDetailResponse.ScheduleDetail detail = scheduleMapper.toDetail(schedule);
+        return GetScheduleDetailResponse.newBuilder()
+                .setSchedule(detail)
+                .build();
     }
 
 
@@ -231,6 +263,32 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
             responseObserver.onError(Status.INTERNAL
                     .withDescription("스케줄 삭제 중 오류 발생: " + e.getMessage())
                     .withCause(e)
+                    .asRuntimeException());
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void isScheduleSelected(IsScheduleSelectedRequest request, StreamObserver<IsScheduleSelectedResponse> responseObserver) {
+        try {
+            String userId = GrpcInterceptorConfig.USER_ID_CONTEXT_KEY.get();
+            if (userId == null || userId.isEmpty()) {
+                responseObserver.onError(io.grpc.Status.UNAUTHENTICATED
+                        .withDescription("사용자 ID를 확인할 수 없습니다.")
+                        .asRuntimeException());
+                return;
+            }
+
+            boolean isSelected = redisTemplate.hasKey("user:" + userId + ":selected");
+            IsScheduleSelectedResponse response = IsScheduleSelectedResponse.newBuilder()
+                    .setIsSelected(isSelected)
+                    .build();
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+        } catch (Exception e) {
+            log.error("스케줄 선택 상태 조회 중 오류 발생", e);
+            responseObserver.onError(io.grpc.Status.INTERNAL
+                    .withDescription("스케줄 선택 상태 조회 중 오류가 발생했습니다: " + e.getMessage())
                     .asRuntimeException());
         }
     }
