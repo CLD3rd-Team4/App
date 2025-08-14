@@ -1,22 +1,35 @@
+// components/screens/ScheduleListScreen.tsx
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import useSchedule from "@/hooks/useSchedule"
-import { scheduleApi } from "@/services/api" // ✅ 중복 import 정리
 import BottomNavigation from "@/components/common/BottomNavigation"
 import { Plus } from "lucide-react"
 import type { Schedule } from "@/types"
+import { generateTimelineItems, type TimelineItem } from "@/lib/timeline"
 import ScheduleProcessingPopup from "@/components/modals/ScheduleProcessingPopup"
 import RecommendationReadyPopup from "@/components/modals/RecommendationReadyPopup"
-import { generateTimelineItems, TimelineItem } from "@/lib/timeline"
+import api from "@/lib/interceptor"
+import { scheduleApi } from "@/services/api"
 
-// 팝업의 현재 상태 (메인 처리 / 추천 완료)
+// ===== 상수 =====
+const DEV_USER_ID = "user123"          // ★ userId 목 유지
+const POLL_INTERVAL_MS = 1500          // 폴링 주기(ms)
+
+// 결과 응답(일부 필드만)
+type GetResultsResponse = {
+  status: "PENDING" | "OK" | "ERROR" | string
+  message?: string
+  slotRecommendations?: Array<{
+    slotId: string
+    places: Array<{ id: string; placeName: string }>
+  }>
+}
+
+// 팝업 상태
 type PopupType = "processing" | "recommendation_ready"
-
-// 🔧 로컬 테스트용 userId
-const DEV_USER_ID = "user123"
 
 export default function ScheduleListScreen() {
   const router = useRouter()
@@ -31,71 +44,107 @@ export default function ScheduleListScreen() {
 
   const [isClient, setIsClient] = useState(false)
 
-  // --- 팝업 관련 상태 ---
+  // 팝업/타임라인 상태
   const [isPopupOpen, setIsPopupOpen] = useState(false)
-  const [selectedScheduleForPopup, setSelectedScheduleForPopup] = useState<Schedule | null>(null)
   const [currentPopup, setCurrentPopup] = useState<PopupType>("processing")
+  const [selectedScheduleForPopup, setSelectedScheduleForPopup] = useState<Schedule | null>(null)
   const [timelineItems, setTimelineItems] = useState<TimelineItem[]>([])
-  // --- 끝: 팝업 관련 상태 ---
+
+  // 폴링 제어
+  const pollingStopRef = useRef<() => void>(() => {})
+  const resultsRef = useRef<GetResultsResponse | null>(null)
 
   useEffect(() => {
     setIsClient(true)
     loadSchedules()
-
-    // ⭐ 로컬 테스트용 userId 주입 (프로덕션에서는 실행 안 됨)
-    if (process.env.NODE_ENV !== "production") {
-      try {
-        localStorage.setItem("userId", DEV_USER_ID)
-      } catch {}
-    }
+    // 로컬에서 userId 목 주입(게이트웨이 없이 테스트용)
+    try { localStorage.setItem("userId", DEV_USER_ID) } catch {}
   }, [loadSchedules])
 
-  // 팝업 자동 진행 시뮬레이션 (API 연동 전 임시 로직)
-  useEffect(() => {
-    if (!isPopupOpen || currentPopup !== "processing") return
+  // ===== 추천 트리거 =====
+  const triggerRecommendRequest = async (scheduleId: string) => {
+    try {
+      await api.post("/recommend/request", null, {
+        params: { scheduleId },
+        headers: { "Cache-Control": "no-cache" },
+      })
+    } catch (e) {
+      console.error("POST /recommend/request failed:", e)
+      // 실패여도 폴링으로 대기 UX 유지
+    }
+  }
 
-    const timer = setTimeout(() => {
-      setTimelineItems((prev) =>
-        prev.map((item) =>
-          item.type === "meal_plan"
-            ? { ...item, status: "completed", description: "추천 완료" }
-            : item
-        )
-      )
-      setCurrentPopup("recommendation_ready")
-    }, 3000)
+  // ===== 결과 폴링 =====
+  const startPollingResults = (userId: string, scheduleId: string) => {
+    let active = true
+    let timer: any = null
 
-    return () => clearTimeout(timer)
-  }, [isPopupOpen, currentPopup])
+    const tick = async () => {
+      if (!active) return
+      try {
+        const res = await api.get<GetResultsResponse>("/recommend/result", {
+          params: { userId, scheduleId },
+          headers: { "Cache-Control": "no-cache" },
+        })
 
-  const handleScheduleSelect = (schedule: Schedule) => {
-    if (!schedule || !schedule.id) return
-
-    // 팝업 먼저 열기
-    setIsPopupOpen(true)
-    setSelectedScheduleForPopup(schedule)
-
-    // 타임라인 생성을 위해 상세 조회
-    scheduleApi
-      .getScheduleDetail(schedule.id)
-      .then((detailResponse: any) => {
-        const fullSchedule = detailResponse?.schedule
-        if (fullSchedule) {
-          const items = generateTimelineItems(fullSchedule)
-          setTimelineItems(items)
-          setCurrentPopup("processing")
-        } else {
-          throw new Error("Timeline generation failed: full schedule not found.")
+        if (res.data.status === "OK") {
+          resultsRef.current = res.data
+          // 타임라인 진행 상태 업데이트(완료 표시)
+          setTimelineItems(prev =>
+            prev.map((it: any) =>
+              it?.type === "meal_plan"
+                ? { ...it, status: "completed", description: "추천 완료" }
+                : it
+            )
+          )
+          setCurrentPopup("recommendation_ready")
+          return // OK → 폴링 종료
         }
-      })
-      .catch((error: any) => {
-        console.error("Error fetching schedule details for popup:", error)
-        alert("스케줄 정보를 준비하는 중 오류가 발생했습니다.")
-        closePopup()
-      })
 
-    // 실제 스케줄 선택 로직 호출 (라우팅 등은 훅 내부 처리 가정)
-    selectSchedule(schedule.id)
+        // PENDING이면 다음 틱 예약
+        timer = setTimeout(tick, POLL_INTERVAL_MS)
+      } catch (err) {
+        console.error("GET /recommend/result polling error:", err)
+        // 에러 시 잠시 후 재시도
+        timer = setTimeout(tick, POLL_INTERVAL_MS * 2)
+      }
+    }
+
+    tick()
+    pollingStopRef.current = () => { active = false; if (timer) clearTimeout(timer) }
+  }
+
+  const stopPollingResults = () => pollingStopRef.current?.()
+
+  // ===== 선택 클릭 =====
+  const handleScheduleSelect = async (schedule: Schedule) => {
+    if (!schedule?.id) return
+
+    // 팝업 오픈 + 타임라인 기본 세팅
+    setSelectedScheduleForPopup(schedule)
+    setTimelineItems([]) // 상세 조회 후 채움
+    setCurrentPopup("processing")
+    setIsPopupOpen(true)
+
+    try {
+      // 타임라인 생성을 위해 상세 조회(성공 시 타임라인 구성)
+      const detail = await scheduleApi.getScheduleDetail(schedule.id)
+      const fullSchedule: Schedule | undefined =
+        (detail as any)?.schedule ?? (detail as any)?.data?.schedule
+      setTimelineItems(generateTimelineItems(fullSchedule || schedule))
+    } catch (e) {
+      console.error("스케줄 상세 조회 실패:", e)
+      // 상세 실패해도 추천은 트리거/폴링 가능하므로 팝업은 유지
+    }
+
+    // 추천 트리거
+    triggerRecommendRequest(schedule.id)
+
+    // 결과 폴링 시작 (userId는 로컬에서 목/혹은 게이트웨이 주입)
+    const userId =
+      (typeof window !== "undefined" && (localStorage.getItem("userId") || DEV_USER_ID)) ||
+      DEV_USER_ID
+    startPollingResults(userId, schedule.id)
   }
 
   const handleScheduleEdit = (schedule: Schedule) => {
@@ -105,16 +154,20 @@ export default function ScheduleListScreen() {
   const closePopup = () => {
     setIsPopupOpen(false)
     setSelectedScheduleForPopup(null)
+    setCurrentPopup("processing")
+    stopPollingResults()
+    resultsRef.current = null
   }
 
+  // 추천 완료 팝업 → “결과 보기”
   const handleViewResults = async () => {
     if (!selectedScheduleForPopup?.id) return
     try {
-      await selectSchedule(selectedScheduleForPopup.id)
-      // selectSchedule 내부에서 라우팅 처리 시 여기서는 팝업만 닫기
+      await selectSchedule(selectedScheduleForPopup.id) // 필요 시 훅 상태 반영
       closePopup()
+      router.push("/recommendations/")                 // 추천 결과 페이지로 이동
     } catch (error) {
-      console.error("Failed to view results:", error)
+      console.error("결과 보기 실패:", error)
     }
   }
 
@@ -215,7 +268,7 @@ export default function ScheduleListScreen() {
           <RecommendationReadyPopup
             isOpen={currentPopup === "recommendation_ready"}
             onViewResults={handleViewResults}
-            onGoBack={closePopup} // 이전으로 버튼은 그냥 팝업을 닫도록 처리
+            onGoBack={closePopup}
           />
         </>
       )}
