@@ -17,6 +17,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mapzip.recommend.config.GrpcHeaderConfig;
 import com.mapzip.recommend.dto.MultiSlotRecommendRequestDto;
 import com.mapzip.recommend.dto.SlotInfoDto;
 import com.mapzip.recommend.entity.RecommendationSelectionEntity;
@@ -265,8 +266,8 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 	public void placesForReview(PlacesForReviewRequest request,
 	                            StreamObserver<PlacesForReviewResponse> responseObserver) {
 
-	    // ✅ 목 유저 ID (나중에 인증 정보에서 추출)
-	    String userId = "user123";
+	    //0.userid 가져오
+	    String userId = GrpcHeaderConfig.UserIdContext.USER_ID.get();
 
 	    // 1. 유저의 추천 선택 식당 조회
 	    List<RecommendationSelectionEntity> selectedList = selectionRepository.findByUserId(userId);
