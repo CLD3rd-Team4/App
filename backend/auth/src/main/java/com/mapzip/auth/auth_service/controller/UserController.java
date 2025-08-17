@@ -5,6 +5,7 @@ import com.mapzip.auth.auth_service.dto.RefreshTokenRequestDto;
 import com.mapzip.auth.auth_service.dto.TokenResponseDto;
 import com.mapzip.auth.auth_service.service.KakaoOAuthService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -18,13 +19,14 @@ import java.util.Map;
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
+@Slf4j
 public class UserController {
 
     private final KakaoOAuthService kakaoOAuthService;
 
     @PostMapping("/kakao/callback")
     public ResponseEntity<Map<String, String>> handleKakaoCallback(@RequestParam String code) {
-        System.out.println("callback 요청");
+        log.info("callback 요청 수신");
         TokenResponseDto token = kakaoOAuthService.loginWithKakao(code);
 
         // 쿠키 설정
@@ -47,7 +49,6 @@ public class UserController {
                 .sameSite("None")
                 .build();
 
-        System.out.println("쿠키 설정 완료");
         Map<String, String> response = new HashMap<>();
         response.put("message", "로그인 성공");
 
@@ -63,12 +64,14 @@ public class UserController {
     public ResponseEntity<String> getKakaoId(
             @AuthenticationPrincipal(expression = "principal") String kakaoId
     ) {
+        log.info("kakaoid 요청 수신");
         return ResponseEntity.ok("내 카카오 ID: " + kakaoId);
     }
 
     // Refresh Token을 통한 Access Token 재발급
     @PostMapping("/token/refresh")
     public ResponseEntity<Map<String, String>> refresh(@CookieValue("refreshToken") String refreshToken) {
+        log.info("refresh 요청 수신");
         TokenResponseDto token = kakaoOAuthService.reissueAccessToken(refreshToken);
 
         ResponseCookie access = ResponseCookie.from("accessToken", token.getAccessToken())
@@ -87,7 +90,7 @@ public class UserController {
 
     @PostMapping("/token/logout")
     public ResponseEntity<Void> logout(@CookieValue("refreshToken") String refreshToken) {
-        System.out.println("로그아웃 요청");
+        log.info("logout 요청 수신");
 
         kakaoOAuthService.logout(refreshToken); // Redis에서 삭제
 

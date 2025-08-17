@@ -50,18 +50,59 @@ public class ReviewController {
         
         logger.info("Verifying receipt for user: {}, restaurant: {}", userId, request.getExpectedRestaurantName());
         
-        // OCR 처리
-        OcrResultDto ocrResult = reviewService.verifyReceipt(
-            request.getReceiptImage().getBytes(), 
-            request.getExpectedRestaurantName(), 
-            request.getExpectedAddress());
-        
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("ocrResult", ocrResult);
-        response.put("message", ocrResult.isValid() ? "영수증 검증 성공" : "영수증 검증 실패");
-        
-        return ResponseEntity.ok(response);
+        try {
+            // 입력값 검증
+            if (request.getReceiptImage() == null || request.getReceiptImage().isEmpty()) {
+                throw new IllegalArgumentException("영수증 이미지가 필요합니다.");
+            }
+            
+            if (request.getExpectedRestaurantName() == null || request.getExpectedRestaurantName().trim().isEmpty()) {
+                throw new IllegalArgumentException("식당명이 필요합니다.");
+            }
+            
+            // 파일 크기 및 형식 검증
+            if (request.getReceiptImage().getSize() > 10 * 1024 * 1024) { // 10MB 제한
+                throw new IllegalArgumentException("이미지 크기는 10MB 이하여야 합니다.");
+            }
+            
+            String contentType = request.getReceiptImage().getContentType();
+            if (contentType == null || (!contentType.startsWith("image/"))) {
+                throw new IllegalArgumentException("이미지 파일만 업로드 가능합니다.");
+            }
+            
+            // OCR 처리
+            OcrResultDto ocrResult = reviewService.verifyReceipt(
+                request.getReceiptImage().getBytes(), 
+                request.getExpectedRestaurantName(), 
+                request.getExpectedAddress());
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("ocrResult", ocrResult);
+            response.put("message", ocrResult.isValid() ? "영수증 검증 성공" : "영수증 검증 실패");
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (IllegalArgumentException e) {
+            logger.warn("OCR request validation failed for user: {}, error: {}", userId, e.getMessage());
+            
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", e.getMessage());
+            errorResponse.put("errorCode", "VALIDATION_ERROR");
+            
+            return ResponseEntity.badRequest().body(errorResponse);
+            
+        } catch (Exception e) {
+            logger.error("OCR processing failed for user: {}", userId, e);
+            
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", "영수증 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+            errorResponse.put("errorCode", "OCR_PROCESSING_ERROR");
+            
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
     }
     
     /**

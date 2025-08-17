@@ -269,35 +269,85 @@ export const scheduleApi = {
       }
     }
   },
+
+  // 스케줄 선택 상태 조회
+  getSelectionStatus: async (): Promise<{ isSelected: boolean }> => {
+    try {
+      const response = await api.get("/schedule/selectedStatus");
+      return { isSelected: response.data.isSelected };
+    } catch (error: any) {
+      console.error("스케줄 선택 상태 조회 실패:", error);
+      if (error.response) {
+        throw new APIError(
+          error.response.data?.message || "스케줄 선택 상태를 불러오지 못했습니다.",
+          error.response.status,
+          error.response.data
+        );
+      } else if (error.request) {
+        throw new APIError(
+          "서버에서 응답이 없습니다. 네트워크 연결을 확인해주세요.",
+          0
+        );
+      } else {
+        throw new APIError(
+          `요청 설정 중 오류가 발생했습니다: ${error.message}`,
+          -1
+        );
+      }
+    }
+  },
 };
 
 export const recommendApi = {
-  // 스케줄을 선택하고 요약 정보를 받아오는 API (가상)
+  // 스케줄을 선택하고 요약 정보를 받아오는 API
   selectAndGetSummary: async (scheduleId: string) => {
-    // 실제 아키텍처:
-    // 1. 프론트엔드는 이 함수를 호출해 API 게이트웨이의 특정 엔드포인트(예: /recommendations/summary)를 호출합니다.
-    // 2. 게이트웨이는 요청을 recommend 서비스로 라우팅합니다.
-    // 3. recommend 서비스는 schedule 서비스의 getScheduleDetail gRPC 메서드를 호출합니다.
-    // 4. schedule 서비스는 DB의 is_selected 플래그를 업데이트하고, 원본 스케줄 데이터를 recommend 서비스에 반환합니다.
-    // 5. recommend 서비스는 모든 계산(TMap, Kakao)을 수행하여 최종 "요약 정보"를 생성하고, 이를 프론트엔드에 반환합니다.
-    console.log(`[가상 API] recommend 서비스에 ${scheduleId} 선택 및 요약 요청`);
-    
-    // 개발 단계에서는 recommend 서비스가 없으므로, 임시로 schedule 서비스의 상세 정보를 그대로 반환하는 것처럼 시뮬레이션합니다.
-    const response = await scheduleApi.getScheduleDetail(scheduleId); 
-    return response;
+    try {
+      console.log(`[API] 스케줄 서비스에 ${scheduleId} 선택 및 상세 정보 요청`);
+      const response = await api.get(`/schedule/${scheduleId}:select`);
+      const data = response.data;
+
+      const scheduleData = data.schedule ? data.schedule : data;
+
+      if (scheduleData && Object.keys(scheduleData).length > 0) {
+        return { schedule: mapScheduleResponse(scheduleData) };
+      }
+      return { schedule: null };
+    } catch (error: any) {
+      console.error("스케줄 선택 및 상세 정보 조회 실패:", error);
+      if (error.response) {
+        throw new APIError(
+          error.response.data?.message || "스케줄 선택 및 상세 정보를 불러오지 못했습니다.",
+          error.response.status,
+          error.response.data
+        );
+      } else if (error.request) {
+        throw new APIError(
+          "서버에서 응답이 없습니다. 네트워크 연결을 확인해주세요.",
+          0
+        );
+      } else {
+        throw new APIError(
+          `요청 설정 중 오류가 발생했습니다: ${error.message}`,
+          -1
+        );
+      }
+    }
   },
 
-  // 현재 선택된 스케줄의 요약 정보를 가져오는 API (가상)
+  // 현재 선택된 스케줄의 요약 정보를 가져오는 API
   getActiveScheduleSummary: async () => {
-    // 실제 아키텍처:
-    // 1. 프론트엔드는 이 함수를 호출해 API 게이트웨이의 엔드포인트(예: /recommendations/summary/active)를 호출합니다.
-    // 2. 게이트웨이는 요청을 recommend 서비스로 라우팅합니다.
-    // 3. recommend 서비스는 schedule 서비스 DB에서 is_selected가 true인 스케줄을 찾고, 없으면 null을 반환합니다.
-    // 4. 스케줄이 있으면, 해당 스케줄의 최종 "요약 정보"를 찾아 프론트엔드에 반환합니다. (캐시 또는 DB에서 조회)
-    console.log("[가상 API] recommend 서비스에 현재 활성화된 스케줄 요약 요청");
+    console.log("[API] 추천 서버에 최종 요약 결과 요청");
+    // ScheduleListScreen의 폴링 로직과 동일한 엔드포인트를 호출하여 일관성을 맞춥니다.
+    // userId와 scheduleId는 인터셉터 또는 서버 로직에서 처리될 것으로 가정합니다.
+    const response = await api.get("/recommend/result");
+    const data = response.data;
 
-    // 개발 단계에서는 임시로 비어있는 응답을 반환합니다.
-    return Promise.resolve({ schedule: null });
+    // getRecommendResult와 유사하게, 실제 스케줄 객체를 반환하도록 처리합니다.
+    const scheduleData = data.schedule ? data.schedule : data;
+    if (scheduleData && Object.keys(scheduleData).length > 0) {
+      return { schedule: mapScheduleResponse(scheduleData) };
+    }
+    return { schedule: null };
   },
 
   // 특정 스케줄 ID에 대한 요약 정보를 가져오는 API (가상)

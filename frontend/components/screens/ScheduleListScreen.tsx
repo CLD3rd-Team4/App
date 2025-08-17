@@ -123,24 +123,30 @@ export default function ScheduleListScreen() {
     setIsPopupOpen(true)
 
     try {
-      // 타임라인 생성을 위해 상세 조회(성공 시 타임라인 구성)
-      const detail = await scheduleApi.getScheduleDetail(schedule.id)
-      const fullSchedule: Schedule | undefined =
-        (detail as any)?.schedule ?? (detail as any)?.data?.schedule
-      setTimelineItems(generateTimelineItems(fullSchedule || schedule))
+      // 1. 스케줄 선택 및 상태 업데이트
+      const selectedScheduleData = await selectSchedule(schedule.id) 
+
+      // 2. 타임라인 생성
+      if (selectedScheduleData) {
+        setTimelineItems(generateTimelineItems(selectedScheduleData))
+      } else {
+        setTimelineItems(generateTimelineItems(schedule))
+      }
+
+      // 3. 추천 분석 요청
+      triggerRecommendRequest(schedule.id)
+
+      // 4. 결과 폴링 시작
+      const userId =
+        (typeof window !== "undefined" && (localStorage.getItem("userId") || DEV_USER_ID)) ||
+        DEV_USER_ID
+      startPollingResults(userId, schedule.id)
+
     } catch (e) {
-      console.error("스케줄 상세 조회 실패:", e)
-      // 상세 실패해도 추천은 트리거/폴링 가능하므로 팝업은 유지
+      console.error("스케줄 선택 처리 중 오류 발생:", e)
+      alert("스케줄 선택 처리에 실패했습니다.")
+      setIsPopupOpen(false) // 에러 발생 시 팝업 닫기
     }
-
-    // 추천 트리거
-    triggerRecommendRequest(schedule.id)
-
-    // 결과 폴링 시작 (userId는 로컬에서 목/혹은 게이트웨이 주입)
-    const userId =
-      (typeof window !== "undefined" && (localStorage.getItem("userId") || DEV_USER_ID)) ||
-      DEV_USER_ID
-    startPollingResults(userId, schedule.id)
   }
 
   const handleScheduleEdit = (schedule: Schedule) => {

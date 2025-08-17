@@ -35,7 +35,7 @@ public class CustomRouteLocator {
                         .filters(f -> f
                                 .filter(xssProtectionFilter.apply(new XssProtectionFilter.Config()))
                                 .filter(jwtAuthenticationFilter.apply(new JwtAuthenticationFilter.Config())))
-                        .uri("http://recommend.service-recommend:9090"))
+                        .uri("http://recommend.service-recommend:9092"))
 
                 // HTTP (port 8080): 이미지 처리 + HTTP 전용 API
                 .route("review-http-post", r -> r.path("/review")

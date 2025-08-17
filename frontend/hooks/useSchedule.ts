@@ -2,151 +2,107 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { scheduleApi, recommendApi, APIError } from "@/services/api"
+import { scheduleApi, recommendApi } from "@/services/api"
 import type { Schedule, SchedulePayload } from "@/types"
+import api from "@/lib/interceptor"
+
+const getInitialSelectionStatus = (): boolean => {
+  if (typeof window === "undefined") return false;
+  try {
+    const item = localStorage.getItem("scheduleSelected");
+    if (!item) return false;
+    const parsed = JSON.parse(item);
+    const isExpired = Date.now() - parsed.timestamp > 24 * 60 * 60 * 1000;
+    return parsed.value === true && !isExpired;
+  } catch (e) {
+    return false;
+  }
+};
 
 export default function useSchedule() {
-  const router = useRouter()
-  const [schedules, setSchedules] = useState<Schedule[]>([])
-  const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isProcessing, setIsProcessing] = useState(false)
+  const router = useRouter();
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isSelected, setIsSelected] = useState<boolean>(getInitialSelectionStatus);
+  const [isLoading, setIsLoading] = useState(true); // 초기 로딩 상태는 true로 시작
 
-  const loadSchedules = useCallback(async () => {
-    try {
-      setIsLoading(true)
-      const data = await scheduleApi.getSchedules()
-      setSchedules(data)
-    } catch (error) {
-      console.error("스케줄 목록 로드 실패:", error)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  const deselectSchedule = useCallback(() => {
-    setSelectedSchedule(null);
+  const deselectAndClear = useCallback(() => {
     localStorage.removeItem("scheduleSelected");
+    setSelectedSchedule(null);
+    setIsSelected(false);
   }, []);
 
-  const loadSelectedSchedule = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const response = await recommendApi.getActiveScheduleSummary();
-      if (response && response.schedule) {
-        setSelectedSchedule(response.schedule);
-      } else {
-        // TTL이 만료되었거나 선택된 스케줄이 없는 경우, 로컬 상태를 동기화합니다.
-        deselectSchedule();
-      }
-    } catch (error) {
-      console.error("선택된 스케줄 요약 로드 실패:", error);
-      deselectSchedule(); // 에러 발생 시에도 상태를 초기화합니다.
-    } finally {
-      setIsLoading(false);
-    }
-  }, [deselectSchedule]);
-
+  // HomePage가 마운트될 때 단 한번만 실행되는 초기화 로직
   useEffect(() => {
-    const scheduleSelected = localStorage.getItem("scheduleSelected") === "true";
-    if (scheduleSelected) {
-      loadSelectedSchedule();
-    } else {
-      setIsLoading(false);
-    }
-  }, [loadSelectedSchedule]);
+    const initialize = async () => {
+      setIsLoading(true);
+      let finalIsSelected = getInitialSelectionStatus();
 
-  const selectSchedule = async (scheduleId: string) => {
+      if (!finalIsSelected) {
+        try {
+          const statusResponse = await scheduleApi.getSelectionStatus();
+          finalIsSelected = statusResponse.isSelected;
+          if(finalIsSelected) localStorage.setItem('scheduleSelected', JSON.stringify({ value: true, timestamp: Date.now() }));
+        } catch (e) { finalIsSelected = false; }
+      }
+
+      if (finalIsSelected) {
+        setIsSelected(true);
+        try {
+          const summaryResponse = await recommendApi.getActiveScheduleSummary();
+          if (summaryResponse && summaryResponse.schedule) {
+            setSelectedSchedule(summaryResponse.schedule);
+          } else {
+            setSelectedSchedule(null);
+          }
+        } catch (e) {
+          setSelectedSchedule(null);
+        }
+      } else {
+        deselectAndClear();
+      }
+      setIsLoading(false);
+    };
+
+    initialize();
+  }, [deselectAndClear]); // deselectAndClear는 useCallback으로 감싸져 있어 한번만 실행됨을 보장
+
+  const selectSchedule = useCallback(async (scheduleId: string): Promise<Schedule | null> => {
     setIsProcessing(true);
     try {
-      // 백엔드에 선택 사실을 알려 Valkey 상태 등을 업데이트하게 합니다.
-      await recommendApi.selectAndGetSummary(scheduleId);
-      // 프론트엔드 UI를 위해 localStorage에 플래그를 저장합니다.
-      localStorage.setItem("scheduleSelected", "true");
+      const response = await recommendApi.selectAndGetSummary(scheduleId);
+      if (response && response.schedule) {
+        localStorage.setItem("scheduleSelected", JSON.stringify({ value: true, timestamp: Date.now() }));
+        setSelectedSchedule(response.schedule);
+        setIsSelected(true);
+        return response.schedule;
+      } else {
+        deselectAndClear();
+        return null;
+      }
     } catch (error) {
-      console.error("스케줄 선택 처리 실패:", error);
-      alert("스케줄 선택 처리에 실패했습니다.");
-      localStorage.removeItem("scheduleSelected");
+      deselectAndClear();
+      throw error;
     } finally {
       setIsProcessing(false);
     }
-  };
+  }, [deselectAndClear]);
 
-  const createSchedule = async (scheduleData: SchedulePayload) => {
-    setIsProcessing(true)
-    try {
-      const response = await scheduleApi.createSchedule(scheduleData)
-      const newSchedule: Schedule = {
-        id: response.scheduleId,
-        ...scheduleData,
-      };
-      setSchedules((prev) => [...prev, newSchedule])
-      router.push("/schedule")
-    } catch (error) {
-      console.error("스케줄 생성 실패:", error)
-      throw error
-    } finally {
-      setIsProcessing(false)
-    }
-  }
+  const triggerRecommendRequest = useCallback(async (scheduleId: string) => {
+    try { await api.post("/recommend/request", { scheduleId }); } catch (e) { console.error(e); }
+  }, []);
 
-  const updateSchedule = async (scheduleId: string, scheduleData: SchedulePayload) => {
-    setIsProcessing(true)
-    try {
-      const scheduleToUpdate: Schedule = {
-        id: scheduleId,
-        ...scheduleData,
-      };
-
-      await scheduleApi.updateSchedule(scheduleToUpdate);
-      
-      setSchedules((prev) => 
-        prev.map((s) => (s.id === scheduleId ? { ...s, ...scheduleData } : s))
-      );
-
-      if (selectedSchedule?.id === scheduleId) {
-        setSelectedSchedule(prev => prev ? { ...prev, ...scheduleData, id: scheduleId } : null);
-      }
-
-      router.push("/schedule");
-
-    } catch (error) {
-      console.error("스케줄 업데이트 실패:", error)
-      alert("스케줄 업데이트에 실패했습니다.")
-    } finally {
-      setIsProcessing(false)
-    }
-  }
-
-  const deleteSchedule = async (scheduleId: string) => {
-    setIsProcessing(true)
-    try {
-      await scheduleApi.deleteSchedule(scheduleId)
-      setSchedules((prev) => prev.filter((s) => s.id !== scheduleId))
-      if (selectedSchedule?.id === scheduleId) {
-        // 선택 해제 시에는 deselectSchedule 콜백을 사용합니다.
-        const freshDeselect = deselectSchedule;
-        freshDeselect();
-        router.push("/");
-        router.refresh();
-      }
-    } catch (error) {
-      console.error("스케줄 삭제 실패:", error)
-    } finally {
-      setIsProcessing(false)
-    }
-  }
+  const loadSchedules = useCallback(async () => { setIsLoading(true); try { const data = await scheduleApi.getSchedules(); setSchedules(data); } catch (e) { console.error(e); } finally { setIsLoading(false); } }, []);
+  const createSchedule = async (scheduleData: SchedulePayload) => { setIsProcessing(true); try { await scheduleApi.createSchedule(scheduleData); router.push("/schedule"); } catch (e) { console.error(e); } finally { setIsProcessing(false); } };
+  const updateSchedule = async (scheduleId: string, scheduleData: SchedulePayload) => { setIsProcessing(true); try { await scheduleApi.updateSchedule({ id: scheduleId, ...scheduleData }); router.push("/schedule"); } catch (e) { console.error(e); } finally { setIsProcessing(false); } };
+  const deleteSchedule = async (scheduleId: string) => { setIsProcessing(true); try { await scheduleApi.deleteSchedule(scheduleId); setSchedules(s => s.filter(sch => sch.id !== scheduleId)); } catch (e) { console.error(e); } finally { setIsProcessing(false); } };
+  const deselectSchedule = useCallback(() => { deselectAndClear(); }, [deselectAndClear]);
 
   return {
-    schedules,
-    selectedSchedule,
-    isLoading,
-    isProcessing,
-    loadSchedules,
+    schedules, selectedSchedule, isLoading, isProcessing, isSelected,
+    loadSchedules, deselectSchedule, createSchedule, updateSchedule, deleteSchedule,
     selectSchedule,
-    deselectSchedule,
-    createSchedule,
-    updateSchedule,
-    deleteSchedule,
+    triggerRecommendRequest,
   }
 }

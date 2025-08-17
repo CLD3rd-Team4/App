@@ -26,23 +26,33 @@ public class GrpcHeaderInterceptor implements ServerInterceptor {
         // Gateway에서 HTTP 헤더로 전달된 x-user-id 추출
         String userId = headers.get(Metadata.Key.of("x-user-id", Metadata.ASCII_STRING_MARSHALLER));
         
-        if (userId == null || userId.isEmpty() || !isValidUserId(userId)) {
-            logger.warn("Authentication failed - Missing or invalid x-user-id. Method: {}", 
+        if (userId == null || userId.isEmpty()) {
+            logger.warn("Authentication failed - Missing x-user-id. Method: {}", 
                       call.getMethodDescriptor().getFullMethodName());
             call.close(Status.UNAUTHENTICATED.withDescription("Authentication required"), headers);
             return new ServerCall.Listener<ReqT>() {};
         }
         
-        // JWT 토큰 재검증 (Gateway에서 한 번 더 검증)
-        if (!validateJwtFromGateway(headers)) {
-            logger.warn("JWT validation failed. Method: {}", 
-                      call.getMethodDescriptor().getFullMethodName());
-            call.close(Status.UNAUTHENTICATED.withDescription("Invalid authentication"), headers);
+        if (!isValidUserId(userId)) {
+            logger.warn("Authentication failed - Invalid x-user-id format: {}. Method: {}", 
+                      userId, call.getMethodDescriptor().getFullMethodName());
+            call.close(Status.UNAUTHENTICATED.withDescription("Invalid user ID format"), headers);
             return new ServerCall.Listener<ReqT>() {};
         }
-
-        logger.debug("User authenticated successfully for method: {}", 
-                    call.getMethodDescriptor().getFullMethodName());
+        
+        // Gateway에서 오는 요청과 직접 HTTP 요청 구분하여 처리
+        boolean isFromGateway = validateJwtFromGateway(headers);
+        boolean isDirectHttpRequest = !isFromGateway;
+        
+        if (isDirectHttpRequest) {
+            // 직접 HTTP 요청의 경우 기본적인 사용자 ID 검증만 수행
+            logger.info("Direct HTTP request authenticated for user: {}, method: {}", 
+                      userId, call.getMethodDescriptor().getFullMethodName());
+        } else {
+            // Gateway를 통한 요청의 경우 JWT 재검증
+            logger.debug("Gateway request authenticated for user: {}, method: {}", 
+                        userId, call.getMethodDescriptor().getFullMethodName());
+        }
 
         // Context에 사용자 ID 저장
         Context context = Context.current().withValue(USER_ID_CONTEXT_KEY, userId);

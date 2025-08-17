@@ -122,6 +122,12 @@
             <artifactId>spring-boot-starter-cache</artifactId>
         </dependency>
         
+        <!-- Apache Commons Pool2 for Redis connection pooling -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-pool2</artifactId>
+        </dependency>
+        
         <!-- Spring Kafka는 현재 사용하지 않음 - 필요시 추가 -->
         <!-- 
         <dependency>
