@@ -84,7 +84,7 @@ export default function useSchedule() {
       if (isSelected) await deselectAndClear(); // 혹시 모를 프론트 상태 불일치 정리
     }
     setIsLoading(false);
-  }, [isSelected, deselectAndClear]);
+  }, [deselectAndClear]);
 
   const selectSchedule = useCallback(async (scheduleId: string): Promise<Schedule | null> => {
     setIsProcessing(true);
