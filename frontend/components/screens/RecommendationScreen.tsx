@@ -112,9 +112,14 @@ export default function RecommendationScreen() {
 
       // ✅ userId 제거, scheduleId만 전달 + 캐시버스터
       const { data } = await api.get<GetResultsResponse>("/recommend/result", {
-        params: { scheduleId, _ts: Date.now() },
-        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
-      })
+       params: { scheduleId, _ts: Date.now() },
+        headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json",   // ← 일부 게이트웨이 대응용
+        "Cache-Control": "no-cache",
+      "Pragma": "no-cache",
+      },
+});
 
       // ✅ 가드: 응답이 현재 선택된 스케줄의 것이 아니면 무시
       if (activeScheduleIdRef.current !== scheduleId) {
