@@ -54,7 +54,7 @@ public class RecommendRequestConsumer {
 
     private static final String NEXT_TOPIC = "recommend-result";
 
-    @KafkaListener(topics = "recommend-request", groupId = "recommend-service")
+    @KafkaListener(topics = "recommend-request", groupId = "recommend-service-request")
     private void consume(@Payload String payload) {
         try {
             // 로그로 수신 확인
