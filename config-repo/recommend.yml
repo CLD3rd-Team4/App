@@ -1,6 +1,5 @@
 # Recommend 서비스 설정 (EKS 환경 기본)
 
-
 server:
   port: 8082
 spring:
@@ -37,9 +36,13 @@ spring:
 
   kafka:
     bootstrap-servers: >
-      b-1.mapzipdevmain.2sgil5.c4.kafka.ap-northeast-2.amazonaws.com:9092,
-      b-2.mapzipdevmain.2sgil5.c4.kafka.ap-northeast-2.amazonaws.com:9092,
-      b-3.mapzipdevmain.2sgil5.c4.kafka.ap-northeast-2.amazonaws.com:9092
+      b-1.mapzipdevmain.2sgil5.c4.kafka.ap-northeast-2.amazonaws.com:9094,
+      b-2.mapzipdevmain.2sgil5.c4.kafka.ap-northeast-2.amazonaws.com:9094,
+      b-3.mapzipdevmain.2sgil5.c4.kafka.ap-northeast-2.amazonaws.com:9094
+    properties:
+      security.protocol: SSL
+      ssl.endpoint.identification.algorithm: https
+      client.dns.lookup: use_all_dns_ips
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
