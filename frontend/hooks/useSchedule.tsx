@@ -63,65 +63,52 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
 
   const initializeHomepage = useCallback(async () => {
     setIsLoading(true);
-    let finalIsSelected = getInitialSelectionStatus();
+    try {
+      // 백엔드에서 isSelected와 scheduleId를 함께 받아옵니다.
+      const { isSelected: serverIsSelected, scheduleId } = await scheduleApi.getSelectionStatus();
 
-    if (!finalIsSelected) {
-      try {
-        const statusResponse = await scheduleApi.getSelectionStatus();
-        finalIsSelected = statusResponse.isSelected;
-        if (finalIsSelected) {
-          localStorage.setItem('scheduleSelected', JSON.stringify({ value: true, timestamp: Date.now() }));
-        }
-      } catch (e) {
-        finalIsSelected = false;
-      }
-    }
-    
-    setIsSelected(finalIsSelected);
-
-    if (finalIsSelected) {
-      try {
-        const summaryResponse = await recommendApi.getActiveScheduleSummary();
+      if (serverIsSelected && scheduleId) {
+        // isSelected와 scheduleId가 모두 유효하면, 요약 정보를 불러옵니다.
+        const summaryResponse = await recommendApi.getActiveScheduleSummary(scheduleId);
         if (summaryResponse && summaryResponse.schedule) {
           setSelectedSchedule(summaryResponse.schedule);
+          setIsSelected(true);
+          localStorage.setItem("scheduleSelected", JSON.stringify({ value: true, timestamp: Date.now() }));
         } else {
-          throw new Error("요약 정보는 있으나 스케줄 데이터가 없습니다.");
+          // API 호출은 성공했으나 데이터가 없는 경우, 선택 상태를 해제합니다.
+          throw new Error("getActiveScheduleSummary succeeded but returned no schedule data.");
         }
-      } catch (error) {
-        console.error("홈페이지 요약 정보 로딩 실패, 선택 상태를 초기화합니다.", error);
-        await deselectAndClear();
+      } else {
+        // 선택된 스케줄이 없는 경우, 로컬 상태를 확실히 정리합니다.
+        if (isSelected) {
+          await deselectAndClear();
+        }
       }
+    } catch (error) {
+      console.error("홈페이지 초기화 중 에러 발생, 모든 선택 상태를 초기화합니다.", error);
+      await deselectAndClear();
+    } finally {
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
-  }, [deselectAndClear, getInitialSelectionStatus]);
+  }, [deselectAndClear]); // isSelected 의존성 제거
 
   const selectSchedule = useCallback(async (scheduleId: string): Promise<Schedule | null> => {
-    console.log("[DEBUG] selectSchedule: 함수 시작, scheduleId:", scheduleId);
     setIsProcessing(true);
     try {
-      console.log("[DEBUG] selectSchedule: recommendApi.selectAndGetSummary API 호출 직전");
       const response = await recommendApi.selectAndGetSummary(scheduleId);
-      console.log("[DEBUG] selectSchedule: API 호출 성공, 응답:", response);
-
       if (response && response.schedule) {
-        console.log("[DEBUG] selectSchedule: 응답 데이터 유효, 상태 업데이트 시작");
         localStorage.setItem("scheduleSelected", JSON.stringify({ value: true, timestamp: Date.now() }));
         setSelectedSchedule(response.schedule);
         setIsSelected(true);
-        console.log("[DEBUG] selectSchedule: 상태 업데이트 완료");
         return response.schedule;
       } else {
-        console.warn("[DEBUG] selectSchedule: API는 성공했으나 응답 데이터 없음, 선택 해제 처리");
         await deselectAndClear();
         return null;
       }
     } catch (error) {
-      console.error("[DEBUG] selectSchedule: API 호출 중 에러 발생", error);
       await deselectAndClear();
       throw error;
     } finally {
-      console.log("[DEBUG] selectSchedule: 함수 종료");
       setIsProcessing(false);
     }
   }, [deselectAndClear]);
