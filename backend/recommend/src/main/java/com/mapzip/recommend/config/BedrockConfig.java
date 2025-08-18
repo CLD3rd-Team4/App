@@ -14,7 +14,7 @@ public class BedrockConfig {
 
    @Bean
     public BedrockRuntimeClient bedrockRuntimeClient(
-            @Value("${aws.region:us-east-1}") String region  // Config Server에서 외부화
+            @Value("${aws.region:ap-northeast-2}") String region  // Config Server에서 외부화
     ) {
         return BedrockRuntimeClient.builder()
                 .region(Region.of(region))
