@@ -173,7 +173,7 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public void selectSchedule(SelectScheduleRequest request, StreamObserver<GetScheduleDetailResponse> responseObserver) {
         try {
             String scheduleId = request.getScheduleId();
