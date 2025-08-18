@@ -115,6 +115,14 @@ management:
       probes:
         enabled: true
   metrics:
-    export:
-      prometheus:
-        enabled: true
+    distribution:
+      percentiles-histogram:
+        http:
+          server:
+            requests: true
+      slo:
+        http.server.requests: 100ms,200ms,500ms,1s,2s
+    tags:
+      application: ${spring.application.name}
+      environment: ${ENVIRONMENT:prod}
+      region: ${AWS_REGION:ap-northeast-2}

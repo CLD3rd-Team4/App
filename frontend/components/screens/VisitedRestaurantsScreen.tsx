@@ -151,7 +151,7 @@ export default function VisitedRestaurantsScreen() {
           ) : visitedRestaurants.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-gray-600 mb-4">미작성 리뷰가 없습니다.</p>
-              <p className="text-sm text-gray-500 mb-4">최근 방문하신 식당? 후기를 남겨보세요.</p>
+              <p className="text-sm text-gray-500 mb-4">최근 방문하신 식당의 후기를 남겨보세요.</p>
               <Button
                 onClick={() => setShowNewRestaurantForm(true)}
                 className="bg-blue-500 hover:bg-blue-600 text-white flex items-center gap-2"
@@ -163,7 +163,7 @@ export default function VisitedRestaurantsScreen() {
             <div className="space-y-4">
               <div className="bg-blue-500 text-white p-4 rounded-lg">
                 <h2 className="font-medium mb-2">미 작성 리뷰</h2>
-                <p className="text-sm opacity-90">최근 방문하신 식당? 후기를 남겨보세요.</p>
+                <p className="text-sm opacity-90">최근 방문하신 식당의 후기를 남겨보세요.</p>
               </div>
 
               <div className="space-y-3">
