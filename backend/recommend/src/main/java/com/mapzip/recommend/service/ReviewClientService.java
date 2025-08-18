@@ -20,6 +20,25 @@ public class ReviewClientService {
 
     private final ReviewServiceGrpc.ReviewServiceBlockingStub reviewStub;
 
+    public void storePlacesForReview(String userId, List<RecommendationSelectionEntity> selections) {
+        List<com.mapzip.review.grpc.ReviewProto.ReviewPlaceInfo> placeInfos = selections.stream()
+                .map(selection -> com.mapzip.review.grpc.ReviewProto.ReviewPlaceInfo.newBuilder()
+                        .setId(selection.getPlaceId())
+                        .setPlaceName(selection.getPlaceName())
+                        .setAddressName(selection.getAddressName())
+                        .setPlaceUrl(selection.getPlaceUrl())
+                        .setScheduledTime(selection.getScheduledTime())
+                        .build())
+                .collect(Collectors.toList());
+
+        com.mapzip.review.grpc.ReviewProto.StorePlacesForReviewRequest request = com.mapzip.review.grpc.ReviewProto.StorePlacesForReviewRequest.newBuilder()
+                .setUserId(userId)
+                .addAllPlaces(placeInfos)
+                .build();
+
+        reviewStub.storePlacesForReview(request);
+    }
+
     public ReviewStatsDto getRestaurantStats(String restaurant_id) {
     	GetReviewSummaryRequest request = GetReviewSummaryRequest.newBuilder()
     			.addAllRestaurantIds(Arrays.asList(restaurant_id))

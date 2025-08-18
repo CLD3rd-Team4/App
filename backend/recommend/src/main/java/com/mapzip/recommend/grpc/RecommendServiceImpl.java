@@ -25,6 +25,7 @@ import com.mapzip.recommend.dto.SlotInfoDto;
 import com.mapzip.recommend.entity.RecommendationSelectionEntity;
 import com.mapzip.recommend.repository.RecommendationSelectionRepository;
 import com.mapzip.recommend.service.RecommendRequestService;
+import com.mapzip.recommend.service.ReviewClientService;
 import com.mapzip.recommend.service.ScheduleDetailQueryService;
 
 import io.grpc.stub.StreamObserver;
@@ -41,9 +42,11 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 	private final RecommendRequestService recommendRequestService;
 	private final RecommendationSelectionRepository selectionRepository;
 	private final RedisTemplate<String, String> redisTemplate;
+	private final ReviewClientService reviewClientService;
 	private final ScheduleDetailQueryService scheduleDetailQueryService;
 	private final StringRedisTemplate redisTemplateString;
     private final RecommendationSelectionRepository selectionRepo;
+
 
 	// 선택된 스케줄 프론트에서 조회
 	@Override
@@ -98,17 +101,18 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 	}
 
 	@Override
-	@Transactional
+	@Transactional  
 	public void submitSelectedPlace(SelectedPlaceRequest request, StreamObserver<SubmitResponse> responseObserver) {
-		// 동일 유저 다른 스케줄에서 선택한 식당 정보 db에서 삭제
+		//동일 유저 다른 스케줄에서 선택한 식당 정보 db에서 삭제 
 		String userId = GrpcHeaderConfig.UserIdContext.USER_ID.get();
 		selectionRepository.deleteByUserId(userId);
-
+		
 		// 요청에서 유저 및 스케줄 정보 추출
 		String scheduleId = request.getScheduleId();
-		List<SelectedPlace> selectedPlaces = request.getSelectedPlacesList();
+		List<RecommendationSelectionEntity> savedEntities = new ArrayList<>();
 		for (SelectedPlace place : request.getSelectedPlacesList()) {
-			log.info("Saving place: slotId={}, id={}, name={}", place.getSlotId(), place.getId(), place.getPlaceName());
+			log.info("Saving place: slotId={}, id={}, name={}", 
+			        place.getSlotId(), place.getId(), place.getPlaceName());
 
 			RecommendationSelectionEntity entity = RecommendationSelectionEntity.builder().userId(userId)
 					.scheduleId(scheduleId).slotId(place.getSlotId()).placeId(place.getId())
@@ -118,15 +122,18 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 					.averageRating(place.getAverageRating()).representativeReview(place.getRepresentativeReview())
 					.build();
 			selectionRepository.save(entity);
+			savedEntities.add(entity);
 		}
 
-		SubmitResponse response = SubmitResponse.newBuilder().setStatus("OK").setMessage("✅ 선택된 식당들이 성공적으로 저장되었습니다.")
-				.build();
+		// 리뷰 서비스에 미작성 리뷰로 저장 요청
+		reviewClientService.storePlacesForReview(userId, savedEntities);
+
+		SubmitResponse response = SubmitResponse.newBuilder().setStatus("OK").setMessage("✅ 선택된 식당들이 성공적으로 저장되었습니다.").build();
 
 		responseObserver.onNext(response);
 		responseObserver.onCompleted();
 	}
-
+	
 	@Override
 	public void getRecommendationResults(GetRecommendationResultsRequest request,
 			StreamObserver<GetRecommendationResultsResponse> responseObserver) {
