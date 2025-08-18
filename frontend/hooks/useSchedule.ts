@@ -51,53 +51,50 @@ export default function useSchedule() {
         const statusResponse = await scheduleApi.getSelectionStatus();
         finalIsSelected = statusResponse.isSelected;
         if(finalIsSelected) localStorage.setItem('scheduleSelected', JSON.stringify({ value: true, timestamp: Date.now() }));
-      } catch (e) { finalIsSelected = false; }
+      } catch (e) { 
+        finalIsSelected = false; 
+      }
     }
 
     if (finalIsSelected) {
       setIsSelected(true);
       try {
-        // Promise.race를 사용하여 타임아웃 구현
-        const summaryPromise = recommendApi.getActiveScheduleSummary();
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('API call timed out after 10 seconds')), 10000)
-        );
-
-        const summaryResponse = await Promise.race([summaryPromise, timeoutPromise]);
-
+        const summaryResponse = await recommendApi.getActiveScheduleSummary();
         if (summaryResponse && summaryResponse.schedule) {
           setSelectedSchedule(summaryResponse.schedule);
         } else {
-          // 데이터가 없는 경우, 선택 상태를 해제합니다.
-          throw new Error("No schedule summary data found.");
+          // API 호출은 성공했으나 데이터가 없는 경우 (추천 정보 생성 실패 등)
+          // 이 경우를 에러로 간주하고 선택 상태를 해제합니다.
+          throw new Error("No schedule summary data found, deselecting.");
         }
       } catch (e) {
-        console.error("요약 정보 로딩 실패 또는 타임아웃. 선택 상태를 초기화합니다:", e);
+        // API 호출 자체가 실패하거나, 데이터가 없어 에러를 던진 경우
+        console.error("요약 정보 로딩 실패. 선택 상태를 초기화합니다:", e);
         await deselectAndClear();
       }
     } else {
-      deselectAndClear();
+      // 선택된 스케줄이 없는 것이 확인된 경우
+      if (isSelected) deselectAndClear(); // 혹시 모를 프론트 상태 불일치 정리
     }
     setIsLoading(false);
-  }, [deselectAndClear]);
+  }, [isSelected, deselectAndClear]);
 
-  const selectSchedule = useCallback(async (scheduleId: string): Promise<void> => {
+  const selectSchedule = useCallback(async (scheduleId: string): Promise<Schedule | null> => {
     setIsProcessing(true);
     try {
-      // API를 호출하여 서버에 선택 사실을 알리기만 하고, 응답 데이터는 사용하지 않습니다.
-      await recommendApi.selectAndGetSummary(scheduleId);
-
-      // 클라이언트 측에서는 선택되었다는 상태와 타임스탬프만 기록합니다.
-      localStorage.setItem("scheduleSelected", JSON.stringify({ value: true, timestamp: Date.now() }));
-      setIsSelected(true);
-      // 요약 정보 상태는 여기서 관리하지 않으므로 null로 유지합니다.
-      setSelectedSchedule(null);
-
+      const response = await recommendApi.selectAndGetSummary(scheduleId);
+      if (response && response.schedule) {
+        localStorage.setItem("scheduleSelected", JSON.stringify({ value: true, timestamp: Date.now() }));
+        setSelectedSchedule(response.schedule);
+        setIsSelected(true);
+        return response.schedule;
+      } else {
+        deselectAndClear();
+        return null;
+      }
     } catch (error) {
-      // 실패 시 상태를 확실하게 되돌립니다.
       deselectAndClear();
-      console.error("Failed to select schedule:", error);
-      throw error; // 에러를 다시 던져서 호출한 쪽에서 알 수 있도록 합니다.
+      throw error;
     } finally {
       setIsProcessing(false);
     }
