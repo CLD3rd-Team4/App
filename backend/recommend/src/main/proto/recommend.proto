@@ -67,8 +67,7 @@ message SubmitResponse {
 }
 
 message GetRecommendationResultsRequest {
-  string userId = 1;
-  string scheduleId = 2;
+  string scheduleId = 1;
 }
 
 

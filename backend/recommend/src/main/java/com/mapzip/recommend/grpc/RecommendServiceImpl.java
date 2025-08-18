@@ -89,8 +89,7 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 	@Override
 	public void getRecommendationResults(GetRecommendationResultsRequest request,
 	                                     StreamObserver<GetRecommendationResultsResponse> responseObserver) {
-
-	    final String userId = request.getUserId();
+		String userId=GrpcHeaderConfig.UserIdContext.USER_ID.get();
 	    final String scheduleId = request.getScheduleId();
 
 	    // 키 포맷: recommend:{userId}:{scheduleId}:{slotId}:{MEAL|SNACK}:{placeN}
