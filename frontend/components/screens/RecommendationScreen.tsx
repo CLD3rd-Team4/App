@@ -112,11 +112,6 @@ export default function RecommendationScreen() {
 
       const { data } = await api.get<GetResultsResponse>("/recommend/result", {
       params: { scheduleId },   // ← 쿼리스트링으로 전달
-      headers: {
-      accept: "application/json",
-      "cache-control": "no-cache",
-      pragma: "no-cache",
-  },
 })
 
       // ✅ 가드: 응답이 현재 선택된 스케줄의 것이 아니면 무시
