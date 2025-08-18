@@ -15,8 +15,7 @@ import api from "@/lib/interceptor"
 import { scheduleApi } from "@/services/api"
 
 // ===== 상수 =====
-const DEV_USER_ID = "user123"          // ★ userId 목 유지
-const POLL_INTERVAL_MS = 1500          // 폴링 주기(ms)
+const POLL_INTERVAL_MS = 1500 // 폴링 주기(ms)
 
 // 결과 응답(일부 필드만)
 type GetResultsResponse = {
@@ -57,7 +56,6 @@ export default function ScheduleListScreen() {
   useEffect(() => {
     setIsClient(true)
     loadSchedules()
-    
   }, [loadSchedules])
 
   // ===== 추천 트리거 =====
@@ -70,8 +68,8 @@ export default function ScheduleListScreen() {
     }
   }
 
-  // ===== 결과 폴링 =====
-  const startPollingResults = (userId: string, scheduleId: string) => {
+  // ===== 결과 폴링 (userId 제거) =====
+  const startPollingResults = (scheduleId: string) => {
     let active = true
     let timer: any = null
 
@@ -79,7 +77,7 @@ export default function ScheduleListScreen() {
       if (!active) return
       try {
         const res = await api.get<GetResultsResponse>("/recommend/result", {
-          params: { userId, scheduleId }
+          params: { scheduleId }, // ✅ userId 제거
         })
 
         if (res.data.status === "OK") {
@@ -133,14 +131,10 @@ export default function ScheduleListScreen() {
       }
 
       // 3. 추천 분석 요청
-      triggerRecommendRequest(schedule.id)
+      await triggerRecommendRequest(schedule.id)
 
-      // 4. 결과 폴링 시작
-      const userId =
-        (typeof window !== "undefined" && (localStorage.getItem("userId") || DEV_USER_ID)) ||
-        DEV_USER_ID
-      startPollingResults(userId, schedule.id)
-
+      // 4. 결과 폴링 시작 (✅ schedule.id만 사용)
+      startPollingResults(schedule.id)
     } catch (e) {
       console.error("스케줄 선택 처리 중 오류 발생:", e)
       alert("스케줄 선택 처리에 실패했습니다.")
@@ -166,7 +160,7 @@ export default function ScheduleListScreen() {
     try {
       await selectSchedule(selectedScheduleForPopup.id) // 필요 시 훅 상태 반영
       closePopup()
-      router.push("/recommendations/")                 // 추천 결과 페이지로 이동
+      router.push("/recommendations/") // 추천 결과 페이지로 이동
     } catch (error) {
       console.error("결과 보기 실패:", error)
     }
