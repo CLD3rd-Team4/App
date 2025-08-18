@@ -57,8 +57,7 @@ export default function ScheduleListScreen() {
   useEffect(() => {
     setIsClient(true)
     loadSchedules()
-    // 로컬에서 userId 목 주입(게이트웨이 없이 테스트용)
-    try { localStorage.setItem("userId", DEV_USER_ID) } catch {}
+    
   }, [loadSchedules])
 
   // ===== 추천 트리거 =====
@@ -124,7 +123,7 @@ export default function ScheduleListScreen() {
 
     try {
       // 1. 스케줄 선택 및 상태 업데이트
-      const selectedScheduleData = await selectSchedule(schedule.id) 
+      const selectedScheduleData = await selectSchedule(schedule.id)
 
       // 2. 타임라인 생성
       if (selectedScheduleData) {

@@ -25,48 +25,66 @@ export default function useSchedule() {
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSelected, setIsSelected] = useState<boolean>(getInitialSelectionStatus);
-  const [isLoading, setIsLoading] = useState(true); // 초기 로딩 상태는 true로 시작
+  const [isLoading, setIsLoading] = useState(true);
 
-  const deselectAndClear = useCallback(() => {
-    localStorage.removeItem("scheduleSelected");
-    setSelectedSchedule(null);
-    setIsSelected(false);
+  const deselectAndClear = useCallback(async () => {
+    try {
+      // 서버의 선택 상태를 먼저 해제합니다.
+      await scheduleApi.deselectSchedule();
+    } catch (error) {
+      console.error("서버 선택 상태 해제 실패:", error);
+      // 실패하더라도 프론트엔드 상태는 초기화하여 사용자 경험을 개선합니다.
+    } finally {
+      // 프론트엔드의 상태를 초기화합니다.
+      localStorage.removeItem("scheduleSelected");
+      setSelectedSchedule(null);
+      setIsSelected(false);
+    }
   }, []);
 
-  // HomePage가 마운트될 때 단 한번만 실행되는 초기화 로직
-  useEffect(() => {
-    const initialize = async () => {
-      setIsLoading(true);
-      let finalIsSelected = getInitialSelectionStatus();
+  const initializeHomepage = useCallback(async () => {
+    setIsLoading(true);
+    let finalIsSelected = getInitialSelectionStatus();
 
-      if (!finalIsSelected) {
-        try {
-          const statusResponse = await scheduleApi.getSelectionStatus();
-          finalIsSelected = statusResponse.isSelected;
-          if(finalIsSelected) localStorage.setItem('scheduleSelected', JSON.stringify({ value: true, timestamp: Date.now() }));
-        } catch (e) { finalIsSelected = false; }
+    if (!finalIsSelected) {
+      try {
+        const statusResponse = await scheduleApi.getSelectionStatus();
+        finalIsSelected = statusResponse.isSelected;
+        if(finalIsSelected) localStorage.setItem('scheduleSelected', JSON.stringify({ value: true, timestamp: Date.now() }));
+      } catch (e) { 
+        finalIsSelected = false; 
       }
+    }
 
-      if (finalIsSelected) {
-        setIsSelected(true);
-        try {
-          const summaryResponse = await recommendApi.getActiveScheduleSummary();
-          if (summaryResponse && summaryResponse.schedule) {
-            setSelectedSchedule(summaryResponse.schedule);
-          } else {
-            setSelectedSchedule(null);
-          }
-        } catch (e) {
-          setSelectedSchedule(null);
+    if (finalIsSelected) {
+      setIsSelected(true);
+      try {
+        // Promise.race를 사용하여 타임아웃 (10초) 구현
+        const summaryPromise = recommendApi.getActiveScheduleSummary();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('API call timed out after 10 seconds')), 10000)
+        );
+
+        // API 호출과 타임아웃 중 먼저 끝나는 것을 기다립니다.
+        const summaryResponse = await Promise.race([summaryPromise, timeoutPromise]) as { schedule: Schedule | null };
+
+        if (summaryResponse && summaryResponse.schedule) {
+          setSelectedSchedule(summaryResponse.schedule);
+        } else {
+          // API 호출은 성공했으나 데이터가 없는 경우 (추천 정보 생성 실패 등)
+          throw new Error("No schedule summary data found, deselecting.");
         }
-      } else {
-        deselectAndClear();
+      } catch (e) {
+        // API 호출 자체가 실패하거나, 타임아웃되거나, 데이터가 없는 경우
+        console.error("요약 정보 로딩 실패. 선택 상태를 초기화합니다:", e);
+        await deselectAndClear();
       }
-      setIsLoading(false);
-    };
-
-    initialize();
-  }, [deselectAndClear]); // deselectAndClear는 useCallback으로 감싸져 있어 한번만 실행됨을 보장
+    } else {
+      // 선택된 스케줄이 없는 것이 확인된 경우
+      if (isSelected) await deselectAndClear(); // 혹시 모를 프론트 상태 불일치 정리
+    }
+    setIsLoading(false);
+  }, [deselectAndClear]);
 
   const selectSchedule = useCallback(async (scheduleId: string): Promise<Schedule | null> => {
     setIsProcessing(true);
@@ -102,6 +120,7 @@ export default function useSchedule() {
   return {
     schedules, selectedSchedule, isLoading, isProcessing, isSelected,
     loadSchedules, deselectSchedule, createSchedule, updateSchedule, deleteSchedule,
+    initializeHomepage, // HomePage에서 사용
     selectSchedule,
     triggerRecommendRequest,
   }

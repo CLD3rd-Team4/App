@@ -296,6 +296,33 @@ export const scheduleApi = {
       }
     }
   },
+
+  // 스케줄 선택 해제
+  deselectSchedule: async (): Promise<{ success: boolean; message: string }> => {
+    try {
+      const response = await api.delete("/schedule/selection");
+      return response.data;
+    } catch (error: any) {
+      console.error("스케줄 선택 해제 실패:", error);
+      if (error.response) {
+        throw new APIError(
+          error.response.data?.message || "스케줄 선택을 해제하지 못했습니다.",
+          error.response.status,
+          error.response.data
+        );
+      } else if (error.request) {
+        throw new APIError(
+          "서버에서 응답이 없습니다. 네트워크 연결을 확인해주세요.",
+          0
+        );
+      } else {
+        throw new APIError(
+          `요청 설정 중 오류가 발생했습니다: ${error.message}`,
+          -1
+        );
+      }
+    }
+  },
 };
 
 export const recommendApi = {
