@@ -59,24 +59,24 @@ export default function useSchedule() {
     if (finalIsSelected) {
       setIsSelected(true);
       try {
-        // Promise.race를 사용하여 타임아웃 (10초) 구현
-        const summaryPromise = recommendApi.getActiveScheduleSummary();
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('API call timed out after 10 seconds')), 10000)
-        );
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8초 타임아웃
 
-        // API 호출과 타임아웃 중 먼저 끝나는 것을 기다립니다.
-        const summaryResponse = await Promise.race([summaryPromise, timeoutPromise]) as { schedule: Schedule | null };
+        const summaryResponse = await recommendApi.getActiveScheduleSummary(controller.signal);
+        clearTimeout(timeoutId); // 성공 시 타임아웃 해제
 
         if (summaryResponse && summaryResponse.schedule) {
           setSelectedSchedule(summaryResponse.schedule);
         } else {
-          // API 호출은 성공했으나 데이터가 없는 경우 (추천 정보 생성 실패 등)
           throw new Error("No schedule summary data found, deselecting.");
         }
-      } catch (e) {
-        // API 호출 자체가 실패하거나, 타임아웃되거나, 데이터가 없는 경우
-        console.error("요약 정보 로딩 실패. 선택 상태를 초기화합니다:", e);
+      } catch (e: any) {
+        // clear-timeout은 try 블록에서도 실행되었으므로 여기서 또 할 필요는 없습니다.
+        if (e.name === 'AbortError') {
+          console.error("요약 정보 로딩 타임아웃. 선택 상태를 초기화합니다.");
+        } else {
+          console.error("요약 정보 로딩 실패. 선택 상태를 초기화합니다:", e);
+        }
         await deselectAndClear();
       }
     } else {
