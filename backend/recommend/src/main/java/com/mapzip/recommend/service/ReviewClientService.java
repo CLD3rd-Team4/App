@@ -3,6 +3,8 @@ package com.mapzip.recommend.service;
 import java.util.Arrays;
 
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.mapzip.recommend.dto.ReviewStatsDto;
 import com.mapzip.review.grpc.ReviewProto.GetReviewSummaryRequest;

@@ -8,6 +8,10 @@ import org.mockito.InjectMocks;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -88,5 +92,27 @@ public class OcrServiceTest {
 
         // Then
         assertFalse(result, "잘못된 날짜 형식은 무효해야 함");
+    }
+
+    @Test
+    void testProcessRealReceiptImage() throws IOException {
+        // This is an integration test that calls the actual Google Cloud Vision API.
+        // It requires valid credentials (google.cloud.vision.api-key or google.cloud.vision.credentials-path)
+        // to be configured in the test environment.
+        
+        // Given
+        String expectedRestaurantName = "퇴촌농협하나로마트";
+        String expectedAddress = "경기도 광주시 퇴촌면 광동로 52번길 7";
+        byte[] imageData = Files.readAllBytes(Paths.get("receipt.jfif"));
+
+        // When
+        OcrResultDto result = ocrService.processReceiptImage(imageData, expectedRestaurantName, expectedAddress);
+
+        // Then
+        assertNotNull(result, "Result should not be null");
+        assertTrue(result.isValid(), "Receipt should be considered valid after weight adjustment");
+        System.out.println("OCR Raw Text: " + result.getRawText());
+        System.out.println("Validation Result: " + result.isValid());
+        System.out.println("Confidence Score: " + result.getConfidence());
     }
 }

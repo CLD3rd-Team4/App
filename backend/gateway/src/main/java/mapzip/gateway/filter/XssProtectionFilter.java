@@ -85,6 +85,13 @@ public class XssProtectionFilter extends AbstractGatewayFilterFactory<XssProtect
                 return chain.filter(exchange);
             }
 
+            // multipart/form-data 요청은 XSS 필터링 완전히 건너뛰기
+            MediaType contentType = request.getHeaders().getContentType();
+            if (MediaType.MULTIPART_FORM_DATA.isCompatibleWith(contentType)) {
+                log.debug("[XSS Filter] Bypassing multipart/form-data request completely");
+                return chain.filter(exchange);
+            }
+
             // POST/PUT 요청은 body 필터링
             ServerHttpRequestDecorator decorator = new ServerHttpRequestDecorator(request) {
                 @Override
@@ -133,6 +140,10 @@ public class XssProtectionFilter extends AbstractGatewayFilterFactory<XssProtect
             return sanitizeJsonBody(body);
         } else if (MediaType.APPLICATION_FORM_URLENCODED.isCompatibleWith(contentType)) {
             return sanitizeFormBody(body);
+        } else if (MediaType.MULTIPART_FORM_DATA.isCompatibleWith(contentType)) {
+            // multipart/form-data는 XSS 필터링 건너뛰기 (바이너리 데이터 포함)
+            log.debug("[XSS Filter] Skipping multipart/form-data content type");
+            return body;
         }
 
         return sanitizeXss(body);
