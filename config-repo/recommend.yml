@@ -65,10 +65,7 @@ spring:
     kubernetes:
       discovery:
         enabled: true
-logging:
-  level:
-    org.springframework.kafka.core.KafkaAdmin: DEBUG
-    org.apache.kafka.clients.admin: DEBUG
+
 eureka:
   client:
     enabled: false
