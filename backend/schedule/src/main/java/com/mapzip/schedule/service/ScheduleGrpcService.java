@@ -294,6 +294,41 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
         }
     }
 
+    @Override
+    @Transactional
+    public void deselectSchedule(DeselectScheduleRequest request, StreamObserver<DeselectScheduleResponse> responseObserver) {
+        try {
+            String userId = GrpcInterceptorConfig.USER_ID_CONTEXT_KEY.get();
+            if (userId == null || userId.isEmpty()) {
+                responseObserver.onError(io.grpc.Status.UNAUTHENTICATED
+                        .withDescription("사용자 ID를 확인할 수 없습니다.")
+                        .asRuntimeException());
+                return;
+            }
+
+            String key = "user:" + userId + ":selected";
+            Boolean deleted = redisTemplate.delete(key);
+
+            if (Boolean.TRUE.equals(deleted)) {
+                log.info("사용자 '{}'의 스케줄 선택 상태를 해제했습니다.", userId);
+            } else {
+                log.warn("사용자 '{}'의 스케줄 선택 상태 키가 존재하지 않거나 삭제에 실패했습니다.", userId);
+            }
+
+            DeselectScheduleResponse response = DeselectScheduleResponse.newBuilder()
+                    .setSuccess(true)
+                    .setMessage("스케줄 선택이 해제되었습니다.")
+                    .build();
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+        } catch (Exception e) {
+            log.error("스케줄 선택 해제 중 오류 발생", e);
+            responseObserver.onError(io.grpc.Status.INTERNAL
+                    .withDescription("스케줄 선택 해제 중 오류가 발생했습니다: " + e.getMessage())
+                    .asRuntimeException());
+        }
+    }
+
 
 
 }
