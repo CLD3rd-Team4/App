@@ -59,22 +59,29 @@ export default function useSchedule() {
     if (finalIsSelected) {
       setIsSelected(true);
       try {
-        const summaryResponse = await recommendApi.getActiveScheduleSummary();
+        // Promise.race를 사용하여 타임아웃 (10초) 구현
+        const summaryPromise = recommendApi.getActiveScheduleSummary();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('API call timed out after 10 seconds')), 10000)
+        );
+
+        // API 호출과 타임아웃 중 먼저 끝나는 것을 기다립니다.
+        const summaryResponse = await Promise.race([summaryPromise, timeoutPromise]) as { schedule: Schedule | null };
+
         if (summaryResponse && summaryResponse.schedule) {
           setSelectedSchedule(summaryResponse.schedule);
         } else {
           // API 호출은 성공했으나 데이터가 없는 경우 (추천 정보 생성 실패 등)
-          // 이 경우를 에러로 간주하고 선택 상태를 해제합니다.
           throw new Error("No schedule summary data found, deselecting.");
         }
       } catch (e) {
-        // API 호출 자체가 실패하거나, 데이터가 없어 에러를 던진 경우
+        // API 호출 자체가 실패하거나, 타임아웃되거나, 데이터가 없는 경우
         console.error("요약 정보 로딩 실패. 선택 상태를 초기화합니다:", e);
         await deselectAndClear();
       }
     } else {
       // 선택된 스케줄이 없는 것이 확인된 경우
-      if (isSelected) deselectAndClear(); // 혹시 모를 프론트 상태 불일치 정리
+      if (isSelected) await deselectAndClear(); // 혹시 모를 프론트 상태 불일치 정리
     }
     setIsLoading(false);
   }, [isSelected, deselectAndClear]);
