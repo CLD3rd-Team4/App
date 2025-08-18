@@ -123,7 +123,7 @@ export default function ScheduleListScreen() {
 
     try {
       // 1. 스케줄 선택 및 상태 업데이트
-      const selectedScheduleData = await selectSchedule(schedule.id) 
+      const selectedScheduleData = await selectSchedule(schedule.id)
 
       // 2. 타임라인 생성
       if (selectedScheduleData) {
