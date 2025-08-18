@@ -370,12 +370,13 @@ export const recommendApi = {
       });
       const data = response.data;
 
-      // getRecommendResult와 유사하게, 실제 스케줄 객체를 반환하도록 처리합니다。
-      const scheduleData = data.schedule ? data.schedule : data;
-      if (data.status === 'OK' && scheduleData && Object.keys(scheduleData).length > 0) {
+      // API 응답에 명시적으로 schedule 객체가 있고, status가 OK일 때만 유효한 요약 정보로 간주합니다.
+      const scheduleData = data.schedule; 
+      if (data.status === 'OK' && scheduleData) {
         return { schedule: mapScheduleResponse(scheduleData) };
       }
-      // PENDING이거나, status가 OK여도 데이터가 없으면 null 반환
+      
+      // PENDING이거나, status가 OK여도 schedule 필드가 없으면 null을 반환합니다.
       return { schedule: null };
     } catch (error) { 
       console.error("getActiveScheduleSummary failed, returning null schedule. Error:", error);

@@ -246,7 +246,7 @@ public class OcrService {
         }
         
         // 종합 점수가 0.6 이상이면 검증 통과
-        return (nameSimilarity * 0.7 + addressSimilarity * 0.3) >= 0.6;
+        return (nameSimilarity * 0.8 + addressSimilarity * 0.2) >= 0.6;
     }
     
     private double calculateConfidence(String extractedRestaurantName, String extractedAddress,
@@ -259,7 +259,7 @@ public class OcrService {
             addressSimilarity = calculateSimilarity(extractedAddress, expectedAddress);
         }
         
-        return nameSimilarity * 0.7 + addressSimilarity * 0.3;
+        return nameSimilarity * 0.8 + addressSimilarity * 0.2;
     }
     
     private double calculateSimilarity(String str1, String str2) {
