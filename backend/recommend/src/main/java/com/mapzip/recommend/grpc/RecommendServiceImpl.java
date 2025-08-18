@@ -10,7 +10,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
 import org.springframework.data.redis.core.RedisTemplate;
@@ -23,6 +22,7 @@ import com.mapzip.recommend.dto.SlotInfoDto;
 import com.mapzip.recommend.entity.RecommendationSelectionEntity;
 import com.mapzip.recommend.repository.RecommendationSelectionRepository;
 import com.mapzip.recommend.service.RecommendRequestService;
+import com.mapzip.recommend.service.ScheduleDetailQueryService;
 
 import io.grpc.stub.StreamObserver;
 import jakarta.transaction.Transactional;
@@ -38,7 +38,56 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 	private final RecommendRequestService recommendRequestService;
 	private final RecommendationSelectionRepository selectionRepository;
 	private final RedisTemplate<String, String> redisTemplate;
+	private final ScheduleDetailQueryService scheduleDetailQueryService;
+	
+	//선택된 스케줄 프론트에서 조회 
+    @Override
+    public void getScheduleDetail(GetSelectedScheduleDetailRequest request,
+                                  StreamObserver<GetSelectedScheduleDetailResponse> responseObserver) {
 
+        String scheduleId = request.getScheduleId();
+        String userId = GrpcHeaderConfig.UserIdContext.USER_ID.get();
+
+        try {
+            var snapOpt = scheduleDetailQueryService.get(userId, scheduleId);
+            if (snapOpt.isEmpty()) {
+                GetSelectedScheduleDetailResponse resp = GetSelectedScheduleDetailResponse.newBuilder()
+                        .setStatus("NOT_FOUND")
+                        .setMessage("No schedule detail in Redis")
+                        .build();
+                responseObserver.onNext(resp);
+                responseObserver.onCompleted();
+                return;
+            }
+
+            var s = snapOpt.get();
+            ScheduleDetail detail = ScheduleDetail.newBuilder()
+                    .setDepartureTime(s.getDepartureTime())
+                    .setDepartureName(s.getDepartureName())
+                    .setDestinationName(s.getDestinationName())
+                    .setEstimatedArrivalTime(s.getEstimatedArrivalTime())
+                    .addAllWaypointNames(s.getWaypointNames())
+                    .addAllWaypointTimes(s.getWaypointTimes())
+                    .build();
+
+            GetSelectedScheduleDetailResponse resp = GetSelectedScheduleDetailResponse.newBuilder()
+                    .setStatus("OK")
+                    .setMessage("success")
+                    .setScheduleDetail(detail)
+                    .build();
+
+            responseObserver.onNext(resp);
+            responseObserver.onCompleted();
+        } catch (Exception e) {
+            log.error("getScheduleDetail error (userId={}, scheduleId={})", userId, scheduleId, e);
+            GetSelectedScheduleDetailResponse resp = GetSelectedScheduleDetailResponse.newBuilder()
+                    .setStatus("ERROR")
+                    .setMessage("Internal error")
+                    .build();
+            responseObserver.onNext(resp);
+            responseObserver.onCompleted();
+        }
+    }
 
 	@Override
 	public void sendRecommendRequest(RecommendRequest request, StreamObserver<RecommendResponse> responseObserver) {
