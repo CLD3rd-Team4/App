@@ -12,11 +12,9 @@ import { generateTimelineItems, type TimelineItem } from "@/lib/timeline"
 import ScheduleProcessingPopup from "@/components/modals/ScheduleProcessingPopup"
 import RecommendationReadyPopup from "@/components/modals/RecommendationReadyPopup"
 import api from "@/lib/interceptor"
-import { scheduleApi } from "@/services/api"
 
 // ===== 상수 =====
-const DEV_USER_ID = "user123"          // ★ userId 목 유지
-const POLL_INTERVAL_MS = 1500          // 폴링 주기(ms)
+const POLL_INTERVAL_MS = 1500 // 폴링 주기(ms)
 
 // 결과 응답(일부 필드만)
 type GetResultsResponse = {
@@ -57,7 +55,6 @@ export default function ScheduleListScreen() {
   useEffect(() => {
     setIsClient(true)
     loadSchedules()
-    
   }, [loadSchedules])
 
   // ===== 추천 트리거 =====
@@ -70,8 +67,8 @@ export default function ScheduleListScreen() {
     }
   }
 
-  // ===== 결과 폴링 =====
-  const startPollingResults = (userId: string, scheduleId: string) => {
+  // ===== 결과 폴링 (userId 제거) =====
+  const startPollingResults = (scheduleId: string) => {
     let active = true
     let timer: any = null
 
@@ -79,7 +76,7 @@ export default function ScheduleListScreen() {
       if (!active) return
       try {
         const res = await api.get<GetResultsResponse>("/recommend/result", {
-          params: { userId, scheduleId }
+          params: { scheduleId }, // ✅ userId 없이 scheduleId만
         })
 
         if (res.data.status === "OK") {
@@ -127,7 +124,6 @@ export default function ScheduleListScreen() {
       if (fullSchedule) {
         setTimelineItems(generateTimelineItems(fullSchedule))
       } else {
-        // selectSchedule이 null을 반환하면 에러 상황으로 간주
         throw new Error("selectSchedule did not return schedule details.")
       }
     } catch (e) {
@@ -135,14 +131,9 @@ export default function ScheduleListScreen() {
       // 상세 실패해도 추천은 트리거/폴링 가능하므로 팝업은 유지
     }
 
-    // 추천 트리거
-    triggerRecommendRequest(schedule.id)
-
-    // 결과 폴링 시작 (userId는 로컬에서 목/혹은 게이트웨이 주입)
-    const userId =
-      (typeof window !== "undefined" && (localStorage.getItem("userId") || DEV_USER_ID)) ||
-      DEV_USER_ID
-    startPollingResults(userId, schedule.id)
+    // 3) 추천 분석 요청 & 4) 결과 폴링 시작 (중복 없이 한 번만)
+    await triggerRecommendRequest(schedule.id)
+    startPollingResults(schedule.id)
   }
 
   const handleScheduleEdit = (schedule: Schedule) => {
@@ -163,7 +154,7 @@ export default function ScheduleListScreen() {
     try {
       await selectSchedule(selectedScheduleForPopup.id) // 필요 시 훅 상태 반영
       closePopup()
-      router.push("/recommendations/")                 // 추천 결과 페이지로 이동
+      router.push("/recommendations/") // 추천 결과 페이지로 이동
     } catch (error) {
       console.error("결과 보기 실패:", error)
     }

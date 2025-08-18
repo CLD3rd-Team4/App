@@ -1,3 +1,5 @@
+// app/recommendations/page.tsx (또는 해당 경로 파일명)
+
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
@@ -29,33 +31,30 @@ type GetResultsResponse = {
   status: "OK" | "PENDING" | "ERROR"
   message?: string
 }
-type SubmitPlace = {
-  slotId: string;
-  mealType: number;           // 0=식사, 1=간식
-  scheduledTime: string;      // "오후 01:30" 그대로 OK
-  id: string;
-  placeName: string;
-  reason?: string;
-  distance?: string;
-  addressName?: string;
-  placeUrl?: string;
-  averageRating?: number;
-  representativeReview?: string;
-};
-type SubmitRequest = {
-  userId: string;
-  scheduleId: string;
-  selectedPlaces: SubmitPlace[];
-};
 
-// ==== 목 파라미터(요청에만 사용) ====
-const USE_MOCK_IDS = true // 실서버 전환 시 false
-const MOCK_USER_ID = "user123"
-const MOCK_SCHEDULE_ID = "schedule123"
+type SubmitPlace = {
+  slotId: string
+  mealType: number           // 0=식사, 1=간식
+  scheduledTime: string      // "오후 01:30" 등 그대로
+  id: string
+  placeName: string
+  reason?: string
+  distance?: string
+  addressName?: string
+  placeUrl?: string
+  averageRating?: number
+  representativeReview?: string
+}
+
+type SubmitRequest = {
+  scheduleId: string
+  selectedPlaces: SubmitPlace[]
+}
 
 // ==== 화면용 타입 ====
 interface MealSection {
-  id: string
+  id: string                 // 화면용 id
+  originSlotId?: string      // 서버에서 받은 slotId (있으면 이걸 우선 사용)
   title: string
   type: "식사" | "간식"
   index: number
@@ -78,7 +77,7 @@ const toRestaurant = (p: ApiPlace): Restaurant => ({
   distance: p.distance || "",
   addressName: p.addressName,
   image: p.image || "/placeholder.svg?height=80&width=80",
-  // @ts-ignore
+  // @ts-ignore(외부 타입)
   placeUrl: p.placeUrl,
 })
 
@@ -97,12 +96,17 @@ export default function RecommendationScreen() {
     try {
       setIsLoading(true)
 
-      const params = USE_MOCK_IDS
-        ? { userId: MOCK_USER_ID, scheduleId: MOCK_SCHEDULE_ID }
-        : { scheduleId: selectedSchedule?.id }
+      const scheduleId = selectedSchedule?.id
+      if (!scheduleId) {
+        setMealSections([])
+        setExpandedSections(new Set())
+        setIsLoading(false)
+        return
+      }
 
+      // ✅ userId 제거, scheduleId만 전달
       const { data } = await api.get<GetResultsResponse>("/recommend/result", {
-        params,
+        params: { scheduleId },
         headers: { "Cache-Control": "no-cache" },
       })
 
@@ -112,7 +116,7 @@ export default function RecommendationScreen() {
         return
       }
 
-      // 첫 place 기준 정렬 (시간 → 식사우선)
+      // 시간(문자열) → 식사/간식 우선 정렬
       const slots = [...data.slotRecommendations].sort((a, b) => {
         const af = a.places?.[0]
         const bf = b.places?.[0]
@@ -130,11 +134,11 @@ export default function RecommendationScreen() {
         const first = slot.places?.[0]
         const label = mealTypeToLabel(first?.mealType ?? 0)
         const idx = label === "식사" ? mealIdx++ : snackIdx++
-        const id = slot.slotId ?? `${label === "식사" ? "meal" : "snack"}-${idx}`
         const restaurants: Restaurant[] = (slot.places || []).map(toRestaurant)
 
         return {
-          id,
+          id: `${label === "식사" ? "meal" : "snack"}-${idx}`,
+          originSlotId: slot.slotId, // ✅ 서버 slotId 보존
           title: sectionTitle(label, idx),
           type: label,
           index: idx,
@@ -159,7 +163,7 @@ export default function RecommendationScreen() {
     loadRecommendations()
   }, [loadRecommendations])
 
-  // UI 핸들러들 — 전부 "컴포넌트 내부"에 있어야 함
+  // UI 핸들러
   const toggleSection = useCallback((sectionId: string) => {
     setExpandedSections((prev) => {
       const next = new Set(prev)
@@ -189,19 +193,23 @@ export default function RecommendationScreen() {
     return mealSections.every((section) => !!selectedRestaurants[section.id])
   }, [mealSections, selectedRestaurants])
 
+  // ✅ 제출: proto 맞춰 POST /recommend/submit 호출
   const handleComplete = async () => {
     if (!isAllSectionsSelected()) {
-      alert("모든 식사/간식 시간에 대해 식당을 선택해주세요.");
-      return;
+      alert("모든 식사/간식 시간에 대해 식당을 선택해주세요.")
+      return
+    }
+
+    const scheduleId = selectedSchedule?.id
+    if (!scheduleId) {
+      alert("오류: 스케줄 ID가 없습니다.")
+      return
     }
 
     const selectedPlaces: SubmitPlace[] = mealSections.map(sec => {
-      const r = selectedRestaurants[sec.id];
-      if (!r) return null as any;
-
+      const r = selectedRestaurants[sec.id]!
       return {
-        // ★ 서버 slotId 우선 사용 (없으면 UI id를 백업으로)
-        slotId: (sec as any).originSlotId || sec.id,
+        slotId: sec.originSlotId || sec.id,             // ✅ 서버 slotId 우선
         mealType: sec.type === "식사" ? 0 : 1,
         scheduledTime: sec.time,
         id: r.id,
@@ -211,31 +219,41 @@ export default function RecommendationScreen() {
         addressName: (r as any).addressName || "",
         placeUrl: (r as any).placeUrl || "",
         averageRating: r.rating ?? 0,
-        representativeReview: r.description || ""
-      };
-    }).filter(Boolean);
+        representativeReview: r.description || "",
+      }
+    })
 
-    // ⚠️ userId/scheduleId는 실제 값으로 맞춰주세요 (지금은 목 예시)
     const payload: SubmitRequest = {
-      userId: "user123",
-      scheduleId: "schedule456",
-      selectedPlaces
-    };
+      scheduleId,
+      selectedPlaces,
+    }
 
     try {
-      // 중앙 상태 관리를 위해 useSchedule 훅의 함수를 사용합니다.
-      if (payload.scheduleId) {
-        await selectSchedule(payload.scheduleId);
-        alert("선택을 저장했습니다.");
-        router.push("/");
-      } else {
-        alert("오류: 스케줄 ID가 없습니다.");
-      }
+      // 실제 서버로 전송
+      await api.post<{
+        status: "OK" | "ERROR"
+        message?: string
+      }>("/recommend/submit", payload)
+
+      // 중앙 상태 업데이트(옵션): 최신 스케줄로 갱신
+      await selectSchedule(scheduleId)
+      const LS_KEY_SELECTED = "recommend:lastSubmit";
+      localStorage.setItem(
+      LS_KEY_SELECTED,
+      JSON.stringify({
+      scheduleId,
+      submittedAt: new Date().toISOString(),
+      selectedPlaces,
+    })
+  )
+
+      alert("선택을 저장했습니다.")
+      router.push("/")
     } catch (e: any) {
-      console.error("submit 실패:", e?.response?.data || e);
-      alert("저장 중 오류가 발생했습니다.");
+      console.error("submit 실패:", e?.response?.data || e)
+      alert("저장 중 오류가 발생했습니다.")
     }
-  };
+  }
 
   // 렌더
   return (
@@ -270,7 +288,7 @@ export default function RecommendationScreen() {
             </div>
           ) : mealSections.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-gray-600 mb-4">식사 시간이 설정되지 않았습니다.</p>
+              <p className="text-gray-600 mb-4">식사 시간이 설정되지 않았거나 결과가 아직 준비되지 않았습니다.</p>
               <Button onClick={() => router.push("/schedule")} className="bg-blue-500 hover:bg-blue-600 text-white">
                 스케줄 수정하기
               </Button>
