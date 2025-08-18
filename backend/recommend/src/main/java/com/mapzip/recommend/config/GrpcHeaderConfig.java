@@ -18,22 +18,22 @@ public class GrpcHeaderConfig {
     @Order(100)
     @GrpcGlobalServerInterceptor
     public ServerInterceptor userIdInterceptor() {
-        return new ServerInterceptor() {
-            @Override
-            public <ReqT, RespT> ServerCall.Listener<ReqT> interceptCall(
-                    ServerCall<ReqT, RespT> call,
-                    Metadata headers,
-                    ServerCallHandler<ReqT, RespT> next) {
+      return new ServerInterceptor() {
+        @Override
+        public <ReqT, RespT> ServerCall.Listener<ReqT> interceptCall(
+            ServerCall<ReqT, RespT> call, Metadata headers, ServerCallHandler<ReqT, RespT> next) {
 
-                // x-user-id 헤더 추출
-                String userId = headers.get(Metadata.Key.of("x-user-id", Metadata.ASCII_STRING_MARSHALLER));
-                System.out.println("받아온 x-user-id = " + userId);
+          String userId = headers.get(Metadata.Key.of("x-user-id", Metadata.ASCII_STRING_MARSHALLER));
+          String method = call.getMethodDescriptor().getFullMethodName();
+          Object remote = call.getAttributes().get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR);
+          String reqId = java.util.UUID.randomUUID().toString().substring(0,8);
 
-                // Context에 userId만 저장
-                Context ctx = Context.current().withValue(UserIdContext.USER_ID, userId);
+          System.out.printf("[IN %s] method=%s remote=%s x-user-id=%s%n", reqId, method, remote, userId);
 
-                return Contexts.interceptCall(ctx, call, headers, next);
-            }
-        };
+          Context ctx = Context.current().withValue(UserIdContext.USER_ID, userId);
+          return Contexts.interceptCall(ctx, call, headers, next);
+        }
+      };
     }
+
 }
