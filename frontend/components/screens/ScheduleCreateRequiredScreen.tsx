@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -44,6 +44,15 @@ export default function ScheduleCreateRequiredScreen({
     },
   )
   const [selectedAdjustment, setSelectedAdjustment] = useState<string>("")
+
+  // 컴포넌트 마운트 시 기본 식사 시간을 하나 추가합니다.
+  useEffect(() => {
+    // initialData가 없고, 식사 시간이 비어있을 때만 실행
+    if (!initialData && formData.targetMealTimes.length === 0) {
+      addMealTime();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 빈 배열은 마운트 시 한 번만 실행되도록 보장합니다.
 
   // 시간을 분으로 변환하는 함수
   const timeToMinutes = (time: string) => {
@@ -172,10 +181,33 @@ export default function ScheduleCreateRequiredScreen({
   }
 
   const handleNext = () => {
-    if (formData.scheduleName && formData.departureTime) {
-      onNext(formData)
+    if (!formData.scheduleName || !formData.departureTime) {
+      // This should be caught by the disabled button state, but it's a good safeguard.
+      alert("스케줄명과 출발 시간을 입력해주세요.");
+      return;
     }
-  }
+
+    if (formData.targetMealTimes.length === 0) {
+      alert("식사 시간은 최소 1개 이상 추가해야 합니다.");
+      return;
+    }
+
+    // Final validation for meal time sequence
+    for (let i = 0; i < formData.targetMealTimes.length; i++) {
+      const mealTime = formData.targetMealTimes[i].time;
+      const minTime = getMinTimeForMeal(i);
+      
+      if (timeToMinutes(mealTime) < timeToMinutes(minTime)) {
+        const errorMessage = i === 0 
+          ? `첫 번째 식사 시간(${mealTime})은 출발 시간 이후인 ${minTime}부터 설정 가능합니다.`
+          : `식사 시간(${mealTime})은 이전 식사 시간 이후인 ${minTime}부터 설정 가능합니다.`
+        alert(errorMessage);
+        return;
+      }
+    }
+
+    onNext(formData);
+  };
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
@@ -317,7 +349,7 @@ export default function ScheduleCreateRequiredScreen({
           </div>
           <Button
             onClick={handleNext}
-            disabled={!formData.scheduleName || !formData.departureTime}
+            disabled={!formData.scheduleName || !formData.departureTime || formData.targetMealTimes.length === 0}
             className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2"
           >
             다음

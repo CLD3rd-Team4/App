@@ -188,7 +188,7 @@ export default function ScheduleListScreen() {
         </div>
 
         <div className="flex-1 content-with-bottom-nav">
-          <div className="p-4">
+          <div className="p-4 pb-24">
             {schedules.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-gray-600 mb-4">생성된 스케줄이 없습니다.</p>
