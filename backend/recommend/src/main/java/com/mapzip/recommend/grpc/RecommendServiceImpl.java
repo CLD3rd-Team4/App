@@ -57,10 +57,10 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 	@Transactional  
 	public void submitSelectedPlace(SelectedPlaceRequest request, StreamObserver<SubmitResponse> responseObserver) {
 		//동일 유저 다른 스케줄에서 선택한 식당 정보 db에서 삭제 
-		 selectionRepository.deleteByUserId(request.getUserId());
+		String userId = GrpcHeaderConfig.UserIdContext.USER_ID.get();
+		selectionRepository.deleteByUserId(userId);
 		
 		// 요청에서 유저 및 스케줄 정보 추출
-		String userId = request.getUserId();
 		String scheduleId = request.getScheduleId();
 		List<SelectedPlace> selectedPlaces = request.getSelectedPlacesList();
 		for (SelectedPlace place : request.getSelectedPlacesList()) {
@@ -89,8 +89,7 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 	@Override
 	public void getRecommendationResults(GetRecommendationResultsRequest request,
 	                                     StreamObserver<GetRecommendationResultsResponse> responseObserver) {
-
-	    final String userId = request.getUserId();
+		String userId=GrpcHeaderConfig.UserIdContext.USER_ID.get();
 	    final String scheduleId = request.getScheduleId();
 
 	    // 키 포맷: recommend:{userId}:{scheduleId}:{slotId}:{MEAL|SNACK}:{placeN}
@@ -129,7 +128,6 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 	        try {
 	            // 키 파싱
 	            String[] parts = key.split(":");
-	            // expect: [recommend, userId, scheduleId, slot1, MEAL, place3]
 	            if (parts.length < 6) {
 	                log.warn("키 형식 불일치: {}", key);
 	                continue;

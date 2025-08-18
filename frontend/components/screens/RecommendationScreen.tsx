@@ -1,9 +1,11 @@
+// app/recommendations/page.tsx
+
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Star, ChevronDown, ChevronUp } from "lucide-react"
+import { ArrowLeft, ChevronDown, ChevronUp, MapPin } from "lucide-react"
 import useSchedule from "@/hooks/useSchedule"
 import type { Restaurant } from "@/types"
 import api from "@/lib/interceptor"
@@ -29,33 +31,30 @@ type GetResultsResponse = {
   status: "OK" | "PENDING" | "ERROR"
   message?: string
 }
-type SubmitPlace = {
-  slotId: string;
-  mealType: number;           // 0=식사, 1=간식
-  scheduledTime: string;      // "오후 01:30" 그대로 OK
-  id: string;
-  placeName: string;
-  reason?: string;
-  distance?: string;
-  addressName?: string;
-  placeUrl?: string;
-  averageRating?: number;
-  representativeReview?: string;
-};
-type SubmitRequest = {
-  userId: string;
-  scheduleId: string;
-  selectedPlaces: SubmitPlace[];
-};
 
-// ==== 목 파라미터(요청에만 사용) ====
-const USE_MOCK_IDS = true // 실서버 전환 시 false
-const MOCK_USER_ID = "user123"
-const MOCK_SCHEDULE_ID = "schedule123"
+type SubmitPlace = {
+  slotId: string
+  mealType: number
+  scheduledTime: string
+  id: string
+  placeName: string
+  reason?: string
+  distance?: string
+  addressName?: string
+  placeUrl?: string
+  averageRating?: number
+  representativeReview?: string
+}
+
+type SubmitRequest = {
+  scheduleId: string
+  selectedPlaces: SubmitPlace[]
+}
 
 // ==== 화면용 타입 ====
 interface MealSection {
-  id: string
+  id: string                 // 화면용 id
+  originSlotId?: string      // 서버 slotId (있으면 이걸 우선 사용)
   title: string
   type: "식사" | "간식"
   index: number
@@ -69,22 +68,64 @@ const mealTypeToLabel = (t: number): "식사" | "간식" => (t === 0 ? "식사" 
 const sectionTitle = (label: "식사" | "간식", idx: number) =>
   label === "식사" ? `식사${idx}` : `간식${idx}`
 
+// 동명 추출 (ex: "서울 광진구 자양동 123-4" -> "자양동")
+const extractDong = (addr?: string) => {
+  if (!addr) return ""
+  const tokens = addr.split(/\s+/)
+  // "XX동/XX가/XX읍/XX면/XX리" 중 가장 뒤쪽 것 우선
+  const dongLike = [...tokens].reverse().find(t => /(동|가|읍|면|리)$/.test(t))
+  return dongLike || tokens[tokens.length - 2] || tokens[tokens.length - 1] || ""
+}
+
+// 별(★/☆) 렌더링 (정수 반올림)
+const renderStars = (rating: number) => {
+  const v = Math.round(Math.max(0, Math.min(5, rating || 0)))
+  const full = "★".repeat(v)
+  const empty = "☆".repeat(5 - v)
+  return (
+    <span className="text-yellow-500 tracking-tight" aria-label={`카카오 평점 ${v}점/5점`}>
+      {full}{empty}
+    </span>
+  )
+}
+
+
+function endOfTodayTs(): number {
+  const d = new Date();
+  d.setHours(23, 59, 59, 999);
+  return d.getTime();
+}
+const LS_KEY_SELECTED = "recommend:lastSubmit";
+function writeLastSubmitSafely(entry: any) {
+  try {
+    localStorage.setItem(LS_KEY_SELECTED, JSON.stringify(entry));
+    console.log("[recommendations] lastSubmit saved:", entry);
+  } catch (e) {
+    console.error("[recommendations] lastSubmit save failed:", e);
+  }
+}
+
+// API → 화면 모델
 const toRestaurant = (p: ApiPlace): Restaurant => ({
   id: p.id,
   placeName: p.placeName,
-  description: p.representativeReview || p.reason || "추천 사유 없음",
+  // 대표 리뷰/이유가 없으면 비어두기(표시 자체를 숨김)
+  description: p.representativeReview || "",
   aiReason: p.reason || "",
-  rating: p.averageRating,
-  distance: p.distance || "",
+  rating: (typeof p.averageRating === "number" && p.averageRating > 0) ? p.averageRating : undefined,
+  distance: "", // 사용 안함
   addressName: p.addressName,
-  image: p.image || "/placeholder.svg?height=80&width=80",
-  // @ts-ignore
+  image: "",    // 이미지 미사용
+  // @ts-ignore 외부 타입
   placeUrl: p.placeUrl,
 })
 
 export default function RecommendationScreen() {
   const router = useRouter()
   const { selectedSchedule, selectSchedule } = useSchedule()
+
+  // refs
+  const activeScheduleIdRef = useRef<string | null>(null)
 
   // state
   const [mealSections, setMealSections] = useState<MealSection[]>([])
@@ -97,14 +138,23 @@ export default function RecommendationScreen() {
     try {
       setIsLoading(true)
 
-      const params = USE_MOCK_IDS
-        ? { userId: MOCK_USER_ID, scheduleId: MOCK_SCHEDULE_ID }
-        : { scheduleId: selectedSchedule?.id }
+      const scheduleId = selectedSchedule?.id
+      if (!scheduleId) {
+        setMealSections([])
+        setExpandedSections(new Set())
+        setIsLoading(false)
+        return
+      }
+
+      // 현재 페이지에서 다루는 유효 스케줄 ID 저장
+      activeScheduleIdRef.current = scheduleId
 
       const { data } = await api.get<GetResultsResponse>("/recommend/result", {
-        params,
-        headers: { "Cache-Control": "no-cache" },
+        params: { scheduleId }, // GET + query
       })
+
+      // 응답이 현재 선택된 스케줄의 것이 아니면 무시
+      if (activeScheduleIdRef.current !== scheduleId) return
 
       if (!data?.slotRecommendations?.length || data.status === "PENDING") {
         setMealSections([])
@@ -112,7 +162,7 @@ export default function RecommendationScreen() {
         return
       }
 
-      // 첫 place 기준 정렬 (시간 → 식사우선)
+      // 시간(문자열) → 식사/간식 우선 정렬
       const slots = [...data.slotRecommendations].sort((a, b) => {
         const af = a.places?.[0]
         const bf = b.places?.[0]
@@ -130,11 +180,11 @@ export default function RecommendationScreen() {
         const first = slot.places?.[0]
         const label = mealTypeToLabel(first?.mealType ?? 0)
         const idx = label === "식사" ? mealIdx++ : snackIdx++
-        const id = slot.slotId ?? `${label === "식사" ? "meal" : "snack"}-${idx}`
         const restaurants: Restaurant[] = (slot.places || []).map(toRestaurant)
 
         return {
-          id,
+          id: `${label === "식사" ? "meal" : "snack"}-${idx}`,
+          originSlotId: slot.slotId, // 서버 slotId 보존
           title: sectionTitle(label, idx),
           type: label,
           index: idx,
@@ -159,7 +209,7 @@ export default function RecommendationScreen() {
     loadRecommendations()
   }, [loadRecommendations])
 
-  // UI 핸들러들 — 전부 "컴포넌트 내부"에 있어야 함
+  // UI 핸들러
   const toggleSection = useCallback((sectionId: string) => {
     setExpandedSections((prev) => {
       const next = new Set(prev)
@@ -189,53 +239,85 @@ export default function RecommendationScreen() {
     return mealSections.every((section) => !!selectedRestaurants[section.id])
   }, [mealSections, selectedRestaurants])
 
+  // 제출
   const handleComplete = async () => {
     if (!isAllSectionsSelected()) {
-      alert("모든 식사/간식 시간에 대해 식당을 선택해주세요.");
-      return;
+      alert("모든 식사/간식 시간에 대해 식당을 선택해주세요.")
+      return
+    }
+
+    const scheduleId = selectedSchedule?.id
+    if (!scheduleId) {
+      alert("오류: 스케줄 ID가 없습니다.")
+      return
     }
 
     const selectedPlaces: SubmitPlace[] = mealSections.map(sec => {
-      const r = selectedRestaurants[sec.id];
-      if (!r) return null as any;
-
+      const r = selectedRestaurants[sec.id]!
       return {
-        // ★ 서버 slotId 우선 사용 (없으면 UI id를 백업으로)
-        slotId: (sec as any).originSlotId || sec.id,
+        slotId: sec.originSlotId || sec.id,
         mealType: sec.type === "식사" ? 0 : 1,
         scheduledTime: sec.time,
         id: r.id,
         placeName: r.placeName,
-        reason: r.aiReason || r.description || "",
-        distance: r.distance || "",
+        reason: r.aiReason || "",             // 이유 없으면 비움
+        distance: "",                          // 사용 안함
         addressName: (r as any).addressName || "",
         placeUrl: (r as any).placeUrl || "",
         averageRating: r.rating ?? 0,
-        representativeReview: r.description || ""
-      };
-    }).filter(Boolean);
+        representativeReview: r.description || "",
+      }
+    })
 
-    // ⚠️ userId/scheduleId는 실제 값으로 맞춰주세요 (지금은 목 예시)
     const payload: SubmitRequest = {
-      userId: "user123",
-      scheduleId: "schedule456",
-      selectedPlaces
-    };
+      scheduleId,
+      selectedPlaces,
+    }
+    const endOfTodayTs = () => {
+      const d = new Date()
+      d.setHours(23, 59, 59, 999)
+      return d.getTime()
+    }
 
     try {
-      // 중앙 상태 관리를 위해 useSchedule 훅의 함수를 사용합니다.
-      if (payload.scheduleId) {
-        await selectSchedule(payload.scheduleId);
-        alert("선택을 저장했습니다.");
-        router.push("/");
-      } else {
-        alert("오류: 스케줄 ID가 없습니다.");
-      }
-    } catch (e: any) {
-      console.error("submit 실패:", e?.response?.data || e);
-      alert("저장 중 오류가 발생했습니다.");
-    }
+  await api.post<{ status: "OK" | "ERROR"; message?: string }>("/recommend/submit", payload);
+  await selectSchedule(scheduleId);
+
+  const entry = {
+    scheduleId,
+    submittedAt: new Date().toISOString(),
+    selectedPlaces,
+    isSelected: true,
+    expiryAt: endOfTodayTs(),
   };
+  writeLastSubmitSafely(entry);
+
+  // 저장 확인 로그 (원하면)
+  console.log("[recommendations] readback:", localStorage.getItem(LS_KEY_SELECTED));
+
+  alert("선택을 저장했습니다.");
+  router.push("/");
+} catch (e: any) {
+  console.error("submit 실패:", e?.response?.data || e);
+  alert("저장 중 오류가 발생했습니다.");
+}
+  };
+
+
+  // 작은 MapPin 타일 (이미지 대체)
+  const PinTile = ({ addressName }: { addressName?: string }) => {
+    const dong = extractDong(addressName)
+    return (
+      <div className="w-20 h-20 rounded-lg bg-blue-100 flex flex-col items-center justify-center relative overflow-hidden">
+        <MapPin className="w-7 h-7 text-blue-600" />
+        {dong ? (
+          <span className="absolute bottom-1 text-[11px] px-1.5 py-0.5 rounded-full bg-white/90 text-gray-700">
+            {dong}
+          </span>
+        ) : null}
+      </div>
+    )
+  }
 
   // 렌더
   return (
@@ -270,7 +352,7 @@ export default function RecommendationScreen() {
             </div>
           ) : mealSections.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-gray-600 mb-4">식사 시간이 설정되지 않았습니다.</p>
+              <p className="text-gray-600 mb-4">식사 시간이 설정되지 않았거나 결과가 아직 준비되지 않았습니다.</p>
               <Button onClick={() => router.push("/schedule")} className="bg-blue-500 hover:bg-blue-600 text-white">
                 스케줄 수정하기
               </Button>
@@ -317,45 +399,57 @@ export default function RecommendationScreen() {
                   {expandedSections.has(section.id) && (
                     <div className="px-4 pb-4 border-t bg-gray-50">
                       <div className="space-y-3 pt-4">
+                        {/* 이전 선택 (있을 때만) */}
                         {section.previousSelection && (
                           <div className="bg-green-50 p-4 rounded-lg border-2 border-green-200">
-                            <div className="flex items-center gap-2 mb-3">
-                              <span className="text-xs bg-green-500 text-white px-2 py-1 rounded-full font-medium">
-                                이전 선택
-                              </span>
-                              <h3 className="font-medium">{section.previousSelection.placeName}</h3>
-                            </div>
-                            <div className="flex items-start gap-3">
-                              <img
-                                src={
-                                  section.previousSelection.image ||
-                                  "/placeholder.svg?height=60&width=60&query=restaurant"
-                                }
-                                alt={section.previousSelection.placeName}
-                                className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
-                              />
+                            <div className="flex items-start gap-4">
+                              <PinTile addressName={section.previousSelection.addressName as any} />
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm text-gray-600 mb-2">{section.previousSelection.description}</p>
-                                <p className="text-sm text-blue-600 mb-2">{section.previousSelection.aiReason}</p>
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-4">
-                                    {section.previousSelection.rating && (
-                                      <div className="flex items-center">
-                                        <Star className="w-4 h-4" />
-                                        <span className="text-sm ml-1 font-medium">
-                                          {section.previousSelection.rating}
-                                        </span>
-                                      </div>
-                                    )}
-                                    <span className="text-sm text-gray-500">
-                                      거리: {section.previousSelection.distance || "1.2km"}
-                                    </span>
-                                  </div>
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className="text-xs bg-green-500 text-white px-2 py-1 rounded-full font-medium">
+                                    이전 선택
+                                  </span>
+                                  <h3 className="font-medium">{section.previousSelection.placeName}</h3>
                                 </div>
+
+                                {section.previousSelection.description && (
+                                  <p className="text-sm text-gray-600 mb-2">{section.previousSelection.description}</p>
+                                )}
+                                {section.previousSelection.aiReason && (
+                                  <p className="text-sm text-blue-600 mb-2">{section.previousSelection.aiReason}</p>
+                                )}
+
+                                {/* 별점/이유 둘 다 없으면 위치(카카오 링크)도 숨김 */}
+                                {(
+                                  (!!section.previousSelection.rating && section.previousSelection.rating > 0) ||
+                                  !!section.previousSelection.aiReason
+                                ) && (
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                      {section.previousSelection.rating && section.previousSelection.rating > 0 && (
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-xs text-gray-500">카카오</span>
+                                          {renderStars(section.previousSelection.rating)}
+                                        </div>
+                                      )}
+                                      {(section.previousSelection as any).placeUrl && (
+                                        <a
+                                          href={(section.previousSelection as any).placeUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-sm text-blue-600 underline"
+                                        >
+                                          카카오 지도
+                                        </a>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+
                                 <Button
                                   onClick={() => handleRestaurantSelect(section.id, section.previousSelection!)}
                                   size="sm"
-                                  className={`w-full mt-2 ${
+                                  className={`w-full mt-3 ${
                                     selectedRestaurants[section.id]?.id === section.previousSelection!.id
                                       ? "bg-green-500 hover:bg-green-600 text-white"
                                       : "bg-blue-500 hover:bg-blue-600 text-white"
@@ -368,54 +462,79 @@ export default function RecommendationScreen() {
                           </div>
                         )}
 
+                        {/* 새로운 추천 */}
                         <div className="space-y-3">
                           <h4 className="font-medium text-gray-800">새로운 추천</h4>
-                          {section.restaurants.map((restaurant) => (
-                            <div
-                              key={restaurant.id}
-                              className={`bg-white border rounded-lg p-4 hover:border-blue-200 transition-all ${
-                                selectedRestaurants[section.id]?.id === restaurant.id ? "border-blue-500 bg-blue-50" : ""
-                              }`}
-                            >
-                              <div className="flex items-start gap-4">
-                                <img
-                                  src={restaurant.image || "/placeholder.svg?height=80&width=80&query=restaurant"}
-                                  alt={restaurant.placeName}
-                                  className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
-                                />
-                                <div className="flex-1 min-w-0">
-                                  {/* 이름 */}
-                                  <h3 className="font-semibold text-lg mb-1">{restaurant.placeName}</h3>
+                          {section.restaurants.map((restaurant) => {
+                            const hasRating = !!restaurant.rating && restaurant.rating > 0
+                            const hasReason = !!restaurant.aiReason
+                            const showMeta = hasRating || hasReason // 둘 다 없으면 위치도 숨김
 
-                                  {/* 한줄평 */}
-                                  <p className="text-sm text-gray-600 mb-2">{restaurant.description}</p>
-                                  <p className="text-sm text-blue-600 mb-3">{restaurant.aiReason}</p>
-                                  <div className="flex items-center justify-between mb-3">
-                                    <div className="flex items-center gap-4">
-                                      {restaurant.rating && (
-                                        <div className="flex items-center">
-                                          <Star className="w-4 h-4" />
-                                          <span className="text-sm ml-1 font-medium">{restaurant.rating}</span>
+                            return (
+                              <div
+                                key={restaurant.id}
+                                className={`bg-white border rounded-lg p-4 hover:border-blue-200 transition-all ${
+                                  selectedRestaurants[section.id]?.id === restaurant.id ? "border-blue-500 bg-blue-50" : ""
+                                }`}
+                              >
+                                <div className="flex items-start gap-4">
+                                  {/* 이미지 대신 위치 타일 */}
+                                  <PinTile addressName={(restaurant as any).addressName} />
+
+                                  <div className="flex-1 min-w-0">
+                                    {/* 이름 */}
+                                    <h3 className="font-semibold text-lg mb-1">{restaurant.placeName}</h3>
+
+                                    {/* 대표 리뷰 */}
+                                    {restaurant.description && (
+                                      <p className="text-sm text-gray-600 mb-2">{restaurant.description}</p>
+                                    )}
+                                    {/* 추천 이유 */}
+                                    {restaurant.aiReason && (
+                                      <p className="text-sm text-blue-600 mb-3">{restaurant.aiReason}</p>
+                                    )}
+
+                                    {/* 메타 (별점 + 카카오 지도 링크). 별점/이유 둘 다 없으면 숨김 */}
+                                    {showMeta && (
+                                      <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-4">
+                                          {hasRating && (
+                                            <div className="flex items-center gap-2">
+                                              <span className="text-xs text-gray-500">카카오</span>
+                                              {renderStars(restaurant.rating as number)}
+                                            </div>
+                                          )}
+
+                                          {(restaurant as any).placeUrl && (
+                                            <a
+                                              href={(restaurant as any).placeUrl}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="text-sm text-blue-600 underline"
+                                            >
+                                              카카오 지도
+                                            </a>
+                                          )}
                                         </div>
-                                      )}
-                                      <span className="text-sm text-gray-500">거리: {restaurant.distance}</span>
-                                    </div>
+                                      </div>
+                                    )}
+
+                                    <Button
+                                      onClick={() => handleRestaurantSelect(section.id, restaurant)}
+                                      size="sm"
+                                      className={`w-full ${
+                                        selectedRestaurants[section.id]?.id === restaurant.id
+                                          ? "bg-green-500 hover:bg-green-600 text-white"
+                                          : "bg-blue-500 hover:bg-blue-600 text-white"
+                                      }`}
+                                    >
+                                      {selectedRestaurants[section.id]?.id === restaurant.id ? "✓ 선택됨" : "선택하기"}
+                                    </Button>
                                   </div>
-                                  <Button
-                                    onClick={() => handleRestaurantSelect(section.id, restaurant)}
-                                    size="sm"
-                                    className={`w-full ${
-                                      selectedRestaurants[section.id]?.id === restaurant.id
-                                        ? "bg-green-500 hover:bg-green-600 text-white"
-                                        : "bg-blue-500 hover:bg-blue-600 text-white"
-                                    }`}
-                                  >
-                                    {selectedRestaurants[section.id]?.id === restaurant.id ? "✓ 선택됨" : "선택하기"}
-                                  </Button>
                                 </div>
                               </div>
-                            </div>
-                          ))}
+                            )
+                          })}
                         </div>
                       </div>
                     </div>

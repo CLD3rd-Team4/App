@@ -56,9 +56,8 @@ message SelectedPlace {
 }
 
 message SelectedPlaceRequest {
-  string userId = 1;
-  string scheduleId = 2;
-  repeated SelectedPlace selectedPlaces = 3;
+  string scheduleId = 1;
+  repeated SelectedPlace selectedPlaces = 2;
 }
 
 message SubmitResponse {
@@ -67,8 +66,7 @@ message SubmitResponse {
 }
 
 message GetRecommendationResultsRequest {
-  string userId = 1;
-  string scheduleId = 2;
+  string scheduleId = 1;
 }
 
 
