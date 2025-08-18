@@ -84,7 +84,7 @@ const toRestaurant = (p: ApiPlace): Restaurant => ({
 
 export default function RecommendationScreen() {
   const router = useRouter()
-  const { selectedSchedule } = useSchedule()
+  const { selectedSchedule, selectSchedule } = useSchedule()
 
   // state
   const [mealSections, setMealSections] = useState<MealSection[]>([])
@@ -223,56 +223,14 @@ export default function RecommendationScreen() {
     };
 
     try {
-      const res = await api.post("/recommend/submit", payload);
-      let mealIdx = 1, snackIdx = 1;
-
-      // payload의 selectedPlaces를 요약 UI에서 쓰는 Restaurant로 변환
-      const toRestaurantFromSubmit = (p: SubmitPlace): Restaurant => ({
-        id: p.id,
-        placeName: p.placeName,
-        description: p.representativeReview || p.reason || "",
-        aiReason: p.reason || "",
-        rating: p.averageRating,
-        distance: p.distance,
-        image: "/placeholder.svg?height=80&width=80",
-        // 타입 확장 필드들(있으면 요약에서 활용 가능)
-        // @ts-ignore
-        addressName: p.addressName,
-        // @ts-ignore
-        placeUrl: p.placeUrl,
-      });
-
-      const selectedRestaurantsForSummary = payload.selectedPlaces.map(p => ({
-        sectionId: p.mealType === 0 ? `meal-${mealIdx++}` : `snack-${snackIdx++}`,
-        restaurant: toRestaurantFromSubmit(p),
-      }));
-
-      const targetMealTimes = payload.selectedPlaces.map(p => ({
-        type: (p.mealType === 0 ? "식사" : "간식") as "식사" | "간식",
-        time: p.scheduledTime,
-      }));
-
-      const summary = {
-        id: payload.scheduleId,
-        title: "나의 스케줄",
-        selectedRestaurants: selectedRestaurantsForSummary,
-        selectedRestaurant: selectedRestaurantsForSummary[0]?.restaurant,
-        targetMealTimes,
-      };
-
-      //  로컬 저장 후 홈(=요약화면)으로 이동
-      localStorage.setItem("selectedSchedule", JSON.stringify(summary));
-      localStorage.setItem("scheduleSelected", "true"); // HomePage에서 요약화면 분기
-
-// 🔧 [로컬 전용] 인증 상태 강제
-if (process.env.NODE_ENV !== "production") {
-  localStorage.setItem("isLoggedIn", "true");          // HomePage의 로그인 체크에 사용
-  // useAuth가 토큰/유저정보를 본다면 함께 넣어줘 (프로젝트에 맞게 키 이름 맞추기)
-  localStorage.setItem("accessToken", "dev-mock-token");
-  localStorage.setItem("user", JSON.stringify({ id: "dev", name: "로컬테스트" }));
-}
-      alert("선택을 저장했습니다.");
-      router.push("/");
+      // 중앙 상태 관리를 위해 useSchedule 훅의 함수를 사용합니다.
+      if (payload.scheduleId) {
+        await selectSchedule(payload.scheduleId);
+        alert("선택을 저장했습니다.");
+        router.push("/");
+      } else {
+        alert("오류: 스케줄 ID가 없습니다.");
+      }
     } catch (e: any) {
       console.error("submit 실패:", e?.response?.data || e);
       alert("저장 중 오류가 발생했습니다.");
