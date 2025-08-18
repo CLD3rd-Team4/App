@@ -89,6 +89,22 @@ const renderStars = (rating: number) => {
   )
 }
 
+
+function endOfTodayTs(): number {
+  const d = new Date();
+  d.setHours(23, 59, 59, 999);
+  return d.getTime();
+}
+const LS_KEY_SELECTED = "recommend:lastSubmit";
+function writeLastSubmitSafely(entry: any) {
+  try {
+    localStorage.setItem(LS_KEY_SELECTED, JSON.stringify(entry));
+    console.log("[recommendations] lastSubmit saved:", entry);
+  } catch (e) {
+    console.error("[recommendations] lastSubmit save failed:", e);
+  }
+}
+
 // API → 화면 모델
 const toRestaurant = (p: ApiPlace): Restaurant => ({
   id: p.id,
@@ -257,29 +273,36 @@ export default function RecommendationScreen() {
       scheduleId,
       selectedPlaces,
     }
+    const endOfTodayTs = () => {
+      const d = new Date()
+      d.setHours(23, 59, 59, 999)
+      return d.getTime()
+    }
 
     try {
-      await api.post<{ status: "OK" | "ERROR"; message?: string }>("/recommend/submit", payload)
-      await selectSchedule(scheduleId)
+  await api.post<{ status: "OK" | "ERROR"; message?: string }>("/recommend/submit", payload);
+  await selectSchedule(scheduleId);
 
-      const LS_KEY_SELECTED = "recommend:lastSubmit"
-      localStorage.setItem(
-        LS_KEY_SELECTED,
-        JSON.stringify({
-          scheduleId,
-          submittedAt: new Date().toISOString(),
-          selectedPlaces,
-          isSelected: true,   
-        })
-      )
+  const entry = {
+    scheduleId,
+    submittedAt: new Date().toISOString(),
+    selectedPlaces,
+    isSelected: true,
+    expiryAt: endOfTodayTs(),
+  };
+  writeLastSubmitSafely(entry);
 
-      alert("선택을 저장했습니다.")
-      router.push("/")
-    } catch (e: any) {
-      console.error("submit 실패:", e?.response?.data || e)
-      alert("저장 중 오류가 발생했습니다.")
-    }
-  }
+  // 저장 확인 로그 (원하면)
+  console.log("[recommendations] readback:", localStorage.getItem(LS_KEY_SELECTED));
+
+  alert("선택을 저장했습니다.");
+  router.push("/");
+} catch (e: any) {
+  console.error("submit 실패:", e?.response?.data || e);
+  alert("저장 중 오류가 발생했습니다.");
+}
+  };
+
 
   // 작은 MapPin 타일 (이미지 대체)
   const PinTile = ({ addressName }: { addressName?: string }) => {
