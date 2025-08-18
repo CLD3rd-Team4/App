@@ -1,12 +1,15 @@
 package com.mapzip.recommend.service;
 
 import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.mapzip.recommend.dto.ReviewStatsDto;
+import com.mapzip.recommend.entity.RecommendationSelectionEntity;
 import com.mapzip.review.grpc.ReviewProto.GetReviewSummaryRequest;
 import com.mapzip.review.grpc.ReviewProto.GetReviewSummaryResponse;
 import com.mapzip.review.grpc.ReviewProto.RestaurantReviewSummary;
@@ -55,7 +58,7 @@ public class ReviewClientService {
                 averageRating,
                 joinedReviews
         );
-        //목데이
+        //목데이터 
 //    	return new ReviewStatsDto(4.2, "음식도 맛있고 분위기도 좋아요!");
     }
 }
