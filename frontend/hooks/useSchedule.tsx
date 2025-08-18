@@ -79,13 +79,22 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
     
     setIsSelected(finalIsSelected);
 
-    // 무한 로딩 방지를 위해 요약 정보 로딩 로직 제거
-    if (!finalIsSelected && isSelected) { 
-       await deselectAndClear();
+    if (finalIsSelected) {
+      try {
+        const summaryResponse = await recommendApi.getActiveScheduleSummary();
+        if (summaryResponse && summaryResponse.schedule) {
+          setSelectedSchedule(summaryResponse.schedule);
+        } else {
+          throw new Error("요약 정보는 있으나 스케줄 데이터가 없습니다.");
+        }
+      } catch (error) {
+        console.error("홈페이지 요약 정보 로딩 실패, 선택 상태를 초기화합니다.", error);
+        await deselectAndClear();
+      }
     }
     
     setIsLoading(false);
-  }, [deselectAndClear, getInitialSelectionStatus, isSelected]);
+  }, [deselectAndClear, getInitialSelectionStatus]);
 
   const selectSchedule = useCallback(async (scheduleId: string): Promise<Schedule | null> => {
     setIsProcessing(true);
