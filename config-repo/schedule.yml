@@ -63,7 +63,8 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus,metrics
+        include: health,info,metrics,prometheus
+      base-path: /actuator
   endpoint:
     health:
       show-details: always
@@ -76,9 +77,17 @@ management:
         liveness:
           include: livenessState,db,grpcServer
   metrics:
-    export:
-      prometheus:
-        enabled: true
+    distribution:
+      percentiles-histogram:
+        http:
+          server:
+            requests: true
+      slo:
+        http.server.requests: 100ms,200ms,500ms,1s,2s
+    tags:
+      application: ${spring.application.name}
+      environment: ${ENVIRONMENT:prod}
+      region: ${AWS_REGION:ap-northeast-2}
 
 # 스케줄링 관련 설정
 scheduling:

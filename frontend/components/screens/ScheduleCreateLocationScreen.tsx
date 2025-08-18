@@ -215,6 +215,21 @@ export default function ScheduleCreateLocationScreen({
   // 완료 처리
   const handleComplete = async () => {
     if (formData && formData.departure && formData.destination && !isLoading) {
+      // 위치 중복 유효성 검사
+      const allLocations = [
+        formData.departure,
+        formData.destination,
+        ...formData.waypoints
+      ].filter(loc => loc); // Filter out null/undefined entries
+
+      const addresses = allLocations.map(loc => loc!.address);
+      const uniqueAddresses = new Set(addresses);
+
+      if (uniqueAddresses.size < addresses.length) {
+        alert("출발지, 도착지, 경유지는 서로 다른 장소여야 합니다.");
+        return;
+      }
+
       setIsLoading(true)
       try {
         // API 호출 대신, 상위 컴포넌트로 데이터 전달

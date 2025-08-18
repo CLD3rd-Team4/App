@@ -214,4 +214,5 @@ message IsScheduleSelectedRequest {
 
 message IsScheduleSelectedResponse {
   bool isSelected = 1;
+  string schedule_id = 2;
 }

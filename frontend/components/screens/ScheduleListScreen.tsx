@@ -12,7 +12,6 @@ import { generateTimelineItems, type TimelineItem } from "@/lib/timeline"
 import ScheduleProcessingPopup from "@/components/modals/ScheduleProcessingPopup"
 import RecommendationReadyPopup from "@/components/modals/RecommendationReadyPopup"
 import api from "@/lib/interceptor"
-import { scheduleApi } from "@/services/api"
 
 // ===== 상수 =====
 const POLL_INTERVAL_MS = 1500 // 폴링 주기(ms)
@@ -77,7 +76,7 @@ export default function ScheduleListScreen() {
       if (!active) return
       try {
         const res = await api.get<GetResultsResponse>("/recommend/result", {
-          params: { scheduleId }, // ✅ userId 제거
+          params: { scheduleId }, // ✅ userId 없이 scheduleId만
         })
 
         if (res.data.status === "OK") {
@@ -120,26 +119,21 @@ export default function ScheduleListScreen() {
     setIsPopupOpen(true)
 
     try {
-      // 1. 스케줄 선택 및 상태 업데이트
-      const selectedScheduleData = await selectSchedule(schedule.id)
-
-      // 2. 타임라인 생성
-      if (selectedScheduleData) {
-        setTimelineItems(generateTimelineItems(selectedScheduleData))
+      // 스케줄을 "선택"하고 상세 정보를 가져옵니다. (Valkey에 저장됨)
+      const fullSchedule = await selectSchedule(schedule.id)
+      if (fullSchedule) {
+        setTimelineItems(generateTimelineItems(fullSchedule))
       } else {
-        setTimelineItems(generateTimelineItems(schedule))
+        throw new Error("selectSchedule did not return schedule details.")
       }
-
-      // 3. 추천 분석 요청
-      await triggerRecommendRequest(schedule.id)
-
-      // 4. 결과 폴링 시작 (✅ schedule.id만 사용)
-      startPollingResults(schedule.id)
     } catch (e) {
-      console.error("스케줄 선택 처리 중 오류 발생:", e)
-      alert("스케줄 선택 처리에 실패했습니다.")
-      setIsPopupOpen(false) // 에러 발생 시 팝업 닫기
+      console.error("스케줄 선택 또는 상세 조회 실패:", e)
+      // 상세 실패해도 추천은 트리거/폴링 가능하므로 팝업은 유지
     }
+
+    // 3) 추천 분석 요청 & 4) 결과 폴링 시작 (중복 없이 한 번만)
+    await triggerRecommendRequest(schedule.id)
+    startPollingResults(schedule.id)
   }
 
   const handleScheduleEdit = (schedule: Schedule) => {
@@ -185,7 +179,7 @@ export default function ScheduleListScreen() {
         </div>
 
         <div className="flex-1 content-with-bottom-nav">
-          <div className="p-4">
+          <div className="p-4 pb-24">
             {schedules.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-gray-600 mb-4">생성된 스케줄이 없습니다.</p>
