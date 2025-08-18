@@ -1,8 +1,8 @@
-// app/recommendations/page.tsx (또는 해당 경로 파일명)
+// app/recommendations/page.tsx
 
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Star, ChevronDown, ChevronUp } from "lucide-react"
@@ -34,8 +34,8 @@ type GetResultsResponse = {
 
 type SubmitPlace = {
   slotId: string
-  mealType: number           // 0=식사, 1=간식
-  scheduledTime: string      // "오후 01:30" 등 그대로
+  mealType: number
+  scheduledTime: string
   id: string
   placeName: string
   reason?: string
@@ -54,7 +54,7 @@ type SubmitRequest = {
 // ==== 화면용 타입 ====
 interface MealSection {
   id: string                 // 화면용 id
-  originSlotId?: string      // 서버에서 받은 slotId (있으면 이걸 우선 사용)
+  originSlotId?: string      // 서버 slotId (있으면 이걸 우선 사용)
   title: string
   type: "식사" | "간식"
   index: number
@@ -77,13 +77,16 @@ const toRestaurant = (p: ApiPlace): Restaurant => ({
   distance: p.distance || "",
   addressName: p.addressName,
   image: p.image || "/placeholder.svg?height=80&width=80",
-  // @ts-ignore(외부 타입)
+  // @ts-ignore 외부 타입
   placeUrl: p.placeUrl,
 })
 
 export default function RecommendationScreen() {
   const router = useRouter()
   const { selectedSchedule, selectSchedule } = useSchedule()
+
+  // refs
+  const activeScheduleIdRef = useRef<string | null>(null)
 
   // state
   const [mealSections, setMealSections] = useState<MealSection[]>([])
@@ -104,11 +107,20 @@ export default function RecommendationScreen() {
         return
       }
 
-      // ✅ userId 제거, scheduleId만 전달
+      // 현재 페이지에서 다루는 유효 스케줄 ID 저장
+      activeScheduleIdRef.current = scheduleId
+
+      // ✅ userId 제거, scheduleId만 전달 + 캐시버스터
       const { data } = await api.get<GetResultsResponse>("/recommend/result", {
-        params: { scheduleId },
-        headers: { "Cache-Control": "no-cache" },
+        params: { scheduleId, _ts: Date.now() },
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
       })
+
+      // ✅ 가드: 응답이 현재 선택된 스케줄의 것이 아니면 무시
+      if (activeScheduleIdRef.current !== scheduleId) {
+        console.log("Stale response 무시:", scheduleId, "≠", activeScheduleIdRef.current)
+        return
+      }
 
       if (!data?.slotRecommendations?.length || data.status === "PENDING") {
         setMealSections([])
@@ -193,7 +205,7 @@ export default function RecommendationScreen() {
     return mealSections.every((section) => !!selectedRestaurants[section.id])
   }, [mealSections, selectedRestaurants])
 
-  // ✅ 제출: proto 맞춰 POST /recommend/submit 호출
+  // ✅ 제출: proto 맞춰 POST /recommend/submit 호출 + localStorage 보관
   const handleComplete = async () => {
     if (!isAllSectionsSelected()) {
       alert("모든 식사/간식 시간에 대해 식당을 선택해주세요.")
@@ -209,7 +221,7 @@ export default function RecommendationScreen() {
     const selectedPlaces: SubmitPlace[] = mealSections.map(sec => {
       const r = selectedRestaurants[sec.id]!
       return {
-        slotId: sec.originSlotId || sec.id,             // ✅ 서버 slotId 우선
+        slotId: sec.originSlotId || sec.id,
         mealType: sec.type === "식사" ? 0 : 1,
         scheduledTime: sec.time,
         id: r.id,
@@ -229,23 +241,21 @@ export default function RecommendationScreen() {
     }
 
     try {
-      // 실제 서버로 전송
-      await api.post<{
-        status: "OK" | "ERROR"
-        message?: string
-      }>("/recommend/submit", payload)
+      await api.post<{ status: "OK" | "ERROR"; message?: string }>("/recommend/submit", payload)
 
-      // 중앙 상태 업데이트(옵션): 최신 스케줄로 갱신
+      // 중앙 상태 업데이트(옵션)
       await selectSchedule(scheduleId)
-      const LS_KEY_SELECTED = "recommend:lastSubmit";
+
+      // 최근 제출 내역 저장 (홈 등에서 안내 용도)
+      const LS_KEY_SELECTED = "recommend:lastSubmit"
       localStorage.setItem(
-      LS_KEY_SELECTED,
-      JSON.stringify({
-      scheduleId,
-      submittedAt: new Date().toISOString(),
-      selectedPlaces,
-    })
-  )
+        LS_KEY_SELECTED,
+        JSON.stringify({
+          scheduleId,
+          submittedAt: new Date().toISOString(),
+          selectedPlaces,
+        })
+      )
 
       alert("선택을 저장했습니다.")
       router.push("/")
