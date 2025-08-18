@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Star, ChevronDown, ChevronUp } from "lucide-react"
+import { ArrowLeft, ChevronDown, ChevronUp, MapPin } from "lucide-react"
 import useSchedule from "@/hooks/useSchedule"
 import type { Restaurant } from "@/types"
 import api from "@/lib/interceptor"
@@ -68,15 +68,38 @@ const mealTypeToLabel = (t: number): "식사" | "간식" => (t === 0 ? "식사" 
 const sectionTitle = (label: "식사" | "간식", idx: number) =>
   label === "식사" ? `식사${idx}` : `간식${idx}`
 
+// 동명 추출 (ex: "서울 광진구 자양동 123-4" -> "자양동")
+const extractDong = (addr?: string) => {
+  if (!addr) return ""
+  const tokens = addr.split(/\s+/)
+  // "XX동/XX가/XX읍/XX면/XX리" 중 가장 뒤쪽 것 우선
+  const dongLike = [...tokens].reverse().find(t => /(동|가|읍|면|리)$/.test(t))
+  return dongLike || tokens[tokens.length - 2] || tokens[tokens.length - 1] || ""
+}
+
+// 별(★/☆) 렌더링 (정수 반올림)
+const renderStars = (rating: number) => {
+  const v = Math.round(Math.max(0, Math.min(5, rating || 0)))
+  const full = "★".repeat(v)
+  const empty = "☆".repeat(5 - v)
+  return (
+    <span className="text-yellow-500 tracking-tight" aria-label={`카카오 평점 ${v}점/5점`}>
+      {full}{empty}
+    </span>
+  )
+}
+
+// API → 화면 모델
 const toRestaurant = (p: ApiPlace): Restaurant => ({
   id: p.id,
   placeName: p.placeName,
-  description: p.representativeReview || p.reason || "추천 사유 없음",
+  // 대표 리뷰/이유가 없으면 비어두기(표시 자체를 숨김)
+  description: p.representativeReview || "",
   aiReason: p.reason || "",
-  rating: p.averageRating,
-  distance: p.distance || "",
+  rating: (typeof p.averageRating === "number" && p.averageRating > 0) ? p.averageRating : undefined,
+  distance: "", // 사용 안함
   addressName: p.addressName,
-  image: p.image || "/placeholder.svg?height=80&width=80",
+  image: "",    // 이미지 미사용
   // @ts-ignore 외부 타입
   placeUrl: p.placeUrl,
 })
@@ -111,14 +134,11 @@ export default function RecommendationScreen() {
       activeScheduleIdRef.current = scheduleId
 
       const { data } = await api.get<GetResultsResponse>("/recommend/result", {
-      params: { scheduleId },   // ← 쿼리스트링으로 전달
-})
+        params: { scheduleId }, // GET + query
+      })
 
-      // ✅ 가드: 응답이 현재 선택된 스케줄의 것이 아니면 무시
-      if (activeScheduleIdRef.current !== scheduleId) {
-        console.log("Stale response 무시:", scheduleId, "≠", activeScheduleIdRef.current)
-        return
-      }
+      // 응답이 현재 선택된 스케줄의 것이 아니면 무시
+      if (activeScheduleIdRef.current !== scheduleId) return
 
       if (!data?.slotRecommendations?.length || data.status === "PENDING") {
         setMealSections([])
@@ -148,7 +168,7 @@ export default function RecommendationScreen() {
 
         return {
           id: `${label === "식사" ? "meal" : "snack"}-${idx}`,
-          originSlotId: slot.slotId, // ✅ 서버 slotId 보존
+          originSlotId: slot.slotId, // 서버 slotId 보존
           title: sectionTitle(label, idx),
           type: label,
           index: idx,
@@ -203,7 +223,7 @@ export default function RecommendationScreen() {
     return mealSections.every((section) => !!selectedRestaurants[section.id])
   }, [mealSections, selectedRestaurants])
 
-  // ✅ 제출: proto 맞춰 POST /recommend/submit 호출 + localStorage 보관
+  // 제출
   const handleComplete = async () => {
     if (!isAllSectionsSelected()) {
       alert("모든 식사/간식 시간에 대해 식당을 선택해주세요.")
@@ -224,8 +244,8 @@ export default function RecommendationScreen() {
         scheduledTime: sec.time,
         id: r.id,
         placeName: r.placeName,
-        reason: r.aiReason || r.description || "",
-        distance: r.distance || "",
+        reason: r.aiReason || "",             // 이유 없으면 비움
+        distance: "",                          // 사용 안함
         addressName: (r as any).addressName || "",
         placeUrl: (r as any).placeUrl || "",
         averageRating: r.rating ?? 0,
@@ -240,11 +260,8 @@ export default function RecommendationScreen() {
 
     try {
       await api.post<{ status: "OK" | "ERROR"; message?: string }>("/recommend/submit", payload)
-
-      // 중앙 상태 업데이트(옵션)
       await selectSchedule(scheduleId)
 
-      // 최근 제출 내역 저장 (홈 등에서 안내 용도)
       const LS_KEY_SELECTED = "recommend:lastSubmit"
       localStorage.setItem(
         LS_KEY_SELECTED,
@@ -261,6 +278,21 @@ export default function RecommendationScreen() {
       console.error("submit 실패:", e?.response?.data || e)
       alert("저장 중 오류가 발생했습니다.")
     }
+  }
+
+  // 작은 MapPin 타일 (이미지 대체)
+  const PinTile = ({ addressName }: { addressName?: string }) => {
+    const dong = extractDong(addressName)
+    return (
+      <div className="w-20 h-20 rounded-lg bg-blue-100 flex flex-col items-center justify-center relative overflow-hidden">
+        <MapPin className="w-7 h-7 text-blue-600" />
+        {dong ? (
+          <span className="absolute bottom-1 text-[11px] px-1.5 py-0.5 rounded-full bg-white/90 text-gray-700">
+            {dong}
+          </span>
+        ) : null}
+      </div>
+    )
   }
 
   // 렌더
@@ -343,45 +375,57 @@ export default function RecommendationScreen() {
                   {expandedSections.has(section.id) && (
                     <div className="px-4 pb-4 border-t bg-gray-50">
                       <div className="space-y-3 pt-4">
+                        {/* 이전 선택 (있을 때만) */}
                         {section.previousSelection && (
                           <div className="bg-green-50 p-4 rounded-lg border-2 border-green-200">
-                            <div className="flex items-center gap-2 mb-3">
-                              <span className="text-xs bg-green-500 text-white px-2 py-1 rounded-full font-medium">
-                                이전 선택
-                              </span>
-                              <h3 className="font-medium">{section.previousSelection.placeName}</h3>
-                            </div>
-                            <div className="flex items-start gap-3">
-                              <img
-                                src={
-                                  section.previousSelection.image ||
-                                  "/placeholder.svg?height=60&width=60&query=restaurant"
-                                }
-                                alt={section.previousSelection.placeName}
-                                className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
-                              />
+                            <div className="flex items-start gap-4">
+                              <PinTile addressName={section.previousSelection.addressName as any} />
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm text-gray-600 mb-2">{section.previousSelection.description}</p>
-                                <p className="text-sm text-blue-600 mb-2">{section.previousSelection.aiReason}</p>
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-4">
-                                    {section.previousSelection.rating && (
-                                      <div className="flex items-center">
-                                        <Star className="w-4 h-4" />
-                                        <span className="text-sm ml-1 font-medium">
-                                          {section.previousSelection.rating}
-                                        </span>
-                                      </div>
-                                    )}
-                                    <span className="text-sm text-gray-500">
-                                      거리: {section.previousSelection.distance || "1.2km"}
-                                    </span>
-                                  </div>
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className="text-xs bg-green-500 text-white px-2 py-1 rounded-full font-medium">
+                                    이전 선택
+                                  </span>
+                                  <h3 className="font-medium">{section.previousSelection.placeName}</h3>
                                 </div>
+
+                                {section.previousSelection.description && (
+                                  <p className="text-sm text-gray-600 mb-2">{section.previousSelection.description}</p>
+                                )}
+                                {section.previousSelection.aiReason && (
+                                  <p className="text-sm text-blue-600 mb-2">{section.previousSelection.aiReason}</p>
+                                )}
+
+                                {/* 별점/이유 둘 다 없으면 위치(카카오 링크)도 숨김 */}
+                                {(
+                                  (!!section.previousSelection.rating && section.previousSelection.rating > 0) ||
+                                  !!section.previousSelection.aiReason
+                                ) && (
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                      {section.previousSelection.rating && section.previousSelection.rating > 0 && (
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-xs text-gray-500">카카오</span>
+                                          {renderStars(section.previousSelection.rating)}
+                                        </div>
+                                      )}
+                                      {(section.previousSelection as any).placeUrl && (
+                                        <a
+                                          href={(section.previousSelection as any).placeUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-sm text-blue-600 underline"
+                                        >
+                                          카카오 지도
+                                        </a>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+
                                 <Button
                                   onClick={() => handleRestaurantSelect(section.id, section.previousSelection!)}
                                   size="sm"
-                                  className={`w-full mt-2 ${
+                                  className={`w-full mt-3 ${
                                     selectedRestaurants[section.id]?.id === section.previousSelection!.id
                                       ? "bg-green-500 hover:bg-green-600 text-white"
                                       : "bg-blue-500 hover:bg-blue-600 text-white"
@@ -394,54 +438,79 @@ export default function RecommendationScreen() {
                           </div>
                         )}
 
+                        {/* 새로운 추천 */}
                         <div className="space-y-3">
                           <h4 className="font-medium text-gray-800">새로운 추천</h4>
-                          {section.restaurants.map((restaurant) => (
-                            <div
-                              key={restaurant.id}
-                              className={`bg-white border rounded-lg p-4 hover:border-blue-200 transition-all ${
-                                selectedRestaurants[section.id]?.id === restaurant.id ? "border-blue-500 bg-blue-50" : ""
-                              }`}
-                            >
-                              <div className="flex items-start gap-4">
-                                <img
-                                  src={restaurant.image || "/placeholder.svg?height=80&width=80&query=restaurant"}
-                                  alt={restaurant.placeName}
-                                  className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
-                                />
-                                <div className="flex-1 min-w-0">
-                                  {/* 이름 */}
-                                  <h3 className="font-semibold text-lg mb-1">{restaurant.placeName}</h3>
+                          {section.restaurants.map((restaurant) => {
+                            const hasRating = !!restaurant.rating && restaurant.rating > 0
+                            const hasReason = !!restaurant.aiReason
+                            const showMeta = hasRating || hasReason // 둘 다 없으면 위치도 숨김
 
-                                  {/* 한줄평 */}
-                                  <p className="text-sm text-gray-600 mb-2">{restaurant.description}</p>
-                                  <p className="text-sm text-blue-600 mb-3">{restaurant.aiReason}</p>
-                                  <div className="flex items-center justify-between mb-3">
-                                    <div className="flex items-center gap-4">
-                                      {restaurant.rating && (
-                                        <div className="flex items-center">
-                                          <Star className="w-4 h-4" />
-                                          <span className="text-sm ml-1 font-medium">{restaurant.rating}</span>
+                            return (
+                              <div
+                                key={restaurant.id}
+                                className={`bg-white border rounded-lg p-4 hover:border-blue-200 transition-all ${
+                                  selectedRestaurants[section.id]?.id === restaurant.id ? "border-blue-500 bg-blue-50" : ""
+                                }`}
+                              >
+                                <div className="flex items-start gap-4">
+                                  {/* 이미지 대신 위치 타일 */}
+                                  <PinTile addressName={(restaurant as any).addressName} />
+
+                                  <div className="flex-1 min-w-0">
+                                    {/* 이름 */}
+                                    <h3 className="font-semibold text-lg mb-1">{restaurant.placeName}</h3>
+
+                                    {/* 대표 리뷰 */}
+                                    {restaurant.description && (
+                                      <p className="text-sm text-gray-600 mb-2">{restaurant.description}</p>
+                                    )}
+                                    {/* 추천 이유 */}
+                                    {restaurant.aiReason && (
+                                      <p className="text-sm text-blue-600 mb-3">{restaurant.aiReason}</p>
+                                    )}
+
+                                    {/* 메타 (별점 + 카카오 지도 링크). 별점/이유 둘 다 없으면 숨김 */}
+                                    {showMeta && (
+                                      <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-4">
+                                          {hasRating && (
+                                            <div className="flex items-center gap-2">
+                                              <span className="text-xs text-gray-500">카카오</span>
+                                              {renderStars(restaurant.rating as number)}
+                                            </div>
+                                          )}
+
+                                          {(restaurant as any).placeUrl && (
+                                            <a
+                                              href={(restaurant as any).placeUrl}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="text-sm text-blue-600 underline"
+                                            >
+                                              카카오 지도
+                                            </a>
+                                          )}
                                         </div>
-                                      )}
-                                      <span className="text-sm text-gray-500">거리: {restaurant.distance}</span>
-                                    </div>
+                                      </div>
+                                    )}
+
+                                    <Button
+                                      onClick={() => handleRestaurantSelect(section.id, restaurant)}
+                                      size="sm"
+                                      className={`w-full ${
+                                        selectedRestaurants[section.id]?.id === restaurant.id
+                                          ? "bg-green-500 hover:bg-green-600 text-white"
+                                          : "bg-blue-500 hover:bg-blue-600 text-white"
+                                      }`}
+                                    >
+                                      {selectedRestaurants[section.id]?.id === restaurant.id ? "✓ 선택됨" : "선택하기"}
+                                    </Button>
                                   </div>
-                                  <Button
-                                    onClick={() => handleRestaurantSelect(section.id, restaurant)}
-                                    size="sm"
-                                    className={`w-full ${
-                                      selectedRestaurants[section.id]?.id === restaurant.id
-                                        ? "bg-green-500 hover:bg-green-600 text-white"
-                                        : "bg-blue-500 hover:bg-blue-600 text-white"
-                                    }`}
-                                  >
-                                    {selectedRestaurants[section.id]?.id === restaurant.id ? "✓ 선택됨" : "선택하기"}
-                                  </Button>
                                 </div>
                               </div>
-                            </div>
-                          ))}
+                            )
+                          })}
                         </div>
                       </div>
                     </div>
