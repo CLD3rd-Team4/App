@@ -99,6 +99,7 @@ message GetRecommendationResultsResponse {
   repeated SlotRecommendation slotRecommendations = 1;
   string status = 2;
   string message = 3;
+  repeated SlotRecommendation selectedSlotPlaces = 4;
 }
 
 
