@@ -49,7 +49,7 @@ type ViewModel = {
   }>
 }
 
-const LAST_SUBMIT_KEY = "recommendations:lastSubmit"
+const LAST_SUBMIT_KEY = "recommend:lastSubmit"
 
 export default function ScheduleSummaryScreen() {
   const router = useRouter()
