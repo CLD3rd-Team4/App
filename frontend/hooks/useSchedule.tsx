@@ -114,59 +114,73 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
 
   // =====================
   // 홈 초기화 (로컬 우선 → 서버 보조)
-  // =====================
-  const initializeHomepage = useCallback(async () => {
-    setIsLoading(true)
-    try {
-      console.log("[useSchedule] initializeHomepage: 로컬 recent submit 확인")
-      const ls = readLastSubmit()
+  // ====================
 
-      // 1) 로컬 TTL 유효하면 그 schedule 요약 요청
-      if (ls?.isSelected && ls?.scheduleId && typeof ls?.expiryAt === "number" && Date.now() <= ls.expiryAt) {
-        console.log("[useSchedule] 로컬 선택 유지 스케줄:", ls.scheduleId, "→ 요약 불러오기")
-        const summaryResponse = await recommendApi.getActiveScheduleSummary(ls.scheduleId)
-        if (summaryResponse?.schedule) {
-          setSelectedSchedule(summaryResponse.schedule)
-          setIsSelected(true)
-          setIsLoading(false)
-          return
-        } else {
-          console.warn("[useSchedule] 로컬 복구 실패: 요약 없음")
-        }
-      } else if (ls?.expiryAt && Date.now() > ls.expiryAt) {
-        console.log("[useSchedule] 로컬 TTL 만료")
+const pickSchedule = (resp: any) =>
+  resp?.schedule ?? resp?.data?.schedule ?? (resp?.id ? resp : null);
+
+const initializeHomepage = useCallback(async () => {
+  setIsLoading(true);
+  try {
+    console.log("[useSchedule] initializeHomepage: 로컬 recent submit 확인");
+    const ls = readLastSubmit();
+
+    // 1) 로컬 TTL 유효하면 선택 유지
+    if (ls?.isSelected && ls.scheduleId && typeof ls.expiryAt === "number" && Date.now() <= ls.expiryAt) {
+      console.log("[useSchedule] 로컬 선택 유지:", ls.scheduleId, "→ 요약 불러오기(실패해도 유지)");
+      setIsSelected(true); // ✅ 선택 먼저 유지
+
+      try {
+        const resp = await recommendApi.getActiveScheduleSummary(ls.scheduleId);
+        const schedule = pickSchedule(resp);
+        if (schedule) setSelectedSchedule(schedule);
+        else console.warn("[useSchedule] 로컬 복구: 요약 없음(선택은 유지)");
+      } catch (err) {
+        console.warn("[useSchedule] 로컬 복구 실패(선택은 유지):", err);
       }
 
-      // 2) 서버 상태 조회
-      console.log("[useSchedule] 서버 선택 상태 확인")
-      const { isSelected: serverIsSelected, scheduleId } = await scheduleApi.getSelectionStatus()
-      if (serverIsSelected && scheduleId) {
-        console.log("[useSchedule] 서버 선택 존재:", scheduleId, "→ 요약 불러오기")
-        const summaryResponse = await recommendApi.getActiveScheduleSummary(scheduleId)
-        if (summaryResponse?.schedule) {
-          setSelectedSchedule(summaryResponse.schedule)
-          setIsSelected(true)
-          writeLastSubmit({
-            scheduleId,
-            isSelected: true,
-            submittedAt: new Date().toISOString(),
-            expiryAt: endOfTodayTs(),
-          })
-          setIsLoading(false)
-          return
-        }
-      }
-
-      // 3) 복구 불가 → 초기화
-      console.log("[useSchedule] 복구 불가 → 선택 상태 초기화")
-      await deselectAndClear()
-    } catch (error) {
-      console.error("홈페이지 초기화 중 에러 발생 → 선택 상태 초기화", error)
-      await deselectAndClear()
-    } finally {
-      setIsLoading(false)
+      setIsLoading(false);
+      return;
     }
-  }, [deselectAndClear])
+
+    // 2) 서버 선택 상태 보조
+    console.log("[useSchedule] 서버 선택 상태 확인");
+    const { isSelected: serverIsSelected, scheduleId } = await scheduleApi.getSelectionStatus();
+    if (serverIsSelected && scheduleId) {
+      console.log("[useSchedule] 서버 선택 존재:", scheduleId, "→ 요약 불러오기(실패해도 유지)");
+      setIsSelected(true); // ✅ 유지
+
+      try {
+        const resp = await recommendApi.getActiveScheduleSummary(scheduleId);
+        const schedule = pickSchedule(resp);
+        if (schedule) setSelectedSchedule(schedule);
+        else console.warn("[useSchedule] 서버 복구: 요약 없음(선택은 유지)");
+      } catch (err) {
+        console.warn("[useSchedule] 서버 복구 실패(선택은 유지):", err);
+      }
+
+      // 로컬도 동기화
+      writeLastSubmit({
+        scheduleId,
+        isSelected: true,
+        submittedAt: new Date().toISOString(),
+        expiryAt: endOfTodayTs(),
+      });
+      setIsLoading(false);
+      return;
+    }
+
+    // 3) 정말로 둘 다 없을 때만 해제
+    console.log("[useSchedule] 복구 불가 → 선택 상태 초기화");
+    await deselectAndClear();
+  } catch (error) {
+    console.error("홈 초기화 에러 → 선택 상태 유지 시도 후 필요 시 초기화", error);
+    // 필요 시만 해제. 기본은 유지 권장
+    // await deselectAndClear();
+  } finally {
+    setIsLoading(false);
+  }
+}, [deselectAndClear]);
 
   // =====================
   // 스케줄 선택 (요약까지 받아서 상태/로컬 기록)
