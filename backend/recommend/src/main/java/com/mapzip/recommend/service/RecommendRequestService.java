@@ -61,7 +61,7 @@ public class RecommendRequestService {
 				.withInterceptors(MetadataUtils.newAttachHeadersInterceptor(md));
 
 		// gRPC로 스케줄 조회 -> 리뷰서버랑 연결
-		GetScheduleDetailResponse response = scheduleStub.getScheduleDetail(request);
+		GetScheduleDetailResponse response = stubWithMd.getScheduleDetail(request);
 
 		TmapScheduleRequest tmapScheduleRequest = TmapRequestMapper.fromScheduleDetail(response.getSchedule(),
 				scheduleId, userId);
