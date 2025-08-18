@@ -2,6 +2,7 @@ import type React from "react"
 import type { Metadata, Viewport } from "next"
 import { Inter } from "next/font/google"
 import Script from "next/script" // <--- Script 임포트 추가
+import { ScheduleProvider } from "@/hooks/useSchedule";
 import "./globals.css"
 
 const inter = Inter({ subsets: ["latin"] })
@@ -40,9 +41,11 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content="map.zip" />
       </head>
       <body className={inter.className}>
-        <div className="min-h-screen bg-gray-100">
-          <div className="mobile-container">{children}</div>
-        </div>
+        <ScheduleProvider>
+          <div className="min-h-screen bg-gray-100">
+            <div className="mobile-container">{children}</div>
+          </div>
+        </ScheduleProvider>
       </body>
     </html>
   )

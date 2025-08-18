@@ -18,7 +18,7 @@ public class RecommendResultConsumer {
 	private final ObjectMapper objectMapper;
 	private final RecommendRedisStoreService recommendRedisStoreService;
 
-	@KafkaListener(topics = "recommend-result", groupId = "recommend-service")
+	@KafkaListener(topics = "recommend-result", groupId = "recommend-service-result")
 	private void consume(ConsumerRecord<String, String> record) {
 		try {
 			// 로그로 수신 확인
