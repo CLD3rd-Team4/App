@@ -111,9 +111,9 @@ export default function RecommendationScreen() {
       activeScheduleIdRef.current = scheduleId
 
       const { data } = await api.get<GetResultsResponse>("/recommend/result", {
-      params: { scheduleId, _ts: Date.now() },   // ← 쿼리스트링으로 전달
+      params: { scheduleId },   // ← 쿼리스트링으로 전달
       headers: {
-       accept: "application/json",
+      accept: "application/json",
       "cache-control": "no-cache",
       pragma: "no-cache",
   },
