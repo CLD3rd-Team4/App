@@ -38,6 +38,8 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 	private final RecommendRequestService recommendRequestService;
 	private final RecommendationSelectionRepository selectionRepository;
 	private final RedisTemplate<String, String> redisTemplate;
+	private final ReviewClientService reviewClientService;
+
 
 
 	@Override
@@ -62,7 +64,7 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 		
 		// 요청에서 유저 및 스케줄 정보 추출
 		String scheduleId = request.getScheduleId();
-		List<SelectedPlace> selectedPlaces = request.getSelectedPlacesList();
+		List<RecommendationSelectionEntity> savedEntities = new ArrayList<>();
 		for (SelectedPlace place : request.getSelectedPlacesList()) {
 			log.info("Saving place: slotId={}, id={}, name={}", 
 			        place.getSlotId(), place.getId(), place.getPlaceName());
@@ -78,7 +80,11 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 					.representativeReview(place.getRepresentativeReview())
 					.build();
 			selectionRepository.save(entity);
+			savedEntities.add(entity);
 		}
+
+		// 리뷰 서비스에 미작성 리뷰로 저장 요청
+		reviewClientService.storePlacesForReview(userId, savedEntities);
 
 		SubmitResponse response = SubmitResponse.newBuilder().setStatus("OK").setMessage("✅ 선택된 식당들이 성공적으로 저장되었습니다.").build();
 
