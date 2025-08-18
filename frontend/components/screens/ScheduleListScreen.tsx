@@ -122,13 +122,16 @@ export default function ScheduleListScreen() {
     setIsPopupOpen(true)
 
     try {
-      // 타임라인 생성을 위해 상세 조회(성공 시 타임라인 구성)
-      const detail = await scheduleApi.getScheduleDetail(schedule.id)
-      const fullSchedule: Schedule | undefined =
-        (detail as any)?.schedule ?? (detail as any)?.data?.schedule
-      setTimelineItems(generateTimelineItems(fullSchedule || schedule))
+      // 스케줄을 "선택"하고 상세 정보를 가져옵니다. (Valkey에 저장됨)
+      const fullSchedule = await selectSchedule(schedule.id)
+      if (fullSchedule) {
+        setTimelineItems(generateTimelineItems(fullSchedule))
+      } else {
+        // selectSchedule이 null을 반환하면 에러 상황으로 간주
+        throw new Error("selectSchedule did not return schedule details.")
+      }
     } catch (e) {
-      console.error("스케줄 상세 조회 실패:", e)
+      console.error("스케줄 선택 또는 상세 조회 실패:", e)
       // 상세 실패해도 추천은 트리거/폴링 가능하므로 팝업은 유지
     }
 
