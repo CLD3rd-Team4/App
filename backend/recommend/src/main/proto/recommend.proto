@@ -10,6 +10,7 @@ service RecommendService {
   rpc GetRecommendationResults(GetRecommendationResultsRequest) returns (GetRecommendationResultsResponse) {
     option (google.api.http) = {
       get: "/recommend/result"
+      body: "*"
     };
   }
  	
