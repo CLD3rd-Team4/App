@@ -269,6 +269,7 @@ export default function RecommendationScreen() {
           scheduleId,
           submittedAt: new Date().toISOString(),
           selectedPlaces,
+          isSelected: true,   
         })
       )
 
