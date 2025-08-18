@@ -43,6 +43,13 @@ spring:
       security.protocol: SSL
       ssl.endpoint.identification.algorithm: https
       client.dns.lookup: use_all_dns_ips
+    admin:
+      auto-create: true
+      fail-fast: true
+      properties:
+        security.protocol: SSL
+        ssl.endpoint.identification.algorithm: https
+        client.dns.lookup: use_all_dns_ips
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
