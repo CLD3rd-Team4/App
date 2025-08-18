@@ -65,6 +65,13 @@ service ScheduleService {
     };
   }
 
+  // 스케줄 선택 해제
+  rpc DeselectSchedule(DeselectScheduleRequest) returns (DeselectScheduleResponse) {
+    option (google.api.http) = {
+      delete: "/schedule/selection"
+    };
+  }
+
   
 }
 
@@ -186,6 +193,16 @@ message DeleteScheduleRequest {
 }
 
 message DeleteScheduleResponse {
+  string message = 1;
+  bool success = 2;
+}
+
+// 3.7 스케줄 선택 해제
+message DeselectScheduleRequest {
+  // No fields needed, userId comes from header
+}
+
+message DeselectScheduleResponse {
   string message = 1;
   bool success = 2;
 }
