@@ -97,22 +97,31 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
   }, [deselectAndClear, getInitialSelectionStatus]);
 
   const selectSchedule = useCallback(async (scheduleId: string): Promise<Schedule | null> => {
+    console.log("[DEBUG] selectSchedule: 함수 시작, scheduleId:", scheduleId);
     setIsProcessing(true);
     try {
+      console.log("[DEBUG] selectSchedule: recommendApi.selectAndGetSummary API 호출 직전");
       const response = await recommendApi.selectAndGetSummary(scheduleId);
+      console.log("[DEBUG] selectSchedule: API 호출 성공, 응답:", response);
+
       if (response && response.schedule) {
+        console.log("[DEBUG] selectSchedule: 응답 데이터 유효, 상태 업데이트 시작");
         localStorage.setItem("scheduleSelected", JSON.stringify({ value: true, timestamp: Date.now() }));
         setSelectedSchedule(response.schedule);
         setIsSelected(true);
+        console.log("[DEBUG] selectSchedule: 상태 업데이트 완료");
         return response.schedule;
       } else {
+        console.warn("[DEBUG] selectSchedule: API는 성공했으나 응답 데이터 없음, 선택 해제 처리");
         await deselectAndClear();
         return null;
       }
     } catch (error) {
+      console.error("[DEBUG] selectSchedule: API 호출 중 에러 발생", error);
       await deselectAndClear();
       throw error;
     } finally {
+      console.log("[DEBUG] selectSchedule: 함수 종료");
       setIsProcessing(false);
     }
   }, [deselectAndClear]);
