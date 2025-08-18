@@ -68,7 +68,7 @@ export default function useSchedule() {
     try {
       const response = await recommendApi.selectAndGetSummary(scheduleId);
       if (response && response.schedule) {
-        localStorage.setItem("scheduleSelected", JSON.stringify({ value: true, timestamp: Date.now(), id: scheduleId }));
+        localStorage.setItem("scheduleSelected", JSON.stringify({ value: true, timestamp: Date.now() }));
         setSelectedSchedule(response.schedule);
         setIsSelected(true);
         return response.schedule;
