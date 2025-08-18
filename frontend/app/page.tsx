@@ -32,7 +32,7 @@ export default function HomePage() {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // initializeHomepage는 useCallback이므로 의존성에 추가해도 안전합니다.
+  }, [isClient, router]); // initializeHomepage는 useCallback이므로 의존성에 추가해도 안전합니다.
 
   // 초기 클라이언트 확인 또는 데이터 로딩 중일 때 로더 표시
   if (!isClient || (isLoggedIn && isLoading)) {
