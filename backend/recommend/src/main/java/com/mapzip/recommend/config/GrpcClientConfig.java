@@ -29,7 +29,6 @@ public class GrpcClientConfig {
         return ScheduleServiceGrpc.newBlockingStub(channel);
     }
 
-    // 이미 있는 review 클라이언트도 같이 있어도 됨
     @Value("${review.grpc.host}")
     private String reviewHost;
 

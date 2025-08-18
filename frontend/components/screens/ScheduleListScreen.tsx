@@ -57,8 +57,7 @@ export default function ScheduleListScreen() {
   useEffect(() => {
     setIsClient(true)
     loadSchedules()
-    // 로컬에서 userId 목 주입(게이트웨이 없이 테스트용)
-    try { localStorage.setItem("userId", DEV_USER_ID) } catch {}
+    
   }, [loadSchedules])
 
   // ===== 추천 트리거 =====

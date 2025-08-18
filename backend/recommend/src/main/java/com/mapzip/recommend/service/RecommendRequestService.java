@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mapzip.recommend.config.GrpcHeaderConfig;
 import com.mapzip.recommend.dto.MultiSlotRecommendRequestDto;
 import com.mapzip.recommend.dto.RecommendRequestDto;
 import com.mapzip.recommend.dto.tmap.TmapScheduleRequest;
@@ -34,9 +35,9 @@ public class RecommendRequestService {
     
     public void sendRecommendRequest(String scheduleId) {
             // userid 목데이터 
-            String userId = "user123";
-            
-            //1. 저장된 스케줄이라면 추천 과정 건너뛰기 
+//            String userId = "user123";
+            // 0. userid 가져오기 
+    		String userId =GrpcHeaderConfig.UserIdContext.USER_ID.get();
             String cacheKey = String.format("scheduleDetail:%s:%s", userId, scheduleId);
             if (Boolean.TRUE.equals(redisTemplate.hasKey(cacheKey))) {
                 // 캐시 있으면 완료 알림만 발행 (key=scheduleId, value=userId)
@@ -48,19 +49,17 @@ public class RecommendRequestService {
             //2. 스케줄 서버로부터 스케줄 정보 받음 
             GetScheduleDetailRequest request = GetScheduleDetailRequest.newBuilder()
                     .setScheduleId(scheduleId)
-                    .setUserId(userId)
                     .build();
 
             // gRPC로 스케줄 조회 -> 리뷰서버랑 연결 
-//            GetScheduleDetailResponse response = scheduleStub.getScheduleDetail(request);
-//            TmapScheduleRequest tmapScheduleRequest = TmapRequestMapper.fromScheduleDetail(response.getSchedule(), scheduleId, userId);
-            //목데이터 -> 빼야
-            TmapScheduleRequest tmapScheduleRequest=MockTmapScheduleRequestBuilder.buildMock();
+            GetScheduleDetailResponse response = scheduleStub.getScheduleDetail(request);
+            TmapScheduleRequest tmapScheduleRequest = TmapRequestMapper.fromScheduleDetail(response.getSchedule(), scheduleId, userId);
+            //목데이터
+//            TmapScheduleRequest tmapScheduleRequest=MockTmapScheduleRequestBuilder.buildMock();
             
             
-            //3. 프론트한테 스케줄 요약 보내는 gRPC
             
-            //4. Kafka 전송 
+            //3. Kafka 전송 
             String payload;
             try {
                 payload = objectMapper.writeValueAsString(tmapScheduleRequest);
