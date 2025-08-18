@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import BottomNavigation from "@/components/common/BottomNavigation"
-import { RefreshCw, Star } from "lucide-react"
+import { RefreshCw } from "lucide-react"
 import api from "@/lib/interceptor"
 import type { Restaurant } from "@/types"
 import { MealType } from "@/types"
@@ -16,8 +16,8 @@ type TimelineItem = {
   title: string
   icon: string
   color: string
-  description?: string
-  rating?: number
+  description?: string       // 추천 이유 (aiReason)
+  url?: string               // 카카오 지도 URL
   restaurant?: Restaurant
 }
 
@@ -41,7 +41,6 @@ type ViewModel = {
   destination?: { name: string }
   calculatedArrivalTime?: string
   waypoints?: Array<{ name: string; arrivalTime?: string }>
-  // 선택 식당/슬롯 (로컬 lastSubmit 기반)
   mealSlots?: Array<{ slotId: string; mealType: number; scheduledTime?: string }>
   selectedRestaurants?: Array<{
     sectionId: string
@@ -49,6 +48,7 @@ type ViewModel = {
   }>
 }
 
+// ✅ 키 통일
 const LAST_SUBMIT_KEY = "recommend:lastSubmit"
 
 export default function ScheduleSummaryScreen() {
@@ -58,7 +58,7 @@ export default function ScheduleSummaryScreen() {
   const [error, setError] = useState<string | null>(null)
   const [vm, setVm] = useState<ViewModel | null>(null)
 
-  // ---- 데이터 로드: 로컬 lastSubmit + 서버 scheduleDetail ----
+  // ---- 데이터 로드: 로컬 lastSubmit (+ 가능하면 서버 scheduleDetail)
   useEffect(() => {
     let mounted = true
     ;(async () => {
@@ -73,6 +73,7 @@ export default function ScheduleSummaryScreen() {
           setVm(null)
           return
         }
+
         const lastSubmit = JSON.parse(raw) as {
           scheduleId: string
           isSelected: boolean
@@ -100,50 +101,52 @@ export default function ScheduleSummaryScreen() {
           return
         }
 
-        // 2) gRPC 게이트웨이로 schedule detail 조회 (userId 필요 없음)
-        const { data } = await api.get<ScheduleDetailResp>(`/recommend/schedule/${encodeURIComponent(scheduleId)}`)
-
-        if (data.status !== "OK" || !data.scheduleDetail) {
-          setError(data.message || "스케줄 정보를 불러오지 못했습니다.")
-          setVm(null)
-          return
+        // 2) 서버에서 출발/도착/경유 가져오기 (있으면 보강, 없어도 로컬만으로 렌더)
+        let d: ScheduleDetailResp["scheduleDetail"] | undefined
+        try {
+          const { data } = await api.get<ScheduleDetailResp>(
+            `/recommend/schedule/${encodeURIComponent(scheduleId)}`
+          )
+          if (data.status === "OK" && data.scheduleDetail) d = data.scheduleDetail
+        } catch {
+          // 서버 요약 없어도 무시하고 로컬로 렌더
         }
 
-        const d = data.scheduleDetail
-
-        // 3) view model 합치기 (서버 스케줄 + 로컬 선택식당)
+        // 3) view model 합치기 (로컬 선택식당 + 서버 스케줄 보강)
         const waypoints =
-          (d.waypointNames || []).map((name, i) => ({
+          d?.waypointNames?.map((name, i) => ({
             name,
-            arrivalTime: (d.waypointTimes || [])[i] || "",
+            arrivalTime: d?.waypointTimes?.[i] || "",
           })) ?? []
 
-        // 로컬의 selectedPlaces를 화면 모델로 변환
-        const mealSlots = lastSubmit.selectedPlaces.map(p => ({
+        // 로컬 선택 슬롯/시간
+        const mealSlots = lastSubmit.selectedPlaces.map((p) => ({
           slotId: p.slotId,
           mealType: p.mealType,
           scheduledTime: p.scheduledTime,
         }))
 
-        const selectedRestaurants = lastSubmit.selectedPlaces.map(p => ({
-        sectionId: (p.mealType === MealType.MEAL ? "meal-" : "snack-") + p.slotId,
-        restaurant: {
-        id: p.id,
-        placeName: p.placeName,
-        aiReason: p.reason ?? "",         
-        rating: p.averageRating ?? 0,
-        placeUrl: p.placeUrl,
-        addressName: p.addressName,
-    
-  } as Restaurant,
-}))
+        // 로컬 선택 식당 → Restaurant
+        const selectedRestaurants = lastSubmit.selectedPlaces.map((p) => ({
+          sectionId: (p.mealType === MealType.MEAL ? "meal-" : "snack-") + p.slotId,
+          restaurant: {
+            id: p.id,
+            placeName: p.placeName,
+            aiReason: p.reason ?? "",          // ✅ 추천 이유
+            // rating: 사용 안 함
+            addressName: p.addressName,
+            // 외부 타입에 있지만 화면에서 쓸 거라 유지
+            // @ts-ignore
+            placeUrl: p.placeUrl,
+          } as Restaurant,
+        }))
 
         const nextVm: ViewModel = {
           scheduleId,
-          departureTime: d.departureTime,
-          departure: d.departureName ? { name: d.departureName } : undefined,
-          destination: d.destinationName ? { name: d.destinationName } : undefined,
-          calculatedArrivalTime: d.estimatedArrivalTime,
+          departureTime: d?.departureTime,
+          departure: d?.departureName ? { name: d.departureName } : undefined,
+          destination: d?.destinationName ? { name: d.destinationName } : undefined,
+          calculatedArrivalTime: d?.estimatedArrivalTime,
           waypoints,
           mealSlots,
           selectedRestaurants,
@@ -159,7 +162,9 @@ export default function ScheduleSummaryScreen() {
         if (mounted) setLoading(false)
       }
     })()
-    return () => { mounted = false }
+    return () => {
+      mounted = false
+    }
   }, [])
 
   const handleUpdate = () => {
@@ -190,18 +195,20 @@ export default function ScheduleSummaryScreen() {
     }
   }
 
+  // "HH:mm"도 지원하여 오전/오후로 포맷
   const formatTime = (time: string) => {
     if (!time || typeof time !== "string") return "시간 미정"
-    const match = time.match(/(오전|오후)\s*(\d{1,2}):(\d{2})/)
-    if (match) return time
-    const parts = time.split(":")
-    if (parts.length < 2) return "시간 미정"
-    const h = parseInt(parts[0], 10)
-    const m = parts[1]
+    // 이미 오전/오후 형태면 그대로
+    if (/(오전|오후)\s*\d{1,2}:\d{2}/.test(time)) return time
+    // 24시간 → 오전/오후
+    const m = time.match(/^(\d{1,2}):(\d{2})$/)
+    if (!m) return "시간 미정"
+    let h = parseInt(m[1], 10)
+    const mm = m[2]
     if (isNaN(h)) return "시간 미정"
     const period = h >= 12 ? "오후" : "오전"
     const displayHour = h === 0 ? 12 : h > 12 ? h - 12 : h
-    return `${period} ${displayHour}:${m}`
+    return `${period} ${displayHour}:${mm}`
   }
 
   const timelineItems: TimelineItem[] = useMemo(() => {
@@ -219,7 +226,7 @@ export default function ScheduleSummaryScreen() {
       })
     }
 
-    vm.waypoints?.forEach(wp => {
+    vm.waypoints?.forEach((wp) => {
       items.push({
         type: "waypoint",
         time: wp.arrivalTime || "",
@@ -229,14 +236,18 @@ export default function ScheduleSummaryScreen() {
       })
     })
 
-    vm.selectedRestaurants?.forEach(item => {
-      const mt = vm.mealSlots?.find(ms => ms.slotId === item.sectionId.split("-").at(-1))
+    // ✅ 식당: 로컬 scheduledTime, aiReason/URL만 사용
+    vm.selectedRestaurants?.forEach((item) => {
+      const slotId = item.sectionId.split("-").pop()
+      const mt = vm.mealSlots?.find((ms) => ms.slotId === slotId)
+
       items.push({
         type: "restaurant",
         time: mt?.scheduledTime || "",
         title: item.restaurant.placeName || "선택된 식당",
-        description: item.restaurant.description || "",
-        rating: item.restaurant.rating || 0,
+        description: item.restaurant.aiReason || "",
+        // @ts-ignore
+        url: (item.restaurant as any).placeUrl || "",
         icon: item.sectionId.startsWith("meal-") ? "식사" : "간식",
         color: "orange",
         restaurant: item.restaurant,
@@ -253,17 +264,28 @@ export default function ScheduleSummaryScreen() {
       })
     }
 
-    // 시간순 정렬
+    // 시간순 정렬 (오전/오후, 24시간 모두 지원)
     const toComparable = (timeStr?: string) => {
       if (!timeStr) return 0
-      const m = timeStr.match(/(오전|오후)\s*(\d{1,2}):(\d{2})/)
-      if (!m) return 0
-      let [, period, hh, mm] = m
-      let h = parseInt(hh, 10)
-      if (period === "오후" && h !== 12) h += 12
-      if (period === "오전" && h === 12) h = 0
-      return h * 100 + parseInt(mm, 10)
+      // 오전/오후 HH:mm
+      const ampm = timeStr.match(/(오전|오후)\s*(\d{1,2}):(\d{2})/)
+      if (ampm) {
+        let [, period, hh, mm] = ampm
+        let h = parseInt(hh, 10)
+        if (period === "오후" && h !== 12) h += 12
+        if (period === "오전" && h === 12) h = 0
+        return h * 100 + parseInt(mm, 10)
+      }
+      // HH:mm
+      const m = timeStr.match(/^(\d{1,2}):(\d{2})$/)
+      if (m) {
+        const h = parseInt(m[1], 10)
+        const mm = parseInt(m[2], 10)
+        return h * 100 + mm
+      }
+      return 0
     }
+
     return items.sort((a, b) => toComparable(a.time) - toComparable(b.time))
   }, [vm])
 
@@ -304,7 +326,10 @@ export default function ScheduleSummaryScreen() {
                 <p className="text-gray-600 mb-4">
                   {error ?? "스케줄 정보가 없습니다. 다시 선택해주세요."}
                 </p>
-                <Button onClick={() => router.push("/schedule/")} className="bg-blue-500 hover:bg-blue-600 text-white">
+                <Button
+                  onClick={() => router.push("/schedule/")}
+                  className="bg-blue-500 hover:bg-blue-600 text-white"
+                >
                   스케줄 선택하기
                 </Button>
               </div>
@@ -347,15 +372,25 @@ export default function ScheduleSummaryScreen() {
                         {item.time ? formatTime(item.time) : "시간 미정"}
                       </p>
                       <p className="font-medium">{item.title}</p>
+
                       {item.type === "restaurant" && (
                         <>
+                          {/* 추천 이유 */}
                           {item.description && (
                             <p className="text-sm text-gray-600">{item.description}</p>
                           )}
-                          {item.rating && item.rating > 0 && (
-                            <div className="flex items-center mt-1">
-                              <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                              <span className="text-sm ml-1">{item.rating}</span>
+
+                          {/* 링크 */}
+                          {item.url && (
+                            <div className="mt-1">
+                              <a
+                                href={item.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm text-blue-600 underline"
+                              >
+                                카카오 지도
+                              </a>
                             </div>
                           )}
                         </>
