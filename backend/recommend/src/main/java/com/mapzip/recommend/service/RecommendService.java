@@ -11,6 +11,8 @@ import com.mapzip.recommend.dto.SlotInfoDto;
 import com.mapzip.recommend.dto.kakao.KakaoSearchResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.bedrockruntime.BedrockRuntimeClient;
@@ -27,6 +29,8 @@ public class RecommendService {
 
     private final BedrockRuntimeClient bedrockRuntimeClient;
     private final ObjectMapper objectMapper;
+    @Value("${bedrock.model-id:apac.anthropic.claude-3-sonnet-20240229-v1:0}")
+    private String bedrockModelId; 
 
     public RecommendResultDto recommendProcess(RecommendRequestDto recommendRequestDto) {
         try {
@@ -43,7 +47,7 @@ public class RecommendService {
             String body = objectMapper.writeValueAsString(messagesRequest);
 
             InvokeModelRequest request = InvokeModelRequest.builder()
-                    .modelId("anthropic.claude-3-sonnet-20240229-v1:0")
+                    .modelId(bedrockModelId)
                     .contentType("application/json")
                     .accept("application/json")
                     .body(SdkBytes.fromUtf8String(body))
@@ -66,9 +70,15 @@ public class RecommendService {
 
         } catch (JsonProcessingException e) {
             throw new RuntimeException("❌ Bedrock 요청 JSON 직렬화 실패", e);
-        } catch (Exception e) {
+        }catch (software.amazon.awssdk.services.bedrockruntime.model.ValidationException ve) {
+            // 프로파일/리전 불일치 시 여기로 옴
+            log.error("Bedrock ValidationException: modelId={}, msg={}", bedrockModelId, ve.getMessage());
+            throw new RuntimeException("❌ Bedrock 호출 중 오류(프로파일/리전 확인 필요)", ve);
+        } 
+        catch (Exception e) {
             throw new RuntimeException("❌ Bedrock 호출 중 오류", e);
         }
+        
     }
 
     private String buildPrompt(RecommendRequestDto dto) {
