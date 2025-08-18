@@ -265,26 +265,31 @@ export default function ScheduleSummaryScreen() {
     }
 
     // 시간순 정렬 (오전/오후, 24시간 모두 지원)
-    const toComparable = (timeStr?: string) => {
-      if (!timeStr) return 0
-      // 오전/오후 HH:mm
-      const ampm = timeStr.match(/(오전|오후)\s*(\d{1,2}):(\d{2})/)
-      if (ampm) {
-        let [, period, hh, mm] = ampm
-        let h = parseInt(hh, 10)
-        if (period === "오후" && h !== 12) h += 12
-        if (period === "오전" && h === 12) h = 0
-        return h * 100 + parseInt(mm, 10)
-      }
-      // HH:mm
-      const m = timeStr.match(/^(\d{1,2}):(\d{2})$/)
-      if (m) {
-        const h = parseInt(m[1], 10)
-        const mm = parseInt(m[2], 10)
-        return h * 100 + mm
-      }
-      return 0
-    }
+    // after — 오전/오후 + 24시간(HH:mm) 둘 다 지원
+  const toComparable = (timeStr?: string) => {
+  if (!timeStr) return 0
+
+  // 1) 오전/오후 HH:mm
+  const ampm = timeStr.match(/(오전|오후)\s*(\d{1,2}):(\d{2})/)
+  if (ampm) {
+    let [, period, hh, mm] = ampm
+    let h = parseInt(hh, 10)
+    if (period === "오후" && h !== 12) h += 12
+    if (period === "오전" && h === 12) h = 0
+    return h * 100 + parseInt(mm, 10)
+  }
+
+  // 2) HH:mm
+  const h24 = timeStr.match(/^(\d{1,2}):(\d{2})$/)
+  if (h24) {
+    const h = parseInt(h24[1], 10)
+    const m = parseInt(h24[2], 10)
+    return h * 100 + m
+  }
+
+  return 0
+}
+
 
     return items.sort((a, b) => toComparable(a.time) - toComparable(b.time))
   }, [vm])
