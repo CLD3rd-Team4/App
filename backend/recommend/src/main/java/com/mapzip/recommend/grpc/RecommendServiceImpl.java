@@ -7,13 +7,15 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -23,6 +25,8 @@ import com.mapzip.recommend.dto.SlotInfoDto;
 import com.mapzip.recommend.entity.RecommendationSelectionEntity;
 import com.mapzip.recommend.repository.RecommendationSelectionRepository;
 import com.mapzip.recommend.service.RecommendRequestService;
+import com.mapzip.recommend.service.ReviewClientService;
+import com.mapzip.recommend.service.ScheduleDetailQueryService;
 
 import io.grpc.stub.StreamObserver;
 import jakarta.transaction.Transactional;
@@ -39,9 +43,50 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 	private final RecommendationSelectionRepository selectionRepository;
 	private final RedisTemplate<String, String> redisTemplate;
 	private final ReviewClientService reviewClientService;
+	private final ScheduleDetailQueryService scheduleDetailQueryService;
+	private final StringRedisTemplate redisTemplateString;
+    private final RecommendationSelectionRepository selectionRepo;
 
 
+	// 선택된 스케줄 프론트에서 조회
+	@Override
+	public void getScheduleDetail(GetSelectedScheduleDetailRequest request,
+			StreamObserver<GetSelectedScheduleDetailResponse> responseObserver) {
 
+		String scheduleId = request.getScheduleId();
+		String userId = GrpcHeaderConfig.UserIdContext.USER_ID.get();
+
+		try {
+			var snapOpt = scheduleDetailQueryService.get(userId, scheduleId);
+			if (snapOpt.isEmpty()) {
+				GetSelectedScheduleDetailResponse resp = GetSelectedScheduleDetailResponse.newBuilder()
+						.setStatus("NOT_FOUND").setMessage("No schedule detail in Redis").build();
+				responseObserver.onNext(resp);
+				responseObserver.onCompleted();
+				return;
+			}
+
+			var s = snapOpt.get();
+			ScheduleDetail detail = ScheduleDetail.newBuilder().setDepartureTime(s.getDepartureTime())
+					.setDepartureName(s.getDepartureName()).setDestinationName(s.getDestinationName())
+					.setEstimatedArrivalTime(s.getEstimatedArrivalTime()).addAllWaypointNames(s.getWaypointNames())
+					.addAllWaypointTimes(s.getWaypointTimes()).build();
+
+			GetSelectedScheduleDetailResponse resp = GetSelectedScheduleDetailResponse.newBuilder().setStatus("OK")
+					.setMessage("success").setScheduleDetail(detail).build();
+
+			responseObserver.onNext(resp);
+			responseObserver.onCompleted();
+		} catch (Exception e) {
+			log.error("getScheduleDetail error (userId={}, scheduleId={})", userId, scheduleId, e);
+			GetSelectedScheduleDetailResponse resp = GetSelectedScheduleDetailResponse.newBuilder().setStatus("ERROR")
+					.setMessage("Internal error").build();
+			responseObserver.onNext(resp);
+			responseObserver.onCompleted();
+		}
+	}
+
+	// 프론트에서 추천 요청
 	@Override
 	public void sendRecommendRequest(RecommendRequest request, StreamObserver<RecommendResponse> responseObserver) {
 		// 추천 처리 로직 호출
@@ -73,11 +118,8 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 					.scheduleId(scheduleId).slotId(place.getSlotId()).placeId(place.getId())
 					.placeName(place.getPlaceName()).mealType(place.getMealType())
 					.scheduledTime(place.getScheduledTime()).reason(place.getReason()).distance(place.getDistance())
-					.addressName(place.getAddressName())
-					.placeUrl(place.getPlaceUrl())
-					.selectedDate(LocalDate.now())
-					.averageRating(place.getAverageRating())
-					.representativeReview(place.getRepresentativeReview())
+					.addressName(place.getAddressName()).placeUrl(place.getPlaceUrl()).selectedDate(LocalDate.now())
+					.averageRating(place.getAverageRating()).representativeReview(place.getRepresentativeReview())
 					.build();
 			selectionRepository.save(entity);
 			savedEntities.add(entity);
@@ -94,237 +136,233 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 	
 	@Override
 	public void getRecommendationResults(GetRecommendationResultsRequest request,
-	                                     StreamObserver<GetRecommendationResultsResponse> responseObserver) {
-		String userId=GrpcHeaderConfig.UserIdContext.USER_ID.get();
-	    final String scheduleId = request.getScheduleId();
+			StreamObserver<GetRecommendationResultsResponse> responseObserver) {
+		final String userId = GrpcHeaderConfig.UserIdContext.USER_ID.get();
+		final String scheduleId = request.getScheduleId();
 
-	    // 키 포맷: recommend:{userId}:{scheduleId}:{slotId}:{MEAL|SNACK}:{placeN}
-	    final String redisKeyPattern = String.format("recommend:%s:%s:*:*:place*", userId, scheduleId);
+		// 0) DB에서 '이미 선택한 식당' 조회 (userId + scheduleId)
+		List<RecommendationSelectionEntity> selectedRows = selectionRepo.findByUserIdAndScheduleId(userId, scheduleId);
 
-	    Set<String> keys = redisTemplate.keys(redisKeyPattern);
+		// slotId -> Set<placeId> (후보 중복 제거용)
+		Map<String, Set<String>> selectedIdsBySlot = new HashMap<>();
+		// slotId -> List<PlaceInfo> (응답으로 보낼 '이전선택')
+		Map<String, List<PlaceInfo>> selectedPlacesBySlot = new HashMap<>();
 
-	    if (keys == null || keys.isEmpty()) {
-	        GetRecommendationResultsResponse response = GetRecommendationResultsResponse.newBuilder()
-	                .setStatus("PENDING")
-	                .setMessage("추천 결과가 아직 준비되지 않았습니다.")
-	                .build();
-	        responseObserver.onNext(response);
-	        responseObserver.onCompleted();
-	        return;
-	    }
+		for (RecommendationSelectionEntity row : selectedRows) {
+			String slotId = nvl(row.getSlotId());
+			String placeId = nvl(row.getPlaceId());
 
-	    // 정렬을 위해 order를 같이 보관
-	    class PlaceWithOrder {
-	        final PlaceInfo place;
-	        final int order;
-	        PlaceWithOrder(PlaceInfo p, int o) { this.place = p; this.order = o; }
-	    }
+			selectedIdsBySlot.computeIfAbsent(slotId, k -> new HashSet<>()).add(placeId);
 
-	    Map<String, List<PlaceWithOrder>> slotMap = new HashMap<>();
-	    ObjectMapper objectMapper = new ObjectMapper();
+			PlaceInfo selectedPi = PlaceInfo.newBuilder().setId(placeId).setPlaceName(nvl(row.getPlaceName()))
+					.setReason(nvl(row.getReason())).setDistance(nvl(row.getDistance()))
+					.setScheduledTime(nvl(row.getScheduledTime()))
+					.setMealType(Optional.ofNullable(row.getMealType()).orElse(0)).setPlaceUrl(nvl(row.getPlaceUrl()))
+					.setAddressName(nvl(row.getAddressName()))
+					.setAverageRating(Optional.ofNullable(row.getAverageRating()).orElse(0d))
+					.setRepresentativeReview(nvl(row.getRepresentativeReview())).build();
 
-	    // 키를 한 번 정렬(슬롯/플레이스 순으로 보장하고 싶으면 comparator 조정)
-	    List<String> sortedKeys = new ArrayList<>(keys);
-	    Collections.sort(sortedKeys);
+			selectedPlacesBySlot.computeIfAbsent(slotId, k -> new ArrayList<>()).add(selectedPi);
+		}
 
-	    for (String key : sortedKeys) {
-	        String value = redisTemplate.opsForValue().get(key);
-	        if (value == null) continue;
+		// 1) Redis 후보 로딩 (키 포맷:
+		// recommend:{userId}:{scheduleId}:{slotId}:{MEAL|SNACK}:{placeN})
+		final String redisKeyPattern = String.format("recommend:%s:%s:*:*:place*", userId, scheduleId);
 
-	        try {
-	            // 키 파싱
-	            String[] parts = key.split(":");
-	            if (parts.length < 6) {
-	                log.warn("키 형식 불일치: {}", key);
-	                continue;
-	            }
-	            String slotId = parts[3];
-	            String mealTypeToken = parts[4];              // MEAL | SNACK
-	            String placeToken   = parts[5];               // place3
-	            int placeOrder = 0;
-	            try {
-	                placeOrder = Integer.parseInt(placeToken.replaceFirst("place", ""));
-	            } catch (NumberFormatException ignore) { /* 0으로 두기 */ }
 
-	            int mealTypeFromKey =
-	                    "MEAL".equalsIgnoreCase(mealTypeToken)  ? 0 :
-	                    "SNACK".equalsIgnoreCase(mealTypeToken) ? 1 : -1;
+		Set<String> keys = redisTemplateString.keys(redisKeyPattern);
 
-	            // 값(JSON) 파싱
-	            JsonNode node = objectMapper.readTree(value);
+		// 2) Redis -> Slot별 후보 목록(PlaceWithOrder) 구성 + DB 중복 제거
+		class PlaceWithOrder {
+			final PlaceInfo place;
+			final int order;
 
-	            int mealType = node.path("mealType").isMissingNode()
-	                    ? mealTypeFromKey
-	                    : node.path("mealType").asInt(mealTypeFromKey);
+			PlaceWithOrder(PlaceInfo p, int o) {
+				this.place = p;
+				this.order = o;
+			}
+		}
 
-	            PlaceInfo place = PlaceInfo.newBuilder()
-	                    .setId(node.path("id").asText(""))
-	                    .setPlaceName(node.path("placeName").asText(""))
-	                    .setReason(node.path("reason").asText(""))
-	                    .setDistance(node.path("distance").asText(""))
-	                    .setScheduledTime(node.path("scheduledTime").asText("")) // 없으면 빈 문자열
-	                    .setMealType(mealType >= 0 ? mealType : 0)              // 기본 0(식사)
-	                    .setPlaceUrl(node.path("placeUrl").asText(""))
-	                    .setAverageRating(node.path("averageRating").asDouble(0))
-	                    .setAddressName(node.path("addressName").asText(""))
-	                    .setRepresentativeReview(node.path("representativeReview").asText(""))
-	                    .build();
+		Map<String, List<PlaceWithOrder>> slotMap = new HashMap<>();
+		ObjectMapper objectMapper = new ObjectMapper();
 
-	            slotMap.computeIfAbsent(slotId, k -> new ArrayList<>())
-	                   .add(new PlaceWithOrder(place, placeOrder));
+		List<String> sortedKeys = new ArrayList<>(keys == null ? List.of() : keys);
+		Collections.sort(sortedKeys);
 
-	        } catch (Exception e) {
-	            log.warn("❌ Redis 값 파싱 오류 - key: {}", key, e);
-	        }
-	    }
+		for (String key : sortedKeys) {
+			String value = redisTemplate.opsForValue().get(key);
+			if (value == null)
+				continue;
 
-	    // 슬롯별 placeN 순으로 정렬해서 proto로 변환
-	    List<SlotRecommendation> slotRecommendations = slotMap.entrySet().stream()
-	            .map(entry -> {
-	                List<PlaceInfo> placesSorted = entry.getValue().stream()
-	                        .sorted(Comparator.comparingInt(p -> p.order))
-	                        .map(p -> p.place)
-	                        .toList();
+			try {
+				// key 파싱
+				String[] parts = key.split(":");
+				if (parts.length < 6) {
+					log.warn("키 형식 불일치: {}", key);
+					continue;
+				}
+				String slotId = parts[3];
+				String mealTypeToken = parts[4]; // MEAL | SNACK
+				String placeToken = parts[5]; // place3
 
-	                return SlotRecommendation.newBuilder()
-	                        .setSlotId(entry.getKey())
-	                        .addAllPlaces(placesSorted)
-	                        .build();
-	            })
-	            .toList();
+				int placeOrder = 0;
+				try {
+					placeOrder = Integer.parseInt(placeToken.replaceFirst("place", ""));
+				} catch (NumberFormatException ignore) {
+				}
 
-	    GetRecommendationResultsResponse response = GetRecommendationResultsResponse.newBuilder()
-	            .addAllSlotRecommendations(slotRecommendations)
-	            .setStatus("OK")
-	            .setMessage("추천 결과를 성공적으로 불러왔습니다.")
-	            .build();
+				int mealTypeFromKey = "MEAL".equalsIgnoreCase(mealTypeToken) ? 0
+						: "SNACK".equalsIgnoreCase(mealTypeToken) ? 1 : 0;
 
-	    responseObserver.onNext(response);
-	    responseObserver.onCompleted();
+				// value(JSON) 파싱
+				JsonNode node = objectMapper.readTree(value);
+				String id = node.path("id").asText("");
+
+				// ✅ DB에서 이미 선택된 place는 후보에서 제거
+				if (selectedIdsBySlot.getOrDefault(slotId, Set.of()).contains(id)) {
+					continue;
+				}
+
+				int mealType = node.has("mealType") ? node.path("mealType").asInt(mealTypeFromKey) : mealTypeFromKey;
+
+				PlaceInfo place = PlaceInfo.newBuilder().setId(id).setPlaceName(node.path("placeName").asText(""))
+						.setReason(node.path("reason").asText("")).setDistance(node.path("distance").asText(""))
+						.setScheduledTime(node.path("scheduledTime").asText("")).setMealType(mealType)
+						.setPlaceUrl(node.path("placeUrl").asText(""))
+						.setAddressName(node.path("addressName").asText(""))
+						.setAverageRating(node.path("averageRating").asDouble(0))
+						.setRepresentativeReview(node.path("representativeReview").asText("")).build();
+
+				slotMap.computeIfAbsent(slotId, k -> new ArrayList<>()).add(new PlaceWithOrder(place, placeOrder));
+
+			} catch (Exception e) {
+				log.warn("❌ Redis 값 파싱 오류 - key: {}", key, e);
+			}
+		}
+
+		// 3) 후보/이전선택을 SlotRecommendation으로 변환
+		List<SlotRecommendation> candidateSlots = slotMap.entrySet().stream().map(entry -> {
+			List<PlaceInfo> placesSorted = entry.getValue().stream().sorted(Comparator.comparingInt(p -> p.order))
+					.map(p -> p.place).toList();
+			return SlotRecommendation.newBuilder().setSlotId(entry.getKey()).addAllPlaces(placesSorted).build();
+		}).toList();
+
+		List<SlotRecommendation> selectedSlots = selectedPlacesBySlot.entrySet().stream()
+				.map(e -> SlotRecommendation.newBuilder().setSlotId(e.getKey()).addAllPlaces(e.getValue()).build())
+				.toList();
+
+		// 4) 응답
+		boolean hasAny = !candidateSlots.isEmpty() || !selectedSlots.isEmpty();
+
+		GetRecommendationResultsResponse response = GetRecommendationResultsResponse.newBuilder()
+				.addAllSlotRecommendations(candidateSlots) // 새 후보
+				.addAllSelectedSlotPlaces(selectedSlots) // 이전 선택
+				.setStatus(hasAny ? "OK" : "PENDING")
+				.setMessage(hasAny ? "추천 결과를 성공적으로 불러왔습니다." : "추천 결과가 아직 준비되지 않았습니다.").build();
+
+		responseObserver.onNext(response);
+		responseObserver.onCompleted();
 	}
 
-	
+	private static String nvl(String s) {
+		return s == null ? "" : s;
+	}
+
+
+
 	@Override
 	public void getSelectedPlaces(GetSelectedPlacesRequest request,
-	                              StreamObserver<GetSelectedPlacesResponse> responseObserver) {
-	    String userId = request.getUserId();
-	    String scheduleId = request.getScheduleId();
+			StreamObserver<GetSelectedPlacesResponse> responseObserver) {
+		String userId = request.getUserId();
+		String scheduleId = request.getScheduleId();
 
-	    // DB에서 유저 및 스케줄 기준으로 데이터 조회
-	    List<RecommendationSelectionEntity> selectedList =
-	            selectionRepository.findByUserIdAndScheduleId(userId, scheduleId);
+		// DB에서 유저 및 스케줄 기준으로 데이터 조회
+		List<RecommendationSelectionEntity> selectedList = selectionRepository.findByUserIdAndScheduleId(userId,
+				scheduleId);
 
-	    if (selectedList == null || selectedList.isEmpty()) {
-	        GetSelectedPlacesResponse response = GetSelectedPlacesResponse.newBuilder()
-	                .setStatus("NOT_FOUND")
-	                .setMessage("선택된 식당이 없습니다.")
-	                .build();
+		if (selectedList == null || selectedList.isEmpty()) {
+			GetSelectedPlacesResponse response = GetSelectedPlacesResponse.newBuilder().setStatus("NOT_FOUND")
+					.setMessage("선택된 식당이 없습니다.").build();
 
-	        responseObserver.onNext(response);
-	        responseObserver.onCompleted();
-	        return;
-	    }
+			responseObserver.onNext(response);
+			responseObserver.onCompleted();
+			return;
+		}
 
-	    Map<String, List<PlaceInfo>> slotMap = new HashMap<>();
+		Map<String, List<PlaceInfo>> slotMap = new HashMap<>();
 
-	    for (RecommendationSelectionEntity entity : selectedList) {
-	        PlaceInfo place = PlaceInfo.newBuilder()
-	                .setId(entity.getPlaceId())
-	                .setPlaceName(entity.getPlaceName())
-	                .setReason(entity.getReason())
-	                .setDistance(entity.getDistance())
-	                .setScheduledTime(entity.getScheduledTime())
-	                .setMealType(entity.getMealType())
-	                .setPlaceUrl(entity.getPlaceUrl())
-	                .setAddressName(entity.getAddressName())
-	                .setAverageRating(entity.getAverageRating())
-	                .setRepresentativeReview(entity.getRepresentativeReview())
-	                .build();
+		for (RecommendationSelectionEntity entity : selectedList) {
+			PlaceInfo place = PlaceInfo.newBuilder().setId(entity.getPlaceId()).setPlaceName(entity.getPlaceName())
+					.setReason(entity.getReason()).setDistance(entity.getDistance())
+					.setScheduledTime(entity.getScheduledTime()).setMealType(entity.getMealType())
+					.setPlaceUrl(entity.getPlaceUrl()).setAddressName(entity.getAddressName())
+					.setAverageRating(entity.getAverageRating())
+					.setRepresentativeReview(entity.getRepresentativeReview()).build();
 
-	        slotMap.computeIfAbsent(entity.getSlotId(), k -> new ArrayList<>()).add(place);
-	    }
+			slotMap.computeIfAbsent(entity.getSlotId(), k -> new ArrayList<>()).add(place);
+		}
 
-	    // SlotRecommendation 리스트로 변환
-	    List<SlotSelectedPlaces> slotPlaces = slotMap.entrySet().stream()
-	    	    .map(entry -> SlotSelectedPlaces.newBuilder()
-	    	        .setSlotId(entry.getKey())
-	    	        .addAllPlaces(entry.getValue())
-	    	        .build())
-	    	    .collect(Collectors.toList());
+		// SlotRecommendation 리스트로 변환
+		List<SlotSelectedPlaces> slotPlaces = slotMap.entrySet().stream().map(entry -> SlotSelectedPlaces.newBuilder()
+				.setSlotId(entry.getKey()).addAllPlaces(entry.getValue()).build()).collect(Collectors.toList());
 
+		// 최종 응답 생성
+		GetSelectedPlacesResponse response = GetSelectedPlacesResponse.newBuilder().addAllSlotPlaces(slotPlaces)
+				.setStatus("OK").setMessage("성공적으로 선택된 식당을 불러왔습니다.").build();
 
-	    // 최종 응답 생성
-	    GetSelectedPlacesResponse response = GetSelectedPlacesResponse.newBuilder()
-	    	    .addAllSlotPlaces(slotPlaces) 
-	    	    .setStatus("OK")
-	    	    .setMessage("성공적으로 선택된 식당을 불러왔습니다.")
-	    	    .build();
-
-
-	    responseObserver.onNext(response);
-	    responseObserver.onCompleted();
+		responseObserver.onNext(response);
+		responseObserver.onCompleted();
 	}
-	
-	//to 리뷰 서버
+
+	// to 리뷰 서버
 	@Override
 	public void placesForReview(PlacesForReviewRequest request,
-	                            StreamObserver<PlacesForReviewResponse> responseObserver) {
+			StreamObserver<PlacesForReviewResponse> responseObserver) {
 
-	    //0.userid 가져오
-	    String userId = GrpcHeaderConfig.UserIdContext.USER_ID.get();
+		// 0.userid 가져오
+		String userId = GrpcHeaderConfig.UserIdContext.USER_ID.get();
 
-	    // 1. 유저의 추천 선택 식당 조회
-	    List<RecommendationSelectionEntity> selectedList = selectionRepository.findByUserId(userId);
+		// 1. 유저의 추천 선택 식당 조회
+		List<RecommendationSelectionEntity> selectedList = selectionRepository.findByUserId(userId);
 
-	    if (selectedList == null || selectedList.isEmpty()) {
-	        PlacesForReviewResponse response = PlacesForReviewResponse.newBuilder()
-	                .setStatus("NOT_FOUND")
-	                .setMessage("리뷰를 위한 식당 선택 정보가 없습니다.")
-	                .build();
-	        responseObserver.onNext(response);
-	        responseObserver.onCompleted();
-	        return;
-	    }
+		if (selectedList == null || selectedList.isEmpty()) {
+			PlacesForReviewResponse response = PlacesForReviewResponse.newBuilder().setStatus("NOT_FOUND")
+					.setMessage("리뷰를 위한 식당 선택 정보가 없습니다.").build();
+			responseObserver.onNext(response);
+			responseObserver.onCompleted();
+			return;
+		}
 
-	    // 2. 응답할 식당 리스트 (이미 응답한 건 제외)
-	    List<ReviewPlaceInfo> responsePlaces = new ArrayList<>();
+		// 2. 응답할 식당 리스트 (이미 응답한 건 제외)
+		List<ReviewPlaceInfo> responsePlaces = new ArrayList<>();
 
-	    for (RecommendationSelectionEntity entity : selectedList) {
-	        String placeId = entity.getPlaceId();
-	        String redisKey = "review_sent:" + userId + ":" + placeId;
+		for (RecommendationSelectionEntity entity : selectedList) {
+			String placeId = entity.getPlaceId();
+			String redisKey = "review_sent:" + userId + ":" + placeId;
 
-	        Boolean alreadySent = redisTemplate.hasKey(redisKey);
-	        if (Boolean.TRUE.equals(alreadySent)) {
-	            log.info("⚠️ 이미 리뷰 응답한 식당 - placeId: {}", placeId);
-	            continue; // 건너뛰기
-	        }
-	        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-	        // 아직 응답하지 않은 경우 → 응답 리스트에 포함
-	        ReviewPlaceInfo reviewPlaceInfo = ReviewPlaceInfo.newBuilder()
-	                .setId(placeId)
-	                .setAddressName(entity.getAddressName())
-	                .setPlaceUrl(entity.getPlaceUrl())
-	                .setScheduledTime(entity.getSelectedDate().format(formatter))
-	                .build();
+			Boolean alreadySent = redisTemplate.hasKey(redisKey);
+			if (Boolean.TRUE.equals(alreadySent)) {
+				log.info("⚠️ 이미 리뷰 응답한 식당 - placeId: {}", placeId);
+				continue; // 건너뛰기
+			}
+			DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+			// 아직 응답하지 않은 경우 → 응답 리스트에 포함
+			ReviewPlaceInfo reviewPlaceInfo = ReviewPlaceInfo.newBuilder().setId(placeId)
+					.setAddressName(entity.getAddressName()).setPlaceUrl(entity.getPlaceUrl())
+					.setScheduledTime(entity.getSelectedDate().format(formatter)).build();
 
-	        responsePlaces.add(reviewPlaceInfo);
+			responsePlaces.add(reviewPlaceInfo);
 
-	        // 응답 보냈다고 Redis에 기록
-	        redisTemplate.opsForValue().set(redisKey, "true", Duration.ofHours(24));
-	    }
+			// 응답 보냈다고 Redis에 기록
+			redisTemplate.opsForValue().set(redisKey, "true", Duration.ofHours(24));
+		}
 
-	    // 3. 응답 생성
-	    PlacesForReviewResponse response = PlacesForReviewResponse.newBuilder()
-	            .addAllPlaces(responsePlaces)
-	            .setStatus("OK")
-	            .setMessage("리뷰 서버로 응답이 성공적으로 전달되었습니다.")
-	            .build();
+		// 3. 응답 생성
+		PlacesForReviewResponse response = PlacesForReviewResponse.newBuilder().addAllPlaces(responsePlaces)
+				.setStatus("OK").setMessage("리뷰 서버로 응답이 성공적으로 전달되었습니다.").build();
 
-	    responseObserver.onNext(response);
-	    responseObserver.onCompleted();
+		responseObserver.onNext(response);
+		responseObserver.onCompleted();
 	}
-
-
-	
 
 }
