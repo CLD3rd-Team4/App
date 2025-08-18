@@ -238,8 +238,8 @@ export default function ScheduleSummaryScreen() {
 
     // ✅ 식당: 로컬 scheduledTime, aiReason/URL만 사용
     vm.selectedRestaurants?.forEach((item) => {
-      const slotId = item.sectionId.split("-").pop()
-      const mt = vm.mealSlots?.find((ms) => ms.slotId === slotId)
+      const slotId = item.sectionId.replace(/^(meal|snack)-/, "")
+      const mt = vm.mealSlots?.find(ms => ms.slotId === slotId)
 
       items.push({
         type: "restaurant",
