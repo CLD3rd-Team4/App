@@ -1,41 +1,60 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { useRouter } from "next/navigation"
-import { scheduleApi, recommendApi } from "@/services/api"
-import type { Schedule, SchedulePayload } from "@/types"
-import api from "@/lib/interceptor"
+import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { scheduleApi, recommendApi } from "@/services/api";
+import type { Schedule, SchedulePayload } from "@/types";
+import api from "@/lib/interceptor";
 
-const getInitialSelectionStatus = (): boolean => {
-  if (typeof window === "undefined") return false;
-  try {
-    const item = localStorage.getItem("scheduleSelected");
-    if (!item) return false;
-    const parsed = JSON.parse(item);
-    const isExpired = Date.now() - parsed.timestamp > 24 * 60 * 60 * 1000;
-    return parsed.value === true && !isExpired;
-  } catch (e) {
-    return false;
-  }
-};
+// 1. 컨텍스트의 타입 정의
+interface ScheduleContextType {
+  schedules: Schedule[];
+  selectedSchedule: Schedule | null;
+  isLoading: boolean;
+  isProcessing: boolean;
+  isSelected: boolean;
+  loadSchedules: () => Promise<void>;
+  deselectSchedule: () => void;
+  createSchedule: (scheduleData: SchedulePayload) => Promise<void>;
+  updateSchedule: (scheduleId: string, scheduleData: SchedulePayload) => Promise<void>;
+  deleteSchedule: (scheduleId: string) => Promise<void>;
+  initializeHomepage: () => Promise<void>;
+  selectSchedule: (scheduleId: string) => Promise<Schedule | null>;
+  triggerRecommendRequest: (scheduleId: string) => Promise<void>;
+}
 
-export default function useSchedule() {
+// 2. 컨텍스트 생성
+const ScheduleContext = createContext<ScheduleContextType | undefined>(undefined);
+
+// 3. 프로바이더 컴포넌트 생성 (Named Export)
+export function ScheduleProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isSelected, setIsSelected] = useState<boolean>(getInitialSelectionStatus);
+  
+  const getInitialSelectionStatus = useCallback((): boolean => {
+    if (typeof window === "undefined") return false;
+    try {
+      const item = localStorage.getItem("scheduleSelected");
+      if (!item) return false;
+      const parsed = JSON.parse(item);
+      const isExpired = Date.now() - parsed.timestamp > 24 * 60 * 60 * 1000;
+      return parsed.value === true && !isExpired;
+    } catch (e) {
+      return false;
+    }
+  }, []);
+
+  const [isSelected, setIsSelected] = useState<boolean>(getInitialSelectionStatus());
   const [isLoading, setIsLoading] = useState(true);
 
   const deselectAndClear = useCallback(async () => {
     try {
-      // 서버의 선택 상태를 먼저 해제합니다.
       await scheduleApi.deselectSchedule();
     } catch (error) {
       console.error("서버 선택 상태 해제 실패:", error);
-      // 실패하더라도 프론트엔드 상태는 초기화하여 사용자 경험을 개선합니다.
     } finally {
-      // 프론트엔드의 상태를 초기화합니다.
       localStorage.removeItem("scheduleSelected");
       setSelectedSchedule(null);
       setIsSelected(false);
@@ -50,22 +69,23 @@ export default function useSchedule() {
       try {
         const statusResponse = await scheduleApi.getSelectionStatus();
         finalIsSelected = statusResponse.isSelected;
-        if(finalIsSelected) localStorage.setItem('scheduleSelected', JSON.stringify({ value: true, timestamp: Date.now() }));
-      } catch (e) { 
-        finalIsSelected = false; 
+        if (finalIsSelected) {
+          localStorage.setItem('scheduleSelected', JSON.stringify({ value: true, timestamp: Date.now() }));
+        }
+      } catch (e) {
+        finalIsSelected = false;
       }
     }
+    
+    setIsSelected(finalIsSelected);
 
-    if (finalIsSelected) {
-      setIsSelected(true);
-      // 요약 정보 로딩 로직을 제거하여 무한 로딩을 원천 차단합니다.
-      // setSelectedSchedule(null); // 필요 시 기존 스케줄 정보 초기화
-    } else {
-      // 선택된 스케줄이 없는 것이 확인된 경우
-      if (isSelected) await deselectAndClear(); // 혹시 모를 프론트 상태 불일치 정리
+    // 무한 로딩 방지를 위해 요약 정보 로딩 로직 제거
+    if (!finalIsSelected && isSelected) { 
+       await deselectAndClear();
     }
+    
     setIsLoading(false);
-  }, [deselectAndClear]);
+  }, [deselectAndClear, getInitialSelectionStatus, isSelected]);
 
   const selectSchedule = useCallback(async (scheduleId: string): Promise<Schedule | null> => {
     setIsProcessing(true);
@@ -77,11 +97,11 @@ export default function useSchedule() {
         setIsSelected(true);
         return response.schedule;
       } else {
-        deselectAndClear();
+        await deselectAndClear();
         return null;
       }
     } catch (error) {
-      deselectAndClear();
+      await deselectAndClear();
       throw error;
     } finally {
       setIsProcessing(false);
@@ -98,11 +118,22 @@ export default function useSchedule() {
   const deleteSchedule = async (scheduleId: string) => { setIsProcessing(true); try { await scheduleApi.deleteSchedule(scheduleId); setSchedules(s => s.filter(sch => sch.id !== scheduleId)); } catch (e) { console.error(e); } finally { setIsProcessing(false); } };
   const deselectSchedule = useCallback(() => { deselectAndClear(); }, [deselectAndClear]);
 
-  return {
+  const value = {
     schedules, selectedSchedule, isLoading, isProcessing, isSelected,
     loadSchedules, deselectSchedule, createSchedule, updateSchedule, deleteSchedule,
-    initializeHomepage, // HomePage에서 사용
-    selectSchedule,
-    triggerRecommendRequest,
-  }
+    initializeHomepage, selectSchedule, triggerRecommendRequest,
+  };
+
+  return <ScheduleContext.Provider value={value}>{children}</ScheduleContext.Provider>;
 }
+
+// 4. 커스텀 훅 생성 (Default Export)
+const useSchedule = () => {
+  const context = useContext(ScheduleContext);
+  if (context === undefined) {
+    throw new Error("useSchedule must be used within a ScheduleProvider");
+  }
+  return context;
+};
+
+export default useSchedule;
