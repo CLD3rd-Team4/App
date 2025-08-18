@@ -98,9 +98,9 @@ external:
 
 # AWS/Bedrock
 aws:
-  region: us-east-1
+  region: ap-northeast-2
 bedrock:
-  model-id: anthropic.claude-3-sonnet-20240229-v1:0
+  model-id: apac.anthropic.claude-3-sonnet-20240229-v1:0
 
 # Actuator/Prometheus
 management:
