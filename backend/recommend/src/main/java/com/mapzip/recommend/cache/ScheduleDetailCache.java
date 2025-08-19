@@ -85,22 +85,25 @@ public class ScheduleDetailCache {
                 Object raw = redis.opsForHash().get(key, "updateLocs");
                 String existed = (raw == null) ? "[]" : raw.toString();
                 java.lang.reflect.Type listType =
-                        new com.google.gson.reflect.TypeToken<java.util.List<java.util.Map<String, String>>>() {}.getType();
+                    new com.google.gson.reflect.TypeToken<java.util.List<java.util.Map<String, String>>>() {}.getType();
                 java.util.List<java.util.Map<String, String>> updateLocs = gson.fromJson(existed, listType);
                 if (updateLocs == null) updateLocs = new java.util.ArrayList<>();
 
-                String destLat  = (req.getDestination() != null) ? nvl(req.getDestination().getLat())  : "";
-                String destLng  = (req.getDestination() != null) ? nvl(req.getDestination().getLng())  : "";
-                String destName = (req.getDestination() != null) ? nvl(req.getDestination().getName()) : "";
+                String destLat = (req.getDestination() != null) ? nvl(req.getDestination().getLat()) : "";
+                String destLng = (req.getDestination() != null) ? nvl(req.getDestination().getLng()) : "";
 
-                String time = (ctx.getClientNowIso() != null && !ctx.getClientNowIso().isBlank())
-                        ? ctx.getClientNowIso() : nvl(estimatedArrivalTime);
+                // 우선순위: clientNowIso → estimatedArrivalTime
+                String rawTime = (ctx.getClientNowIso() != null && !ctx.getClientNowIso().isBlank())
+                        ? ctx.getClientNowIso()
+                        : nvl(estimatedArrivalTime);
+
+                // "오전/오후 HH:mm"으로 정규화
+                String displayTime = toKoreanAmPm(rawTime);
 
                 java.util.Map<String, String> entry = new java.util.LinkedHashMap<>();
-                entry.put("lat",  destLat);
-                entry.put("lng",  destLng);
-                entry.put("name", destName);
-                entry.put("time", nvl(time));
+                entry.put("lat", destLat);
+                entry.put("lng", destLng);
+                entry.put("time", displayTime); // 항상 오전/오후 HH:mm 형식으로 저장
 
                 updateLocs.add(entry);
                 redis.opsForHash().put(key, "updateLocs", gson.toJson(updateLocs));
@@ -152,8 +155,35 @@ public class ScheduleDetailCache {
         String json = (raw == null) ? "[]" : raw.toString();
         return gson.fromJson(json, new TypeToken<List<String>>() {}.getType());
     }
-
-    private String nvl(String s) {
-        return (s == null) ? "" : s;
+    private static String toKoreanAmPm(String input) {
+        if (input == null || input.isBlank()) return "";
+        // 이미 "오전/오후 HH:mm" 이면 그대로
+        if (input.matches("(오전|오후)\\s*\\d{1,2}:\\d{2}")) return input.trim();
+        // "HH:mm" 이면 오전/오후로 변환
+        if (input.matches("\\d{1,2}:\\d{2}")) {
+            String[] sp = input.split(":");
+            int h = Integer.parseInt(sp[0]);
+            String mm = sp[1];
+            String period = (h >= 12) ? "오후" : "오전";
+            int display = (h == 0) ? 12 : (h > 12 ? h - 12 : h);
+            return period + " " + display + ":" + mm;
+        }
+        // ISO 같은 날짜/시간이면 파싱 후 변환 (Asia/Seoul 기준)
+        try {
+            java.time.Instant inst = java.time.Instant.parse(input.trim());
+            java.time.ZonedDateTime zdt = inst.atZone(java.time.ZoneId.of("Asia/Seoul"));
+            int h = zdt.getHour();
+            int m = zdt.getMinute();
+            String period = (h >= 12) ? "오후" : "오전";
+            int display = (h == 0) ? 12 : (h > 12 ? h - 12 : h);
+            String mm = String.format("%02d", m);
+            return period + " " + display + ":" + mm;
+        } catch (Exception ignored) {
+            // 그 외 포맷은 그대로 반환(최소 훼손)
+            return input.trim();
+        }
     }
+
+    private String nvl(String s) { return (s == null) ? "" : s; }
+
 }

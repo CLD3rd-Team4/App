@@ -2,71 +2,65 @@ package com.mapzip.recommend.service;
 
 
 import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
-import lombok.Builder;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.redis.core.HashOperations;
+
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
-import java.lang.reflect.Type;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+
 
 @Service
 @RequiredArgsConstructor
 public class ScheduleDetailQueryService {
 
- private final StringRedisTemplate redis;
- private final Gson gson = new Gson();
- private static final Type LIST_STRING = new TypeToken<List<String>>() {}.getType();
+    private final StringRedisTemplate redis;
+    private final Gson gson = new Gson();
 
- public Optional<Snapshot> get(String userId, String scheduleId) {
-     String key = "scheduleDetail:" + userId + ":" + scheduleId;
-     if (!Boolean.TRUE.equals(redis.hasKey(key))) return Optional.empty();
+    public java.util.Optional<ScheduleSnapshot> get(String userId, String scheduleId) {
+        String key = "scheduleDetail:" + userId + ":" + scheduleId;
+        Boolean exists = redis.hasKey(key);
+        if (exists == null || !exists) return java.util.Optional.empty();
 
-     HashOperations<String, String, String> ops = redis.opsForHash();
-     String departureTime        = ops.get(key, "departureTime");
-     String departureName        = ops.get(key, "departureName");
-     String destinationName      = ops.get(key, "destinationName");
-     String estimatedArrivalTime = ops.get(key, "estimatedArrivalTime");
-     String waypointNamesJson    = ops.get(key, "waypointNames");
-     String waypointTimesJson    = ops.get(key, "waypointTimes");
+        ScheduleSnapshot s = new ScheduleSnapshot();
+        s.setDepartureTime(hget(key, "departureTime"));
+        s.setDepartureName(hget(key, "departureName"));
+        s.setDestinationName(hget(key, "destinationName"));
+        s.setEstimatedArrivalTime(hget(key, "estimatedArrivalTime"));
 
-     List<String> waypointNames = parseList(waypointNamesJson);
-     List<String> waypointTimes = parseList(waypointTimesJson);
+        s.setWaypointNames(asList(hget(key, "waypointNames")));
+        s.setWaypointTimes(asList(hget(key, "waypointTimes")));
 
-     return Optional.of(Snapshot.builder()
-             .departureTime(nvl(departureTime))
-             .departureName(nvl(departureName))
-             .destinationName(nvl(destinationName))
-             .estimatedArrivalTime(nvl(estimatedArrivalTime))
-             .waypointNames(waypointNames)
-             .waypointTimes(waypointTimes)
-             .build());
- }
+        // 업데이트 이력(JSON 문자열) — 저장 시 이미 "오전/오후 HH:mm"
+        s.setUpdateLocs(hget(key, "updateLocs")); // null 가능
 
- private List<String> parseList(String json) {
-     if (json == null || json.isBlank()) return Collections.emptyList();
-     try {
-         return gson.fromJson(json, LIST_STRING);
-     } catch (Exception e) {
-         return Collections.emptyList();
-     }
- }
+        return java.util.Optional.of(s);
+    }
 
- private String nvl(String s) { return (s == null) ? "" : s; }
+    private String hget(String key, String field) {
+        Object v = redis.opsForHash().get(key, field);
+        return v == null ? "" : v.toString();
+    }
 
- @Getter
- @Builder
- public static class Snapshot {
-     private final String departureTime;
-     private final String departureName;
-     private final String destinationName;
-     private final String estimatedArrivalTime;
-     private final List<String> waypointNames;
-     private final List<String> waypointTimes;
- }
+    private java.util.List<String> asList(String json) {
+        if (json == null || json.isBlank()) return java.util.List.of();
+        try {
+            java.lang.reflect.Type t = new com.google.gson.reflect.TypeToken<java.util.List<String>>(){}.getType();
+            java.util.List<String> list = gson.fromJson(json, t);
+            return list == null ? java.util.List.of() : list;
+        } catch (Exception e) {
+            return java.util.List.of();
+        }
+    }
+
+    // 스냅샷 DTO 
+    @lombok.Data
+    public static class ScheduleSnapshot {
+        private String departureTime;
+        private String departureName;
+        private String destinationName;
+        private String estimatedArrivalTime;
+        private java.util.List<String> waypointNames;
+        private java.util.List<String> waypointTimes;
+        private String updateLocs; // JSON 문자열
+    }
 }

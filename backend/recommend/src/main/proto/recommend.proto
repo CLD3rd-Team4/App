@@ -153,14 +153,22 @@ message GetSelectedScheduleDetailRequest {
   string scheduleId = 1;
 }
 
+message UpdateEvent {
+  double lat = 1;
+  double lng = 2;
+  string time = 3; 
+}
+
 message ScheduleDetail {
-  string departureTime = 1;
+  string departureTime = 1;       
   string departureName = 2;
   string destinationName = 3;
-  string estimatedArrivalTime = 4;
+  string estimatedArrivalTime = 4; 
   repeated string waypointNames = 5;
   repeated string waypointTimes = 6;
+  repeated UpdateEvent updates = 7; 
 }
+
 
 message GetSelectedScheduleDetailResponse {
   string status = 1;   

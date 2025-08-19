@@ -50,42 +50,102 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 
 
 	// 선택된 스케줄 프론트에서 조회
-	@Override
-	public void getScheduleDetail(GetSelectedScheduleDetailRequest request,
-			StreamObserver<GetSelectedScheduleDetailResponse> responseObserver) {
+    @Override
+    public void getScheduleDetail(GetSelectedScheduleDetailRequest request,
+            StreamObserver<GetSelectedScheduleDetailResponse> responseObserver) {
 
-		String scheduleId = request.getScheduleId();
-		String userId = GrpcHeaderConfig.UserIdContext.USER_ID.get();
+        final String scheduleId = request.getScheduleId();
+        final String userId = GrpcHeaderConfig.UserIdContext.USER_ID.get();
 
-		try {
-			var snapOpt = scheduleDetailQueryService.get(userId, scheduleId);
-			if (snapOpt.isEmpty()) {
-				GetSelectedScheduleDetailResponse resp = GetSelectedScheduleDetailResponse.newBuilder()
-						.setStatus("NOT_FOUND").setMessage("No schedule detail in Redis").build();
-				responseObserver.onNext(resp);
-				responseObserver.onCompleted();
-				return;
-			}
+        try {
+            var snapOpt = scheduleDetailQueryService.get(userId, scheduleId);
+            if (snapOpt.isEmpty()) {
+                responseObserver.onNext(GetSelectedScheduleDetailResponse.newBuilder()
+                        .setStatus("NOT_FOUND").setMessage("No schedule detail in Redis").build());
+                responseObserver.onCompleted();
+                return;
+            }
 
-			var s = snapOpt.get();
-			ScheduleDetail detail = ScheduleDetail.newBuilder().setDepartureTime(s.getDepartureTime())
-					.setDepartureName(s.getDepartureName()).setDestinationName(s.getDestinationName())
-					.setEstimatedArrivalTime(s.getEstimatedArrivalTime()).addAllWaypointNames(s.getWaypointNames())
-					.addAllWaypointTimes(s.getWaypointTimes()).build();
+            var s = snapOpt.get();
 
-			GetSelectedScheduleDetailResponse resp = GetSelectedScheduleDetailResponse.newBuilder().setStatus("OK")
-					.setMessage("success").setScheduleDetail(detail).build();
+            // updateLocs(JSON) → repeated UpdateEvent
+            java.util.List<UpdateEvent> updates = new java.util.ArrayList<>();
+            try {
+                String raw = s.getUpdateLocs(); // JSON 배열 문자열 (null 가능)
+                if (raw != null && !raw.isBlank()) {
+                    java.lang.reflect.Type listType =
+                        new com.google.gson.reflect.TypeToken<java.util.List<java.util.Map<String, String>>>() {}.getType();
+                    java.util.List<java.util.Map<String, String>> arr = new com.google.gson.Gson().fromJson(raw, listType);
+                    if (arr != null) {
+                        for (java.util.Map<String, String> m : arr) {
+                            double lat = parseDoubleSafe(m.get("lat"));
+                            double lng = parseDoubleSafe(m.get("lng"));
+                            String time = normalizeKoreanAmPm(nvl(m.get("time"))); // ★ 조회 시도 변환
 
-			responseObserver.onNext(resp);
-			responseObserver.onCompleted();
-		} catch (Exception e) {
-			log.error("getScheduleDetail error (userId={}, scheduleId={})", userId, scheduleId, e);
-			GetSelectedScheduleDetailResponse resp = GetSelectedScheduleDetailResponse.newBuilder().setStatus("ERROR")
-					.setMessage("Internal error").build();
-			responseObserver.onNext(resp);
-			responseObserver.onCompleted();
-		}
-	}
+                            UpdateEvent.Builder ub = UpdateEvent.newBuilder();
+                            if (!Double.isNaN(lat)) ub.setLat(lat);
+                            if (!Double.isNaN(lng)) ub.setLng(lng);
+                            if (!time.isBlank())   ub.setTime(time);
+
+                            updates.add(ub.build());
+                        }
+                    }
+                }
+            } catch (Exception ignore) {}
+
+            ScheduleDetail detail = ScheduleDetail.newBuilder()
+                    .setDepartureTime(nvl(s.getDepartureTime()))
+                    .setDepartureName(nvl(s.getDepartureName()))
+                    .setDestinationName(nvl(s.getDestinationName()))
+                    .setEstimatedArrivalTime(nvl(s.getEstimatedArrivalTime()))
+                    .addAllWaypointNames(s.getWaypointNames() == null ? java.util.List.of() : s.getWaypointNames())
+                    .addAllWaypointTimes(s.getWaypointTimes() == null ? java.util.List.of() : s.getWaypointTimes())
+                    .addAllUpdates(updates)
+                    .build();
+
+            responseObserver.onNext(GetSelectedScheduleDetailResponse.newBuilder()
+                    .setStatus("OK").setMessage("success").setScheduleDetail(detail).build());
+            responseObserver.onCompleted();
+
+        } catch (Exception e) {
+            log.error("getScheduleDetail error (userId={}, scheduleId={})", userId, scheduleId, e);
+            responseObserver.onNext(GetSelectedScheduleDetailResponse.newBuilder()
+                    .setStatus("ERROR").setMessage("Internal error").build());
+            responseObserver.onCompleted();
+        }
+    }
+
+
+    private static double parseDoubleSafe(String s) {
+        if (s == null || s.isBlank()) return Double.NaN;
+        try { return Double.parseDouble(s.trim()); } catch (Exception e) { return Double.NaN; }
+    }
+
+    // 저장 포맷과 호환: 이미 "오전/오후 HH:mm"이면 그대로, "HH:mm"도 오전/오후로, ISO면 변환
+    private static String normalizeKoreanAmPm(String input) {
+        if (input == null || input.isBlank()) return "";
+        if (input.matches("(오전|오후)\\s*\\d{1,2}:\\d{2}")) return input.trim();
+        if (input.matches("\\d{1,2}:\\d{2}")) {
+            String[] sp = input.split(":");
+            int h = Integer.parseInt(sp[0]);
+            String mm = sp[1];
+            String period = (h >= 12) ? "오후" : "오전";
+            int display = (h == 0) ? 12 : (h > 12 ? h - 12 : h);
+            return period + " " + display + ":" + mm;
+        }
+        try {
+            java.time.Instant inst = java.time.Instant.parse(input.trim());
+            java.time.ZonedDateTime zdt = inst.atZone(java.time.ZoneId.of("Asia/Seoul"));
+            int h = zdt.getHour();
+            int m = zdt.getMinute();
+            String period = (h >= 12) ? "오후" : "오전";
+            int display = (h == 0) ? 12 : (h > 12 ? h - 12 : h);
+            String mm = String.format("%02d", m);
+            return period + " " + display + ":" + mm;
+        } catch (Exception ignored) {
+            return input.trim();
+        }
+    }
 
 	// 프론트에서 추천 요청
 	@Override
