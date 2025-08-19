@@ -32,7 +32,8 @@ public class OcrService {
     private String credentialsPath;
     
     private static final Pattern DATE_PATTERN = 
-        Pattern.compile("(\\d{4}[-/.]\\d{1,2}[-/.]\\d{1,2}|\\d{1,2}[-/.]\\d{1,2}[-/.]\\d{4})");
+            Pattern.compile("\\b(\\d{4}[-/.](0[1-9]|1[0-2])[-/.](0[1-9]|[12]\\d|3[01])"
+                  + "|(0[1-9]|[12]\\d|3[01])[-/.](0[1-9]|1[0-2])[-/.]\\d{4})\\b");
     
     private static final Pattern AMOUNT_PATTERN = 
         Pattern.compile("(\\d{1,3}(?:,\\d{3})*(?:\\.\\d{2})?|\\d+)원?");
