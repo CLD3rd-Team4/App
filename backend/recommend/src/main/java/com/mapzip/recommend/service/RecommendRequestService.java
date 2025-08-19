@@ -40,27 +40,45 @@ public class RecommendRequestService {
         // 0) userId (메타데이터에서 가져옴)
         String userId = GrpcHeaderConfig.UserIdContext.USER_ID.get();
 
-        // 1) gRPC 요청에서 값 꺼내기 (optional 필드 대응)
-        String scheduleId   = grpcReq.getScheduleId();
-        String clientNowIso = grpcReq.hasClientNowIso() ? grpcReq.getClientNowIso() : null;
-        Double currentLat   = grpcReq.hasCurrentLat()   ? grpcReq.getCurrentLat()   : null;
-        Double currentLng   = grpcReq.hasCurrentLng()   ? grpcReq.getCurrentLng()   : null;
-        boolean IsUpdate=false;
-        if (clientNowIso != null && !clientNowIso.isBlank()
-                && currentLat != null
-                && currentLng != null) {
-        	
-        	IsUpdate=true;
-        } else {
-           IsUpdate=false;
+     // 1) gRPC 요청에서 값 꺼내기 (optional 필드 대응)
+        final String scheduleId = grpcReq.getScheduleId();
+
+        // presence 체크
+        final boolean hasNow = grpcReq.hasClientNowIso() && !grpcReq.getClientNowIso().isBlank();
+        final boolean hasLat = grpcReq.hasCurrentLat();
+        final boolean hasLng = grpcReq.hasCurrentLng();
+
+        final String clientNowIso = hasNow ? grpcReq.getClientNowIso() : null;
+        final Double currentLat   = hasLat ? grpcReq.getCurrentLat()   : null;
+        final Double currentLng   = hasLng ? grpcReq.getCurrentLng()   : null;
+
+        // 업데이트 판단: 세 필드 모두 있을 때만 true (정책 유지)
+        final boolean isUpdate = hasNow && hasLat && hasLng;
+
+        // 디버그 로그 (좌표/시간이 일부만 있어도 찍어줌)
+        log.info("[Recommend] incoming request: scheduleId={}, userId={}, hasNow={}, hasLat={}, hasLng={}, isUpdate={}",
+                scheduleId, userId, hasNow, hasLat, hasLng, isUpdate);
+        if (hasLat || hasLng) {
+            log.info("[Recommend] 추천 업데이트  lat={}, lng={}", currentLat, currentLng);
+        }
+        if (hasNow) {
+            log.info("[Recommend] 추천 업데이트 시간 clientNowIso={}", clientNowIso);
         }
 
-        // 2) 캐시 히트면 결과 토픽 바로 발행
-        String cacheKey = String.format("scheduleDetail:%s:%s", userId, scheduleId);
-        if (Boolean.TRUE.equals(redisTemplate.hasKey(cacheKey))&& IsUpdate==false) {
+     // 2) 캐시 히트면 결과 토픽 바로 발행 (단, 업데이트 요청은 무조건 우회)
+        final String cacheKey = String.format("scheduleDetail:%s:%s", userId, scheduleId);
+        final boolean cacheHit = Boolean.TRUE.equals(redisTemplate.hasKey(cacheKey));
+        log.info("[Recommend] cache check: key='{}', hit={}", cacheKey, cacheHit);
+
+        if (cacheHit && !isUpdate) {
+            // 일반 요청 + 캐시 있음 → 즉시 완료 알림
             kafkaTemplate.send(RESULT_TOPIC, scheduleId, userId);
-            log.info("➡ 캐시 히트: {} 토픽 즉시 전송 완료 scheduleId={}, userId={}", RESULT_TOPIC, scheduleId, userId);
+            log.info("➡ 캐시 히트(일반요청): {} 토픽 즉시 전송 완료 scheduleId={}, userId={}",
+                    RESULT_TOPIC, scheduleId, userId);
             return;
+        } else if (cacheHit && isUpdate) {
+            // 업데이트 요청이면 캐시가 있어도 반드시 재계산 경로로
+            log.info("[Recommend] 업데이트 요청 ");
         }
 
         // 3) 스케줄 서버 조회 (헤더에 x-user-id 부착)
@@ -87,7 +105,7 @@ public class RecommendRequestService {
                 clientNowIso,
                 currentLat,
                 currentLng,
-                IsUpdate
+               isUpdate
         );
 
         // 5) Kafka 전송 (키는 scheduleId로 파티셔닝)
