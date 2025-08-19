@@ -80,15 +80,18 @@ public class ReviewService {
                 logger.info("OCR verification result for user {}: {}", userId, isVerified);
 
                 if (!isVerified) {
-                    return new ReviewCreateResult(null, ocrResult, false, "영수증 검증에 실패하여 리뷰를 생성할 수 없습니다.");
+                    logger.warn("OCR verification failed for user {}, but allowing review creation", userId);
+                    // OCR 검증 실패해도 리뷰 작성은 허용하되, 검증 상태만 표시
                 }
                 
-                // OCR 날짜와 실제 방문 날짜 비교 검증
+                // OCR 날짜와 실제 방문 날짜 비교 검증 (경고만 로그)
                 if (visitDate != null && ocrResult.getVisitDate() != null) {
                     boolean isDateValid = ocrService.validateVisitDate(ocrResult.getVisitDate(), visitDate);
                     if (!isDateValid) {
-                        return new ReviewCreateResult(null, ocrResult, false, 
-                            "영수증 날짜가 방문 날짜와 일치하지 않습니다. 리뷰 작성이 차단되었습니다.");
+                        logger.warn("Date validation failed for user {}: OCR date {} vs visit date {}, but allowing review creation", 
+                                   userId, ocrResult.getVisitDate(), visitDate);
+                        // 날짜 불일치도 리뷰 작성 차단하지 않고 경고만 로그
+                        isVerified = false; // 검증 상태를 false로 설정
                     }
                 }
             }
@@ -122,11 +125,13 @@ public class ReviewService {
             // DynamoDB 복합키 생성
             review.generateCompositeKey();
             
-            // 방문 날짜 설정 (OCR에서 추출되었다면 사용, 아니면 현재 날짜)
+            // 방문 날짜 설정 (우선순위: OCR 추출 > 사용자 입력 > 현재 날짜)
             if (ocrResult != null && ocrResult.getVisitDate() != null && !ocrResult.getVisitDate().isEmpty()) {
-                review.setVisitDate(ocrResult.getVisitDate());
+                review.setVisitDate(ocrResult.getVisitDate()); // OCR 추출 날짜 우선
+            } else if (visitDate != null && !visitDate.isEmpty()) {
+                review.setVisitDate(visitDate); // 사용자가 입력한 날짜
             } else {
-                review.setVisitDate(Instant.now().toString().split("T")[0]); // yyyy-MM-dd 형식
+                review.setVisitDate(Instant.now().toString().split("T")[0]); // 현재 날짜 fallback
             }
             
             // 리뷰 저장
@@ -175,14 +180,14 @@ public class ReviewService {
         Optional<ReviewEntity> existingReview = reviewRepository.findByRestaurantIdAndReviewId(restaurantId, reviewId);
         
         if (existingReview.isEmpty()) {
-            throw new RuntimeException("리뷰를 찾을 수 없습니다.");
+            throw new IllegalStateException("리뷰를 찾을 수 없습니다.");
         }
         
         ReviewEntity review = existingReview.get();
         
         // 작성자 검증
         if (!review.getUserId().equals(userId)) {
-            throw new RuntimeException("리뷰 수정 권한이 없습니다.");
+            throw new SecurityException("리뷰 수정 권한이 없습니다.");
         }
         
         // 리뷰 업데이트
@@ -258,14 +263,14 @@ public class ReviewService {
         
         Optional<ReviewEntity> existingReview = reviewRepository.findByRestaurantIdAndReviewId(restaurantId, reviewId);
         if (existingReview.isEmpty()) {
-            throw new RuntimeException("리뷰를 찾을 수 없습니다.");
+            throw new IllegalStateException("리뷰를 찾을 수 없습니다.");
         }
         
         ReviewEntity review = existingReview.get();
         
         // 작성자 검증
         if (!review.getUserId().equals(userId)) {
-            throw new RuntimeException("리뷰 수정 권한이 없습니다.");
+            throw new SecurityException("리뷰 수정 권한이 없습니다.");
         }
         
         // 리뷰 내용 업데이트
