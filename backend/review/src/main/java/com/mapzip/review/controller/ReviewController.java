@@ -181,7 +181,7 @@ public class ReviewController {
         // OCR 결과 정보도 포함
         if (result.getOcrResult() != null) {
             response.put("ocrResult", Map.of(
-                "isValid", result.getOcrResult().isValid(),
+                "valid", result.getOcrResult().isValid(),
                 "visitDate", result.getOcrResult().getVisitDate() != null ? result.getOcrResult().getVisitDate() : "",
                 "totalAmount", result.getOcrResult().getTotalAmount() != null ? result.getOcrResult().getTotalAmount() : ""
             ));

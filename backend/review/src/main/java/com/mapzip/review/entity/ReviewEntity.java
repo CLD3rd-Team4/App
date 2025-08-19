@@ -13,7 +13,7 @@ public class ReviewEntity implements java.io.Serializable {
 
 
     private String restaurantId;  
-    private String createdAtUserId;  // 복합키: "2024-01-01T12:00:00Z#{userId}"      
+    private String createdAtUserId;  // 복합키(Sort Key): "2024-01-01T12:00:00Z#{userId}" - 실질적인 reviewId 역할
     private String userId;
     private String restaurantName;
     private String restaurantAddress;
@@ -22,6 +22,7 @@ public class ReviewEntity implements java.io.Serializable {
     private List<String> imageUrls;
     private String visitDate;
     private Boolean isVerified;
+    private String reviewStatus;
     private Instant createdAt;
     private Instant updatedAt;
 
@@ -47,7 +48,11 @@ public class ReviewEntity implements java.io.Serializable {
         this.createdAtUserId = createdAtUserId;
     }
     
-    // 리뷰 ID는 복합키(Sort Key)와 동일
+    /**
+     * 프론트엔드 호환성을 위한 reviewId 접근자
+     * 실제로는 createdAtUserId(Sort Key)와 동일한 값
+     * 형식: "2024-01-01T12:00:00Z#userId"
+     */
     public String getReviewId() {
         return this.createdAtUserId;
     }
@@ -135,6 +140,16 @@ public class ReviewEntity implements java.io.Serializable {
 
     public void setIsVerified(Boolean isVerified) {
         this.isVerified = isVerified;
+    }
+
+    @DynamoDbSecondaryPartitionKey(indexNames = "StatusIndex")
+    @DynamoDbAttribute("review_status")
+    public String getReviewStatus() {
+        return reviewStatus != null ? reviewStatus : "PUBLISHED";
+    }
+
+    public void setReviewStatus(String reviewStatus) {
+        this.reviewStatus = reviewStatus;
     }
 
     @DynamoDbAttribute("created_at_instant")
