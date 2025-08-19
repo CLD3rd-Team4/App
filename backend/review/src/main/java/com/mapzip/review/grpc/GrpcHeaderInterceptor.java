@@ -23,19 +23,35 @@ public class GrpcHeaderInterceptor implements ServerInterceptor {
             Metadata headers,
             ServerCallHandler<ReqT, RespT> next) {
 
+        String methodName = call.getMethodDescriptor().getFullMethodName();
+        
+        // 내부 서비스 간 호출은 인증 우회
+        if (isInternalServiceCall(methodName)) {
+            logger.info("Internal service call detected, skipping authentication: {}", methodName);
+            
+            // 내부 호출에서도 x-user-id가 있으면 Context에 저장
+            String userId = headers.get(Metadata.Key.of("x-user-id", Metadata.ASCII_STRING_MARSHALLER));
+            if (userId != null && !userId.isEmpty()) {
+                Context context = Context.current().withValue(USER_ID_CONTEXT_KEY, userId);
+                return Contexts.interceptCall(context, call, headers, next);
+            }
+            
+            // x-user-id가 없어도 통과
+            return next.startCall(call, headers);
+        }
+
         // Gateway에서 HTTP 헤더로 전달된 x-user-id 추출
         String userId = headers.get(Metadata.Key.of("x-user-id", Metadata.ASCII_STRING_MARSHALLER));
         
         if (userId == null || userId.isEmpty()) {
-            logger.warn("Authentication failed - Missing x-user-id. Method: {}", 
-                      call.getMethodDescriptor().getFullMethodName());
+            logger.warn("Authentication failed - Missing x-user-id. Method: {}", methodName);
             call.close(Status.UNAUTHENTICATED.withDescription("Authentication required"), headers);
             return new ServerCall.Listener<ReqT>() {};
         }
         
         if (!isValidUserId(userId)) {
             logger.warn("Authentication failed - Invalid x-user-id format: {}. Method: {}", 
-                      userId, call.getMethodDescriptor().getFullMethodName());
+                      userId, methodName);
             call.close(Status.UNAUTHENTICATED.withDescription("Invalid user ID format"), headers);
             return new ServerCall.Listener<ReqT>() {};
         }
@@ -57,6 +73,16 @@ public class GrpcHeaderInterceptor implements ServerInterceptor {
         // Context에 사용자 ID 저장
         Context context = Context.current().withValue(USER_ID_CONTEXT_KEY, userId);
         return Contexts.interceptCall(context, call, headers, next);
+    }
+    
+    /**
+     * 내부 서비스 간 호출인지 확인
+     * 특정 gRPC 메서드는 인증을 우회
+     */
+    private boolean isInternalServiceCall(String methodName) {
+        return methodName.contains("StorePlacesForReview") ||
+               methodName.contains("GetReviewSummaryForRecommendation") ||
+               methodName.contains("GetReviewsForRecommendation");
     }
     
     /**
