@@ -51,9 +51,19 @@ public class ReviewClientService {
             
             log.info("Successfully stored {} places for review for user: {}", placeInfos.size(), userId);
         } catch (Exception e) {
-            log.error("Failed to store places for review for user: {}", userId, e);
-            // RuntimeException 대신 로그만 남기고 계속 진행
-            // throw new RuntimeException("리뷰 서버 연동 실패: " + e.getMessage(), e);
+            log.error("Failed to store places for review for user: {}, error type: {}, message: {}", 
+                     userId, e.getClass().getSimpleName(), e.getMessage(), e);
+            
+            // gRPC 상태 확인
+            if (e instanceof io.grpc.StatusRuntimeException) {
+                io.grpc.StatusRuntimeException statusException = (io.grpc.StatusRuntimeException) e;
+                log.error("gRPC Status: {}, Description: {}", 
+                         statusException.getStatus().getCode(), 
+                         statusException.getStatus().getDescription());
+            }
+            
+            // 예외를 다시 던져서 상위에서 처리하도록 함
+            throw new RuntimeException("리뷰 서버 연동 실패: " + e.getMessage(), e);
         }
     }
 
