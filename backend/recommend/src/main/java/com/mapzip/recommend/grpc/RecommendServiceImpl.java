@@ -127,7 +127,13 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 		}
 
 		// 리뷰 서비스에 미작성 리뷰로 저장 요청
-		reviewClientService.storePlacesForReview(userId, savedEntities);
+		try {
+			reviewClientService.storePlacesForReview(userId, savedEntities);
+			log.info("Successfully stored places for review for user: {}", userId);
+		} catch (Exception e) {
+			log.error("Failed to store places for review, but continuing with response for user: {}", userId, e);
+			// 리뷰 서버 연동 실패해도 추천 저장은 성공으로 처리
+		}
 
 		SubmitResponse response = SubmitResponse.newBuilder().setStatus("OK").setMessage("✅ 선택된 식당들이 성공적으로 저장되었습니다.").build();
 

@@ -264,7 +264,7 @@ export default function RecommendationScreen() {
   }
 
   const isAllSectionsSelected = useCallback(() => {
-    return mealSections.every((section) => !!selectedRestaurants[section.id])
+    return (mealSections || []).every((section) => !!selectedRestaurants[section.id])
   }, [mealSections, selectedRestaurants])
 
   // 제출
@@ -280,8 +280,12 @@ export default function RecommendationScreen() {
       return
     }
 
-    const selectedPlaces: SubmitPlace[] = mealSections.map(sec => {
-      const r = selectedRestaurants[sec.id]!
+    const selectedPlaces: SubmitPlace[] = (mealSections || []).map(sec => {
+      const r = selectedRestaurants[sec.id]
+      if (!r) {
+        console.error(`No restaurant selected for section ${sec.id}`)
+        return null
+      }
       return {
         slotId: sec.originSlotId || sec.id,
         mealType: sec.type === "식사" ? 0 : 1,
@@ -295,7 +299,7 @@ export default function RecommendationScreen() {
         averageRating: r.rating ?? 0,
         representativeReview: r.description || "",
       }
-    })
+    }).filter(Boolean) as SubmitPlace[]
 
     const payload: SubmitRequest = { scheduleId, selectedPlaces }
 
@@ -354,7 +358,7 @@ export default function RecommendationScreen() {
               : "bg-blue-500 hover:bg-blue-600 text-white shadow-md"
           }`}
         >
-          입력완료 ({Object.keys(selectedRestaurants).length}/{mealSections.length})
+          입력완료 ({Object.keys(selectedRestaurants).length}/{(mealSections || []).length})
         </Button>
       </div>
 
@@ -365,7 +369,7 @@ export default function RecommendationScreen() {
               <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
               <p className="text-gray-600">추천 결과를 불러오는 중...</p>
             </div>
-          ) : mealSections.length === 0 ? (
+          ) : (mealSections || []).length === 0 ? (
             <div className="text-center py-8">
               <p className="text-gray-600 mb-4">식사 시간이 설정되지 않았거나 결과가 아직 준비되지 않았습니다.</p>
               <Button onClick={() => router.push("/schedule")} className="bg-blue-500 hover:bg-blue-600 text-white">
@@ -379,7 +383,7 @@ export default function RecommendationScreen() {
                 <p className="text-sm opacity-90">사용자의 이동경로와 선호도에 따라 추천된 장소입니다</p>
               </div>
 
-              {mealSections.map((section) => (
+              {(mealSections || []).map((section) => (
                 <div key={section.id} className="bg-white rounded-lg shadow-sm border">
                   <button
                     onClick={() => toggleSection(section.id)}
@@ -479,7 +483,7 @@ export default function RecommendationScreen() {
                         {/* 새로운 추천 (최대 2개) */}
                         <div className="space-y-3">
                           <h4 className="font-medium text-gray-800">새로운 추천</h4>
-                          {section.restaurants.map((restaurant) => {
+                          {(section.restaurants || []).map((restaurant) => {
                             const hasRating = !!restaurant.rating && restaurant.rating > 0
                             const hasReason = !!restaurant.aiReason
                             const showMeta = hasRating || hasReason
@@ -556,7 +560,7 @@ export default function RecommendationScreen() {
                   <h3 className="font-medium mb-2">선택된 식당</h3>
                   <div className="space-y-2">
                     {Object.entries(selectedRestaurants).map(([sectionId, restaurant]) => {
-                      const section = mealSections.find((s) => s.id === sectionId)
+                      const section = (mealSections || []).find((s) => s.id === sectionId)
                       return (
                         <div key={sectionId} className="flex items-center gap-2 text-sm">
                           <span className="font-medium">{section?.title}:</span>
