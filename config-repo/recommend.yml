@@ -6,6 +6,10 @@ spring:
   application:
     name: recommend
 
+  webflux:
+    codec:
+      max-in-memory-size: 5MB # TMAP API 응답 버퍼 크기를 5MB로 늘림
+
   datasource:
     url: jdbc:postgresql://recommend-db.mapzip.shop:5432/recommend_db 
     username: mapzip
