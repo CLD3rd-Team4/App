@@ -130,7 +130,7 @@ public class PendingReviewRepository {
             if (existingReview.isPresent()) {
                 PendingReviewEntity entity = existingReview.get();
                 entity.setIsCompleted(true);
-                entity.setUpdatedAt(Instant.now());
+                entity.setUpdatedAt(Instant.now().toString());
                 
                 pendingReviewTable.putItem(entity);
                 return true;
@@ -153,6 +153,13 @@ public class PendingReviewRepository {
             // 각 엔티티의 복합키 생성
             entities.forEach(PendingReviewEntity::generateCompositeKey);
             
+            // 디버깅: 생성된 엔티티 정보 로깅
+            for (PendingReviewEntity entity : entities) {
+                logger.info("Entity details - userId: {}, restaurantId: {}, scheduledTime: {}, compositeKey: {}, createdAt: {}", 
+                           entity.getUserId(), entity.getRestaurantId(), entity.getScheduledTime(), 
+                           entity.getRestaurantIdScheduledTime(), entity.getCreatedAt());
+            }
+            
             // 배치 쓰기 요청 생성
             WriteBatch.Builder<PendingReviewEntity> writeBatchBuilder = WriteBatch.builder(PendingReviewEntity.class)
                     .mappedTableResource(pendingReviewTable);
@@ -170,7 +177,8 @@ public class PendingReviewRepository {
             return true;
             
         } catch (Exception e) {
-            logger.error("Error saving batch of pending reviews", e);
+            logger.error("Error saving batch of pending reviews: {}", e.getMessage(), e);
+            e.printStackTrace();
             return false;
         }
     }

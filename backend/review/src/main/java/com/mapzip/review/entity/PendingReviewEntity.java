@@ -15,8 +15,8 @@ public class PendingReviewEntity {
     private String placeUrl;
     private String scheduledTime;
     private Boolean isCompleted; // false: 미작성, true: 작성완료
-    private Instant createdAt;
-    private Instant updatedAt;
+    private String createdAt;  // ISO-8601 String format for DynamoDB compatibility
+    private String updatedAt;  // ISO-8601 String format for DynamoDB compatibility
 
     public PendingReviewEntity() {}
 
@@ -95,20 +95,20 @@ public class PendingReviewEntity {
     }
 
     @DynamoDbAttribute("created_at")
-    public Instant getCreatedAt() {
+    public String getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(Instant createdAt) {
+    public void setCreatedAt(String createdAt) {
         this.createdAt = createdAt;
     }
 
     @DynamoDbAttribute("updated_at")
-    public Instant getUpdatedAt() {
+    public String getUpdatedAt() {
         return updatedAt;
     }
 
-    public void setUpdatedAt(Instant updatedAt) {
+    public void setUpdatedAt(String updatedAt) {
         this.updatedAt = updatedAt;
     }
     
@@ -118,10 +118,10 @@ public class PendingReviewEntity {
             this.restaurantIdScheduledTime = this.restaurantId + "#" + this.scheduledTime;
         }
         if (this.createdAt == null) {
-            this.createdAt = Instant.now();
+            this.createdAt = Instant.now().toString();
         }
         if (this.updatedAt == null) {
-            this.updatedAt = Instant.now();
+            this.updatedAt = Instant.now().toString();
         }
         if (this.isCompleted == null) {
             this.isCompleted = false; // 기본값: 미작성 상태
