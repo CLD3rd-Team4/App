@@ -63,11 +63,11 @@ public class RecommendRequestConsumer {
             log.info("📩 recommend-request 토픽 수신");
             
             TmapScheduleRequest tmapScheduleRequest = objectMapper.readValue(payload, TmapScheduleRequest.class);
+            String runId = tmapScheduleRequest.getRunId();
             boolean IsUpdate = tmapScheduleRequest.getRecommendUpdateContext().getIsUpdate();
             if(IsUpdate==true) {
             	tmapScheduleRequest = updateScheduleRequestBuilder.build(tmapScheduleRequest);
             }
-            
             //tmap api 요청 
             Map<String, Object> tmapResult = tmapRouteCalculator.calculate(tmapScheduleRequest);
             String estimatedArrivalTime = String.valueOf(tmapResult.get("estimatedArrivalTime"));
@@ -101,7 +101,8 @@ public class RecommendRequestConsumer {
 					recommendResultDto.getRecommendationRequestIds(), 
 					recommendResultDto.getScheduledTimes(),
 					slotMealTypeMap,
-					IsUpdate
+					IsUpdate,
+					runId
 			);
             // scheduleId를 key, userId를 value로 다음 토픽으로 전송
             kafkaTemplate.send("recommend-result", recommendResultDto.getScheduleId(), recommendResultDto.getUserId());
