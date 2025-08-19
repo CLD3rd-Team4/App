@@ -143,4 +143,3 @@ review:
     ocr-results-ttl: ${CACHE_OCR_RESULTS_TTL:172800}       # 48시간 (운영환경 증가)
     recommendation-ttl: ${CACHE_RECOMMENDATION_TTL:21600}   # 6시간 #ttl #재배포
     
-#테스트
