@@ -140,7 +140,7 @@ public class ReviewService {
         }
     }
     
-    @Cacheable(value = "userReviews", key = "#userId + '_' + #page + '_' + #size")
+    @Cacheable(value = "userReviews", key = "#userId + '_' + #page + '_' + #size", unless = "#result == null or #result.isEmpty()")
     public List<ReviewEntity> getUserReviews(String userId, int page, int size) {
         logger.info("Fetching user reviews from database for userId: {}, page: {}, size: {}", userId, page, size);
         return reviewRepository.findByUserId(userId, page, size);
@@ -151,7 +151,7 @@ public class ReviewService {
         return reviewRepository.countByUserId(userId);
     }
     
-    @Cacheable(value = "restaurantReviews", key = "#restaurantId + '_' + #page + '_' + #size")
+    @Cacheable(value = "restaurantReviews", key = "#restaurantId + '_' + #page + '_' + #size", unless = "#result == null or #result.isEmpty()")
     public List<ReviewEntity> getRestaurantReviews(String restaurantId, int page, int size) {
         logger.info("Fetching restaurant reviews from database for restaurantId: {}, page: {}, size: {}", restaurantId, page, size);
         return reviewRepository.findByRestaurantId(restaurantId, page, size);
@@ -300,7 +300,16 @@ public class ReviewService {
     @Cacheable(value = "ocrResults", key = "T(java.util.Arrays).hashCode(#receiptImage) + '_' + #expectedRestaurantName")
     public OcrResultDto verifyReceipt(byte[] receiptImage, String expectedRestaurantName, String expectedAddress) {
         logger.info("Processing OCR for restaurant: {}", expectedRestaurantName);
-        return ocrService.processReceiptImage(receiptImage, expectedRestaurantName, expectedAddress);
+        
+        try {
+            return ocrService.processReceiptImage(receiptImage, expectedRestaurantName, expectedAddress);
+        } catch (IllegalStateException e) {
+            logger.error("OCR service configuration error: {}", e.getMessage());
+            throw new RuntimeException("OCR 서비스 설정 오류: " + e.getMessage(), e);
+        } catch (Exception e) {
+            logger.error("OCR processing failed for restaurant: {}", expectedRestaurantName, e);
+            throw new RuntimeException("영수증 처리 중 오류가 발생했습니다: " + e.getMessage(), e);
+        }
     }
     
     /**
@@ -311,7 +320,7 @@ public class ReviewService {
      * @param size 페이지 크기
      * @return 추천용 고품질 리뷰 목록
      */
-    @Cacheable(value = "recommendationReviews", key = "#area + '_' + #category + '_' + #page + '_' + #size")
+    @Cacheable(value = "recommendationReviews", key = "#area + '_' + #category + '_' + #page + '_' + #size", unless = "#result == null or #result.isEmpty()")
     public List<ReviewEntity> getReviewsForRecommendation(String area, String category, int page, int size) {
         logger.info("Fetching reviews for recommendation - area: {}, category: {}, page: {}, size: {}", 
                    area, category, page, size);

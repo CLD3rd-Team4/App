@@ -10,6 +10,7 @@ import com.mapzip.schedule.repository.MealTimeSlotRepository;
 import com.mapzip.schedule.repository.ScheduleRepository;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -87,8 +88,10 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
         public void updateSchedule(UpdateScheduleRequest request, StreamObserver<GetScheduleDetailResponse> responseObserver) {
             log.info("[DEBUG] updateSchedule RPC called with scheduleId: {}", request.getScheduleId());
             try {
-            Schedule schedule = scheduleRepository.findById(request.getScheduleId())
-                    .orElseThrow(() -> Status.NOT_FOUND.withDescription("수정할 스케줄을 찾을 수 없습니다: " + request.getScheduleId()).asRuntimeException());
+            Schedule schedule = scheduleRepository.findScheduleById(request.getScheduleId());
+            if (schedule == null) {
+                throw Status.NOT_FOUND.withDescription("수정할 스케줄을 찾을 수 없습니다: " + request.getScheduleId()).asRuntimeException();
+            }
 
             String userId = GrpcInterceptorConfig.USER_ID_CONTEXT_KEY.get();
             if (!schedule.getUserId().equals(userId)) {

@@ -6,6 +6,8 @@ spring:
   application:
     name: recommend
 
+  
+
   datasource:
     url: jdbc:postgresql://recommend-db.mapzip.shop:5432/recommend_db 
     username: mapzip
@@ -55,11 +57,14 @@ spring:
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
       acks: all
       retries: 3
+      max-request-size: 5242880 
     consumer:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       group-id: recommend-service
       auto-offset-reset: earliest
+      max-partition-fetch-bytes: 5242880
+
 
   cloud:
     kubernetes:
@@ -126,3 +131,4 @@ management:
       application: ${spring.application.name}
       environment: ${ENVIRONMENT:prod}
       region: ${AWS_REGION:ap-northeast-2}
+      

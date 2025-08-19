@@ -1,7 +1,6 @@
 "use client"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import LoginScreen from "@/components/screens/LoginScreen"
 import HomeScreen from "@/components/screens/HomeScreen"
 import ScheduleSummaryScreen from "@/components/screens/ScheduleSummaryScreen"
 import PWAInstaller from "@/components/PWAInstaller"
@@ -30,7 +29,7 @@ export default function HomePage() {
     } else {
       setIsLoggedIn(false)
       console.log("로그인되지 않음, 로그인 페이지로 이동합니다.")
-      // NOTE: 실제 라우터 이동 대신, 아래 렌더 분기로 LoginScreen을 보여줍니다.
+      router.push('/auth/login');
     }
   }, [isClient, initializeHomepage])
 
@@ -48,7 +47,7 @@ export default function HomePage() {
 
   return (
     <>
-      {!isLoggedIn ? <LoginScreen /> : isSelected ? <ScheduleSummaryScreen /> : <HomeScreen />}
+      {isSelected ? <ScheduleSummaryScreen /> : <HomeScreen />}
       <PWAInstaller />
     </>
   )

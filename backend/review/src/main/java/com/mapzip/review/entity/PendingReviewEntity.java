@@ -5,18 +5,21 @@ import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
 import java.time.Instant;
 
 @DynamoDbBean
-public class PendingReviewEntity {
+public class PendingReviewEntity implements java.io.Serializable {
+
+    private static final long serialVersionUID = 1L;
+
 
     private String userId;  // PK: 사용자 ID
-    private String scheduledTimeRestaurantId;  // SK: "12:00#restaurant123" 
+    private String restaurantIdScheduledTime;  // SK: "restaurant123#12:00" 
     private String restaurantId;
     private String placeName;
     private String addressName;
     private String placeUrl;
     private String scheduledTime;
     private Boolean isCompleted; // false: 미작성, true: 작성완료
-    private Instant createdAt;
-    private Instant updatedAt;
+    private String createdAt;  // ISO-8601 String format for DynamoDB compatibility
+    private String updatedAt;  // ISO-8601 String format for DynamoDB compatibility
 
     public PendingReviewEntity() {}
 
@@ -31,13 +34,13 @@ public class PendingReviewEntity {
     }
 
     @DynamoDbSortKey
-    @DynamoDbAttribute("scheduled_time_restaurant_id")
-    public String getScheduledTimeRestaurantId() {
-        return scheduledTimeRestaurantId;
+    @DynamoDbAttribute("restaurant_id_scheduled_time")
+    public String getRestaurantIdScheduledTime() {
+        return restaurantIdScheduledTime;
     }
 
-    public void setScheduledTimeRestaurantId(String scheduledTimeRestaurantId) {
-        this.scheduledTimeRestaurantId = scheduledTimeRestaurantId;
+    public void setRestaurantIdScheduledTime(String restaurantIdScheduledTime) {
+        this.restaurantIdScheduledTime = restaurantIdScheduledTime;
     }
 
     @DynamoDbAttribute("restaurant_id")
@@ -95,33 +98,33 @@ public class PendingReviewEntity {
     }
 
     @DynamoDbAttribute("created_at")
-    public Instant getCreatedAt() {
+    public String getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(Instant createdAt) {
+    public void setCreatedAt(String createdAt) {
         this.createdAt = createdAt;
     }
 
     @DynamoDbAttribute("updated_at")
-    public Instant getUpdatedAt() {
+    public String getUpdatedAt() {
         return updatedAt;
     }
 
-    public void setUpdatedAt(Instant updatedAt) {
+    public void setUpdatedAt(String updatedAt) {
         this.updatedAt = updatedAt;
     }
     
     // 복합키 생성 헬퍼 메서드
     public void generateCompositeKey() {
         if (this.scheduledTime != null && this.restaurantId != null) {
-            this.scheduledTimeRestaurantId = this.scheduledTime + "#" + this.restaurantId;
+            this.restaurantIdScheduledTime = this.restaurantId + "#" + this.scheduledTime;
         }
         if (this.createdAt == null) {
-            this.createdAt = Instant.now();
+            this.createdAt = Instant.now().toString();
         }
         if (this.updatedAt == null) {
-            this.updatedAt = Instant.now();
+            this.updatedAt = Instant.now().toString();
         }
         if (this.isCompleted == null) {
             this.isCompleted = false; // 기본값: 미작성 상태
@@ -131,7 +134,7 @@ public class PendingReviewEntity {
     // 복합키에서 스케줄 시간 추출
     public static String extractScheduledTimeFromCompositeKey(String compositeKey) {
         if (compositeKey != null && compositeKey.contains("#")) {
-            return compositeKey.split("#")[0];
+            return compositeKey.split("#")[1];
         }
         return null;
     }
@@ -139,7 +142,7 @@ public class PendingReviewEntity {
     // 복합키에서 식당 ID 추출
     public static String extractRestaurantIdFromCompositeKey(String compositeKey) {
         if (compositeKey != null && compositeKey.contains("#")) {
-            return compositeKey.split("#")[1];
+            return compositeKey.split("#")[0];
         }
         return null;
     }

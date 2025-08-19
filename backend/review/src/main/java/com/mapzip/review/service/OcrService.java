@@ -48,6 +48,7 @@ public class OcrService {
                 // Config Server 암호화된 서비스 계정 키 JSON 사용
                 try {
                     logger.info("Config Server 인증 방식 사용");
+                    logger.debug("Service account key received from config server");
                     credentials = ServiceAccountCredentials.fromStream(
                         new ByteArrayInputStream(serviceAccountKey.getBytes())
                     );
@@ -69,6 +70,8 @@ public class OcrService {
                 }
             } else {
                 // 어떤 인증 정보도 없는 경우 오류 발생
+                logger.error("Google Cloud Vision API 인증 정보가 설정되지 않음. api-key: [{}], credentials-path: [{}]", 
+                           serviceAccountKey, credentialsPath);
                 throw new IllegalStateException("구글 클라우드 비전 API 인증 정보가 설정되지 않았습니다. " +
                     "google.cloud.vision.api-key 또는 google.cloud.vision.credentials-path를 설정해주세요.");
             }
@@ -377,4 +380,5 @@ public class OcrService {
         logger.warn("지원되지 않는 날짜 형식: {}", cleanDate);
         return null;
     }
+    
 }

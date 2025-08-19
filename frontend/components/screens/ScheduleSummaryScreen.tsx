@@ -483,7 +483,7 @@ export default function ScheduleSummaryScreen() {
         </div>
 
         <div className="flex-1 content-with-bottom-nav">
-          <div className="p-4">
+          <div className="p-4 pb-24">
             <div className="bg-white rounded-lg p-4 shadow-sm">
               {error || timelineItems.length === 0 ? (
                 <div className="text-center py-8">
