@@ -439,6 +439,23 @@ public class ReviewController {
         health.put("service", "review-service");
         health.put("timestamp", System.currentTimeMillis());
         
+        // DynamoDB 연결 및 UserIdIndex 상태 확인
+        try {
+            // 테스트용 사용자 ID로 쿼리 시도
+            List<ReviewEntity> testResult = reviewService.getUserReviews("test-user-id", 0, 1);
+            health.put("dynamodb", Map.of(
+                "status", "UP",
+                "message", "DynamoDB and UserIdIndex working properly",
+                "testQueryResult", testResult.size() + " reviews found"
+            ));
+        } catch (Exception e) {
+            logger.error("DynamoDB UserIdIndex 확인 실패", e);
+            health.put("dynamodb", Map.of(
+                "status", "DOWN",
+                "message", "DynamoDB UserIdIndex issue: " + e.getMessage()
+            ));
+        }
+        
         // Valkey 연결 상태 확인
         try {
             valkeyTemplate.opsForValue().set("health-check", "OK", java.time.Duration.ofSeconds(10));

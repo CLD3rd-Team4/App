@@ -100,7 +100,7 @@ export default function VisitedRestaurantsScreen() {
     loadCompletedReviews()
   }
 
-  const handleReviewClick = (reviewId: number) => {
+  const handleReviewClick = (reviewId: string) => {
     // 정적 환경에서 안전한 라우팅을 위해 trailing slash 추가
     router.push(`/review/detail/${reviewId}/`)
   }
@@ -227,7 +227,7 @@ export default function VisitedRestaurantsScreen() {
                       >
                         <div 
                           className="cursor-pointer"
-                          onClick={() => handleReviewClick(review.id || index)}
+                          onClick={() => handleReviewClick(review.reviewId || index)}
                         >
                         {review.imageUrls && review.imageUrls.length > 0 ? (
                           <img
@@ -253,7 +253,7 @@ export default function VisitedRestaurantsScreen() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDeleteReview(review.restaurantId || review.id, review.id);
+                            handleDeleteReview(review.restaurantId || review.reviewId, review.reviewId);
                           }}
                           className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 transition-colors"
                         >
