@@ -5,7 +5,10 @@ import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
 import java.time.Instant;
 
 @DynamoDbBean
-public class PendingReviewEntity {
+public class PendingReviewEntity implements java.io.Serializable {
+
+    private static final long serialVersionUID = 1L;
+
 
     private String userId;  // PK: 사용자 ID
     private String restaurantIdScheduledTime;  // SK: "restaurant123#12:00" 
