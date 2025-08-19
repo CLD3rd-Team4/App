@@ -688,9 +688,17 @@ public class ReviewService {
      * 추천서버에서 선택된 식당들을 미작성 리뷰로 저장
      */
     public boolean savePendingReviews(String userId, List<ReviewProto.ReviewPlaceInfo> places) {
+        logger.info("=== STARTING savePendingReviews ===");
         logger.info("Saving {} pending reviews for user: {}", places.size(), userId);
         
         try {
+            // 입력 데이터 로깅
+            for (int i = 0; i < places.size(); i++) {
+                ReviewProto.ReviewPlaceInfo place = places.get(i);
+                logger.info("Place {}: id={}, name={}, address={}, scheduledTime={}", 
+                           i, place.getId(), place.getPlaceName(), place.getAddressName(), place.getScheduledTime());
+            }
+            
             List<PendingReviewEntity> pendingReviews = places.stream()
                     .map(place -> {
                         PendingReviewEntity entity = new PendingReviewEntity();
@@ -700,14 +708,27 @@ public class ReviewService {
                         entity.setAddressName(place.getAddressName());
                         entity.setPlaceUrl(place.getPlaceUrl());
                         entity.setScheduledTime(place.getScheduledTime());
+                        
+                        logger.info("Created entity: userId={}, restaurantId={}, scheduledTime={}", 
+                                   entity.getUserId(), entity.getRestaurantId(), entity.getScheduledTime());
                         return entity;
                     })
                     .collect(Collectors.toList());
             
-            return pendingReviewRepository.saveBatch(pendingReviews);
+            logger.info("Calling repository.saveBatch with {} entities", pendingReviews.size());
+            boolean result = pendingReviewRepository.saveBatch(pendingReviews);
+            logger.info("Repository.saveBatch returned: {}", result);
+            
+            if (result) {
+                logger.info("=== SUCCESSFULLY SAVED {} PENDING REVIEWS ===", places.size());
+            } else {
+                logger.error("=== FAILED TO SAVE PENDING REVIEWS ===");
+            }
+            
+            return result;
             
         } catch (Exception e) {
-            logger.error("Failed to save pending reviews for user: {}", userId, e);
+            logger.error("=== EXCEPTION in savePendingReviews for user: {} ===", userId, e);
             return false;
         }
     }
