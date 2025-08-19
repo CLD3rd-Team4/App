@@ -345,8 +345,11 @@ public class OcrService {
                    extractedAddress, expectedAddress, addressSimilarity);
         logger.info("OCR 검증 - 종합 점수: {}, 임계값: 0.5", overallScore);
         
-        // 종합 점수가 0.5 이상이면 검증 통과 (기존 0.6에서 완화)
-        return overallScore >= 0.5;
+        // 종합 점수가 0.3 이상이면 검증 통과 (더 관대하게 설정)
+        // 또는 식당명이나 주소 중 하나라도 0.6 이상이면 통과
+        boolean isValid = overallScore >= 0.3 || nameSimilarity >= 0.6 || addressSimilarity >= 0.6;
+        logger.info("OCR 검증 최종 결과: {}", isValid);
+        return isValid;
     }
     
     private double calculateConfidence(String extractedRestaurantName, String extractedAddress,
