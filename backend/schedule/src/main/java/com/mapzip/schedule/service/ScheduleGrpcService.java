@@ -173,7 +173,7 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public void selectSchedule(SelectScheduleRequest request, StreamObserver<GetScheduleDetailResponse> responseObserver) {
         try {
             String scheduleId = request.getScheduleId();
@@ -188,8 +188,13 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
 
             // Save selection state to Valkey
             try {
-                redisTemplate.opsForValue().set("user:" + userId + ":selected", "true", 24, TimeUnit.HOURS);
-                log.info("사용자 '{}'의 스케줄 선택 상태를 저장했습니다.", userId);
+                String selectionKey = "user:" + userId + ":selectedSchedule";
+                redisTemplate.opsForValue().set(selectionKey, scheduleId, 24, TimeUnit.HOURS);
+                log.info("사용자 '{}'의 선택된 스케줄 ID '{}'를 저장했습니다.", userId, scheduleId);
+
+                // 기존의 boolean 타입 키는 삭제합니다.
+                redisTemplate.delete("user:" + userId + ":selected");
+
             } catch (Exception e) {
                 log.error("Valkey에 스케줄 선택 상태 저장 중 오류 발생", e);
                 // Valkey 오류가 핵심 기능에 영향을 주지 않도록 에러를 던지지 않고 로그만 남깁니다.
@@ -279,12 +284,20 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
                 return;
             }
 
-            boolean isSelected = redisTemplate.hasKey("user:" + userId + ":selected");
-            log.info("사용자 '{}'의 스케줄 선택 상태 플래그를 조회했습니다: {}", userId, isSelected); // Added log
-            IsScheduleSelectedResponse response = IsScheduleSelectedResponse.newBuilder()
-                    .setIsSelected(isSelected)
-                    .build();
-            responseObserver.onNext(response);
+            String selectionKey = "user:" + userId + ":selectedSchedule";
+            String scheduleId = redisTemplate.opsForValue().get(selectionKey);
+
+            boolean isSelected = (scheduleId != null && !scheduleId.isEmpty());
+
+            log.info("사용자 '{}'의 선택된 스케줄 ID를 조회했습니다: {}", userId, isSelected ? scheduleId : "없음");
+
+            IsScheduleSelectedResponse.Builder responseBuilder = IsScheduleSelectedResponse.newBuilder().setIsSelected(isSelected);
+
+            if (isSelected) {
+                responseBuilder.setScheduleId(scheduleId);
+            }
+            
+            responseObserver.onNext(responseBuilder.build());
             responseObserver.onCompleted();
         } catch (Exception e) {
             log.error("스케줄 선택 상태 조회 중 오류 발생", e);
@@ -306,13 +319,16 @@ public class ScheduleGrpcService extends ScheduleServiceGrpc.ScheduleServiceImpl
                 return;
             }
 
-            String key = "user:" + userId + ":selected";
-            Boolean deleted = redisTemplate.delete(key);
+            String selectionKey = "user:" + userId + ":selectedSchedule";
+            Boolean deleted = redisTemplate.delete(selectionKey);
+
+            // 기존의 boolean 타입 키도 함께 삭제합니다. (마이그레이션 목적)
+            redisTemplate.delete("user:" + userId + ":selected");
 
             if (Boolean.TRUE.equals(deleted)) {
-                log.info("사용자 '{}'의 스케줄 선택 상태를 해제했습니다.", userId);
+                log.info("사용자 '{}'의 선택된 스케줄 ID를 삭제했습니다.", userId);
             } else {
-                log.warn("사용자 '{}'의 스케줄 선택 상태 키가 존재하지 않거나 삭제에 실패했습니다.", userId);
+                log.warn("사용자 '{}'의 선택된 스케줄 ID 키가 존재하지 않거나 삭제에 실패했습니다.", userId);
             }
 
             DeselectScheduleResponse response = DeselectScheduleResponse.newBuilder()

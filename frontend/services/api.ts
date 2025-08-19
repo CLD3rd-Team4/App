@@ -271,10 +271,10 @@ export const scheduleApi = {
   },
 
   // 스케줄 선택 상태 조회
-  getSelectionStatus: async (): Promise<{ isSelected: boolean }> => {
+  getSelectionStatus: async (): Promise<{ isSelected: boolean; scheduleId: string | null }> => {
     try {
       const response = await api.get("/schedule/selectedStatus");
-      return { isSelected: response.data.isSelected };
+      return response.data; // 백엔드가 { isSelected: boolean, scheduleId: string | null }를 반환한다고 가정
     } catch (error: any) {
       console.error("스케줄 선택 상태 조회 실패:", error);
       if (error.response) {
@@ -362,19 +362,26 @@ export const recommendApi = {
   },
 
   // 현재 선택된 스케줄의 요약 정보를 가져오는 API
-  getActiveScheduleSummary: async () => {
-    console.log("[API] 추천 서버에 최종 요약 결과 요청");
-    // ScheduleListScreen의 폴링 로직과 동일한 엔드포인트를 호출하여 일관성을 맞춥니다.
-    // userId와 scheduleId는 인터셉터 또는 서버 로직에서 처리될 것으로 가정합니다.
-    const response = await api.get("/recommend/result");
-    const data = response.data;
+  getActiveScheduleSummary: async (scheduleId: string) => {
+    try {
+      console.log(`[API] 추천 서버에 최종 요약 결과 요청 (scheduleId: ${scheduleId})`);
+      const response = await api.get("/recommend/result", { 
+        params: { scheduleId } 
+      });
+      const data = response.data;
 
-    // getRecommendResult와 유사하게, 실제 스케줄 객체를 반환하도록 처리합니다.
-    const scheduleData = data.schedule ? data.schedule : data;
-    if (scheduleData && Object.keys(scheduleData).length > 0) {
-      return { schedule: mapScheduleResponse(scheduleData) };
+      // API 응답에 명시적으로 schedule 객체가 있고, status가 OK일 때만 유효한 요약 정보로 간주합니다.
+      const scheduleData = data.schedule; 
+      if (data.status === 'OK' && scheduleData) {
+        return { schedule: mapScheduleResponse(scheduleData) };
+      }
+      
+      // PENDING이거나, status가 OK여도 schedule 필드가 없으면 null을 반환합니다.
+      return { schedule: null };
+    } catch (error) { 
+      console.error("getActiveScheduleSummary failed, returning null schedule. Error:", error);
+      return { schedule: null }; // 에러 발생 시에도 null을 반환하여 인터셉터의 페이지 리로드 방지
     }
-    return { schedule: null };
   },
 
   // 특정 스케줄 ID에 대한 요약 정보를 가져오는 API (가상)

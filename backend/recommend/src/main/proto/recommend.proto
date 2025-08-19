@@ -25,6 +25,11 @@ service RecommendService {
       body: "*"
     };
   }
+  rpc GetScheduleDetail(GetSelectedScheduleDetailRequest) returns (GetSelectedScheduleDetailResponse) {
+    option (google.api.http) = {
+      get: "/recommend/schedule/{scheduleId}"
+    };
+  }
   rpc GetSelectedPlaces(GetSelectedPlacesRequest) returns (GetSelectedPlacesResponse);
   rpc PlacesForReview(PlacesForReviewRequest) returns (PlacesForReviewResponse);
 }
@@ -56,9 +61,8 @@ message SelectedPlace {
 }
 
 message SelectedPlaceRequest {
-  string userId = 1;
-  string scheduleId = 2;
-  repeated SelectedPlace selectedPlaces = 3;
+  string scheduleId = 1;
+  repeated SelectedPlace selectedPlaces = 2;
 }
 
 message SubmitResponse {
@@ -67,8 +71,7 @@ message SubmitResponse {
 }
 
 message GetRecommendationResultsRequest {
-  string userId = 1;
-  string scheduleId = 2;
+  string scheduleId = 1;
 }
 
 
@@ -96,6 +99,7 @@ message GetRecommendationResultsResponse {
   repeated SlotRecommendation slotRecommendations = 1;
   string status = 2;
   string message = 3;
+  repeated SlotRecommendation selectedSlotPlaces = 4;
 }
 
 
@@ -134,4 +138,26 @@ message PlacesForReviewResponse {
   repeated ReviewPlaceInfo places = 1;
   string status = 2;
   string message = 3;
+}
+
+
+
+
+message GetSelectedScheduleDetailRequest {
+  string scheduleId = 1;
+}
+
+message ScheduleDetail {
+  string departureTime = 1;
+  string departureName = 2;
+  string destinationName = 3;
+  string estimatedArrivalTime = 4;
+  repeated string waypointNames = 5;
+  repeated string waypointTimes = 6;
+}
+
+message GetSelectedScheduleDetailResponse {
+  string status = 1;   
+  string message = 2;
+  ScheduleDetail scheduleDetail = 3;
 }

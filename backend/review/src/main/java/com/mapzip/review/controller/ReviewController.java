@@ -2,6 +2,7 @@ package com.mapzip.review.controller;
 
 import com.mapzip.review.dto.OcrResultDto;
 import com.mapzip.review.dto.VerifyReceiptRequest;
+import com.mapzip.review.dto.CreateReviewRequest;
 import com.mapzip.review.entity.PendingReviewEntity;
 import com.mapzip.review.entity.ReviewEntity;
 import com.mapzip.review.service.ReviewService;
@@ -112,31 +113,16 @@ public class ReviewController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Map<String, Object>> createReview(
             @RequestHeader("x-user-id") String userId,
-            @RequestParam("restaurantId") String restaurantId,
-            @RequestParam("restaurantName") String restaurantName,
-            @RequestParam("restaurantAddress") String restaurantAddress,
-            @RequestParam("rating") int rating,
-            @RequestParam("content") String content,
-            @RequestParam(value = "receiptImages", required = false) List<MultipartFile> receiptImages,
-            @RequestParam(value = "reviewImages", required = false) List<MultipartFile> reviewImages,
-            @RequestParam(value = "scheduledTime", required = false) String scheduledTime,
-            @RequestParam(value = "visitDate", required = false) String visitDate) throws Exception {
+            @Valid @ModelAttribute CreateReviewRequest request) throws Exception {
         
-        logger.info("Creating review for user: {}, restaurant: {}", userId, restaurantId);
+        logger.info("Creating review for user: {}, restaurant: {}", userId, request.getRestaurantId());
         
-        // 입력값 검증
-        if (rating < 1 || rating > 5) {
-            throw new IllegalArgumentException("평점은 1-5 사이여야 합니다.");
-        }
-        
-        if (content == null || content.trim().isEmpty()) {
-            throw new IllegalArgumentException("리뷰 내용은 필수입니다.");
-        }
+        // DTO로 입력값 검증이 자동 처리됨
         
         // 영수증 이미지 변환
         List<byte[]> receiptImageBytes = new ArrayList<>();
-        if (receiptImages != null) {
-            for (MultipartFile file : receiptImages) {
+        if (request.getReceiptImages() != null) {
+            for (MultipartFile file : request.getReceiptImages()) {
                 if (!file.isEmpty()) {
                     receiptImageBytes.add(file.getBytes());
                 }
@@ -145,8 +131,8 @@ public class ReviewController {
         
         // 리뷰 이미지 변환
         List<byte[]> reviewImageBytes = new ArrayList<>();
-        if (reviewImages != null) {
-            for (MultipartFile file : reviewImages) {
+        if (request.getReviewImages() != null) {
+            for (MultipartFile file : request.getReviewImages()) {
                 if (!file.isEmpty()) {
                     reviewImageBytes.add(file.getBytes());
                 }
@@ -155,14 +141,14 @@ public class ReviewController {
         
         // 리뷰 생성 (방문 날짜 포함)
         ReviewService.ReviewCreateResult result = reviewService.createReview(
-            userId, restaurantId, restaurantName, restaurantAddress, 
-            rating, content, receiptImageBytes, reviewImageBytes, visitDate);
+            userId, request.getRestaurantId(), request.getRestaurantName(), request.getRestaurantAddress(), 
+            request.getRating(), request.getContent(), receiptImageBytes, reviewImageBytes, request.getVisitDate());
         
         // 리뷰 작성 성공 시 관련 미작성 리뷰를 완료 처리
-        if (result.isSuccess() && scheduledTime != null) {
+        if (result.isSuccess() && request.getScheduledTime() != null) {
             try {
-                reviewService.markPendingReviewAsCompleted(userId, restaurantId, scheduledTime);
-                logger.info("Marked pending review as completed for user: {}, restaurant: {}", userId, restaurantId);
+                reviewService.markPendingReviewAsCompleted(userId, request.getRestaurantId(), request.getScheduledTime());
+                logger.info("Marked pending review as completed for user: {}, restaurant: {}", userId, request.getRestaurantId());
             } catch (Exception e) {
                 logger.warn("Failed to mark pending review as completed, but review was created successfully", e);
             }
