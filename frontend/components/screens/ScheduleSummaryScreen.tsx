@@ -282,33 +282,25 @@ export default function ScheduleSummaryScreen() {
     pollingStopRef.current = () => { active = false; if (timer) clearTimeout(timer) }
   }
   const stopPollingResults = () => pollingStopRef.current?.()
-  // axios가 transformRequest로 body를 바꾸는 문제를 회피: 명시적 JSON 직렬화
-async function sendRecommendUpdateJSON(
-  url: string,
-  payload: any
-): Promise<void> {
-  try {
-    // 1) axios로 시도 (JSON 강제)
-    await api.post(url, payload, {
-      headers: { "Content-Type": "application/json" },
-      transformRequest: [(data) => JSON.stringify(data)], // ✅ 여기 핵심
-    });
-  } catch (axiosErr) {
-    console.warn("[RecommendUpdate] axios send failed. fallback to fetch.", axiosErr);
-    // 2) fetch 폴백 (baseURL 고려)
-    const base = (api as any)?.defaults?.baseURL || "";
-    const full = url.startsWith("http") ? url : base + url;
-    const res = await fetch(full, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include", // 필요 시 세션/쿠키
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      throw new Error(`fetch failed: ${res.status} ${txt}`);
-    }
+// 파일 상단 근처에 유틸
+const getCurrentPositionAsync = (opts?: PositionOptions) =>
+  new Promise<GeolocationPosition>((resolve, reject) => {
+    if (!navigator.geolocation) return reject(new Error("Geolocation not supported"))
+    navigator.geolocation.getCurrentPosition(resolve, reject, opts)
+  })
+
+// ===== 추천 업데이트 트리거 (심플) =====
+const triggerRecommendUpdate = async (scheduleId: string) => {
+  const pos = await getCurrentPositionAsync({ enableHighAccuracy: true, timeout: 10000, maximumAge: 0 })
+  const payload = {
+    scheduleId,
+    clientNowIso: new Date().toISOString(),
+    currentLat: pos.coords.latitude,
+    currentLng: pos.coords.longitude,
   }
+  console.log("[RecommendUpdate] payload", payload)
+  // ✅ 스케줄 리스트와 동일 패턴: 그냥 객체 바디로 post → JSON 자동 세팅
+  await api.post("/recommend/request", payload)
 }
 
   // 추천 업데이트 전송
@@ -318,47 +310,27 @@ async function sendRecommendUpdateJSON(
     return
   }
 
-  // ETA 선검사
+  // ETA 선검사 (현재 시간이 ETA 이후면 전송 안 함)
   if (vm.calculatedArrivalTime) {
     const eta = parseDisplayTimeToDate(vm.calculatedArrivalTime)
-    if (eta && new Date().getTime() > eta.getTime()) {
+    if (eta && Date.now() > eta.getTime()) {
       alert("도착 예상 시간을 이미 지났습니다. 추천 업데이트 요청을 보낼 수 없어요.")
       return
     }
   }
 
-  setUpdating(true)
-  setIsPopupOpen(true)
-  setCurrentPopup("processing")
-  startPollingResults(vm.scheduleId)
-  const getCurrentPositionAsync = (opts?: PositionOptions) =>
-  new Promise<GeolocationPosition>((resolve, reject) => {
-    if (!navigator.geolocation) {
-      return reject(new Error("Geolocation not supported"))
-    }
-    navigator.geolocation.getCurrentPosition(resolve, reject, opts)
-  })
   try {
-    // ✅ 위치 가져오기 (로그 포함)
-    const pos = await getCurrentPositionAsync({ enableHighAccuracy: true, timeout: 10000, maximumAge: 0 })
-    const { latitude, longitude } = pos.coords
-    const nowIso = new Date().toISOString()
+    setUpdating(true)
+    setIsPopupOpen(true)
+    setCurrentPopup("processing")
+    startPollingResults(vm.scheduleId)
 
-    // ✅ payload 로그로 찍어서 'Network 탭'과 일치 확인
-    const payload = {
-      scheduleId: vm.scheduleId,
-      clientNowIso: nowIso,   // camelCase
-      currentLat: latitude,
-      currentLng: longitude,
-    }
-    console.debug("[RecommendUpdate] sending payload:", JSON.stringify(payload));
+    await triggerRecommendUpdate(vm.scheduleId)   // ✅ 한 줄로 끝
 
-    await sendRecommendUpdateJSON(RECOMMEND_SEND_URL, payload)
-    // 성공 → 폴링이 준비완료로 전환
-
+    // 성공 시 폴링이 '준비완료'로 상태 전환
   } catch (err: any) {
-    console.error("[RecommendUpdate] failed before send or during send:", err)
-    // 지오로케이션 실패 사유 UI
+    console.error("[RecommendUpdate] failed:", err)
+    // 지오 위치 실패 코드 처리
     if (err?.code === err?.PERMISSION_DENIED) {
       alert("위치 정보 접근 권한이 거부되었습니다. 설정에서 권한을 허용해주세요.")
     } else if (err?.code === err?.POSITION_UNAVAILABLE) {
@@ -373,6 +345,7 @@ async function sendRecommendUpdateJSON(
     setIsPopupOpen(false)
   }
 }
+
 
 
   // 기존 포맷터 (표시용)
