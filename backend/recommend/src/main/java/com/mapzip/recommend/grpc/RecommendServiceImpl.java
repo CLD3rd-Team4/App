@@ -91,7 +91,7 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 	@Override
 	public void sendRecommendRequest(RecommendRequest request, StreamObserver<RecommendResponse> responseObserver) {
 		// 추천 처리 로직 호출
-		recommendRequestService.sendRecommendRequest(request.getScheduleId());
+		recommendRequestService.sendRecommendRequest(request);
 
 		// 응답
 		RecommendResponse response = RecommendResponse.newBuilder().setStatus("OK").setMessage("스케줄 선택이 성공적으로 처리되었습니다.")

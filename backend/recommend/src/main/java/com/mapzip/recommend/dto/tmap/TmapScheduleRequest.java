@@ -16,16 +16,28 @@ public class TmapScheduleRequest {
 
     private List<MealSlotData> mealSlots;
 
-
     private String userNote;
     private String purpose;
     private List<String> companions;
+
+    // 도착 여유 시간
+    private Integer arrivalBufferMinutes;
+
+    // 추천 업데이트 컨텍스트
+    private RecommendUpdateContext recommendUpdateContext;
+
     @Data
     public static class LocationDto {
         private String lat;
         private String lng;
         private String name;
     }
-    //도착 여유 시간 
-    private Integer arrivalBufferMinutes;
+
+    @Data
+    public static class RecommendUpdateContext {
+        private String clientNowIso;  // 현재 시간
+        private Double currentLat;    // 현재 위도
+        private Double currentLng;    // 현재 경도
+        private Boolean isUpdate;     // true면 "추천 업데이트 요청"
+    }
 }
