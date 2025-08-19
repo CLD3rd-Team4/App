@@ -20,6 +20,7 @@ const POLL_INTERVAL_MS = 1500 // 폴링 주기(ms)
 type GetResultsResponse = {
   status: "PENDING" | "OK" | "ERROR" | string
   message?: string
+  runId?: string           // ✅ 서버가 돌려줄 수도 있는 runId
   slotRecommendations?: Array<{
     slotId: string
     places: Array<{ id: string; placeName: string }>
@@ -28,6 +29,17 @@ type GetResultsResponse = {
 
 // 팝업 상태
 type PopupType = "processing" | "recommendation_ready"
+
+// ✅ HHmm(KST) runId 생성
+const genRunId = () =>
+  new Intl.DateTimeFormat("ko-KR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Seoul",
+  })
+    .format(new Date())
+    .replace(":", "")
 
 export default function ScheduleListScreen() {
   const router = useRouter()
@@ -52,23 +64,27 @@ export default function ScheduleListScreen() {
   const pollingStopRef = useRef<() => void>(() => {})
   const resultsRef = useRef<GetResultsResponse | null>(null)
 
+  // ✅ 현재 요청의 runId 저장
+  const currentRunIdRef = useRef<string | null>(null)
+
   useEffect(() => {
     setIsClient(true)
     loadSchedules()
   }, [loadSchedules])
 
-  // ===== 추천 트리거 =====
-  const triggerRecommendRequest = async (scheduleId: string) => {
+  // ===== 추천 트리거 (runId 포함) =====
+  const triggerRecommendRequest = async (scheduleId: string, runId: string) => {
     try {
-      await api.post("/recommend/request", { scheduleId })
+      // 바디에 runId 포함(서버 proto가 runId를 optional로 받도록 반영되어 있어야 함)
+      await api.post("/recommend/request", { scheduleId, runId })
     } catch (e) {
       console.error("POST /recommend/request failed:", e)
       // 실패여도 폴링으로 대기 UX 유지
     }
   }
 
-  // ===== 결과 폴링 (userId 제거) =====
-  const startPollingResults = (scheduleId: string) => {
+  // ===== 결과 폴링 (runId 일치 확인) =====
+  const startPollingResults = (scheduleId: string, runId: string) => {
     let active = true
     let timer: any = null
 
@@ -76,10 +92,16 @@ export default function ScheduleListScreen() {
       if (!active) return
       try {
         const res = await api.get<GetResultsResponse>("/recommend/result", {
-          params: { scheduleId }, // ✅ userId 없이 scheduleId만
+          params: { scheduleId, runId }, // ✅ runId 함께 조회
         })
 
         if (res.data.status === "OK") {
+          // 서버가 다른 runId를 돌려주면 무시하고 계속 대기
+          if (res.data.runId && res.data.runId !== runId) {
+            timer = setTimeout(tick, POLL_INTERVAL_MS)
+            return
+          }
+
           resultsRef.current = res.data
           // 타임라인 진행 상태 업데이트(완료 표시)
           setTimelineItems(prev =>
@@ -112,6 +134,9 @@ export default function ScheduleListScreen() {
   const handleScheduleSelect = async (schedule: Schedule) => {
     if (!schedule?.id) return
 
+    // 기존 폴링 정리 후 새 요청 준비
+    stopPollingResults()
+
     // 팝업 오픈 + 타임라인 기본 세팅
     setSelectedScheduleForPopup(schedule)
     setTimelineItems([]) // 상세 조회 후 채움
@@ -131,9 +156,13 @@ export default function ScheduleListScreen() {
       // 상세 실패해도 추천은 트리거/폴링 가능하므로 팝업은 유지
     }
 
-    // 3) 추천 분석 요청 & 4) 결과 폴링 시작 (중복 없이 한 번만)
-    await triggerRecommendRequest(schedule.id)
-    startPollingResults(schedule.id)
+    // ✅ runId 생성 및 고정
+    const runId = genRunId()
+    currentRunIdRef.current = runId
+
+    // 3) 추천 분석 요청(runId 포함) & 4) 결과 폴링 시작(runId 포함)
+    await triggerRecommendRequest(schedule.id, runId)
+    startPollingResults(schedule.id, runId)
   }
 
   const handleScheduleEdit = (schedule: Schedule) => {
@@ -146,6 +175,7 @@ export default function ScheduleListScreen() {
     setCurrentPopup("processing")
     stopPollingResults()
     resultsRef.current = null
+    currentRunIdRef.current = null
   }
 
   // 추천 완료 팝업 → “결과 보기”
