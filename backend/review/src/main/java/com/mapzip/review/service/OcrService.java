@@ -48,6 +48,15 @@ public class OcrService {
                 // Config Server 암호화된 서비스 계정 키 JSON 사용
                 try {
                     logger.info("Config Server 인증 방식 사용");
+                    logger.info("Service account key length: {}, full value: [{}]", 
+                               serviceAccountKey.length(), serviceAccountKey);
+                    
+                    // JSON 형식인지 간단 체크
+                    if (!serviceAccountKey.trim().startsWith("{")) {
+                        logger.error("Service account key is not valid JSON format. Key is still encrypted or malformed: [{}]", serviceAccountKey);
+                        throw new IllegalStateException("Config Server에서 받은 서비스 계정 키가 유효한 JSON 형식이 아닙니다. 복호화가 실패했을 수 있습니다.");
+                    }
+                    
                     credentials = ServiceAccountCredentials.fromStream(
                         new ByteArrayInputStream(serviceAccountKey.getBytes())
                     );
@@ -69,6 +78,8 @@ public class OcrService {
                 }
             } else {
                 // 어떤 인증 정보도 없는 경우 오류 발생
+                logger.error("Google Cloud Vision API 인증 정보가 설정되지 않음. api-key: [{}], credentials-path: [{}]", 
+                           serviceAccountKey, credentialsPath);
                 throw new IllegalStateException("구글 클라우드 비전 API 인증 정보가 설정되지 않았습니다. " +
                     "google.cloud.vision.api-key 또는 google.cloud.vision.credentials-path를 설정해주세요.");
             }
