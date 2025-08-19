@@ -132,6 +132,7 @@ public class ReviewService {
             // 리뷰 저장
             ReviewEntity savedReview = reviewRepository.save(review);
             
+            
             return new ReviewCreateResult(savedReview, ocrResult, true, "리뷰가 성공적으로 작성되었습니다.");
             
         } catch (Exception e) {
