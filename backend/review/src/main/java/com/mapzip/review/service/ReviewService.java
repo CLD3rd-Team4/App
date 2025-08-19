@@ -300,7 +300,16 @@ public class ReviewService {
     @Cacheable(value = "ocrResults", key = "T(java.util.Arrays).hashCode(#receiptImage) + '_' + #expectedRestaurantName")
     public OcrResultDto verifyReceipt(byte[] receiptImage, String expectedRestaurantName, String expectedAddress) {
         logger.info("Processing OCR for restaurant: {}", expectedRestaurantName);
-        return ocrService.processReceiptImage(receiptImage, expectedRestaurantName, expectedAddress);
+        
+        try {
+            return ocrService.processReceiptImage(receiptImage, expectedRestaurantName, expectedAddress);
+        } catch (IllegalStateException e) {
+            logger.error("OCR service configuration error: {}", e.getMessage());
+            throw new RuntimeException("OCR 서비스 설정 오류: " + e.getMessage(), e);
+        } catch (Exception e) {
+            logger.error("OCR processing failed for restaurant: {}", expectedRestaurantName, e);
+            throw new RuntimeException("영수증 처리 중 오류가 발생했습니다: " + e.getMessage(), e);
+        }
     }
     
     /**

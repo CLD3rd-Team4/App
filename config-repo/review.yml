@@ -121,7 +121,7 @@ management:
 # 로깅 설정
 logging:
   level:
-    com.mapzip.review: ${LOG_LEVEL_REVIEW:INFO}
+    com.mapzip.review: ${LOG_LEVEL_REVIEW:DEBUG}
     software.amazon.awssdk: ${LOG_LEVEL_AWS:WARN}
     com.google.cloud: ${LOG_LEVEL_GOOGLE:WARN}
 
