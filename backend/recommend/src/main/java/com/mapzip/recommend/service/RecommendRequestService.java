@@ -98,6 +98,7 @@ public class RecommendRequestService {
 
         // 4) Tmap 요청 매핑 
         // 추천 업데이트일 경우 isUpdate=true 
+       String runId=grpcReq.getRunId();
         TmapScheduleRequest tmapScheduleRequest = TmapRequestMapper.fromScheduleDetail(
                 scheduleRes.getSchedule(),
                 scheduleId,
@@ -105,7 +106,8 @@ public class RecommendRequestService {
                 clientNowIso,
                 currentLat,
                 currentLng,
-               isUpdate
+               isUpdate,
+               runId
         );
 
         // 5) Kafka 전송 (키는 scheduleId로 파티셔닝)

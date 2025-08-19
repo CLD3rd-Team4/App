@@ -143,139 +143,173 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 	
 	@Override
 	public void getRecommendationResults(GetRecommendationResultsRequest request,
-			StreamObserver<GetRecommendationResultsResponse> responseObserver) {
-		final String userId = GrpcHeaderConfig.UserIdContext.USER_ID.get();
-		final String scheduleId = request.getScheduleId();
-		final String runId = request.getRunId();
+	        StreamObserver<GetRecommendationResultsResponse> responseObserver) {
 
-		// 0) DB에서 '이미 선택한 식당' 조회 (userId + scheduleId)
-		List<RecommendationSelectionEntity> selectedRows = selectionRepo.findByUserIdAndScheduleId(userId, scheduleId);
+	    final String userId = GrpcHeaderConfig.UserIdContext.USER_ID.get();
+	    final String scheduleId = request.getScheduleId();
+	    final String clientRunId = request.getRunId(); // 요청 runId
 
-		// slotId -> Set<placeId> (후보 중복 제거용)
-		Map<String, Set<String>> selectedIdsBySlot = new HashMap<>();
-		// slotId -> List<PlaceInfo> (응답으로 보낼 '이전선택')
-		Map<String, List<PlaceInfo>> selectedPlacesBySlot = new HashMap<>();
+	    // ★ Valkey에 저장된 마지막 runId 불러오기
+	    final String lastRunKey = "recommend:run:last:" + scheduleId; // scheduleId 단위 키
+	    final String lastCompletedRunId = redisTemplateString.opsForValue().get(lastRunKey);
 
-		for (RecommendationSelectionEntity row : selectedRows) {
-			String slotId = nvl(row.getSlotId());
-			String placeId = nvl(row.getPlaceId());
+	    // ★ runId가 왔는데, 최신 runId와 다르면 무조건 PENDING 반환 (이전 결과로 OK 떨어지는 것 방지)
+	    if (clientRunId != null) {
+	        if (lastCompletedRunId == null || !clientRunId.equals(lastCompletedRunId)) {
+	            GetRecommendationResultsResponse pending = GetRecommendationResultsResponse.newBuilder()
+	                    .addAllSlotRecommendations(Collections.emptyList())
+	                    .addAllSelectedSlotPlaces(Collections.emptyList())
+	                    .setStatus("PENDING")
+	                    .setMessage("최신 실행(runId)의 결과가 아직 준비되지 않았습니다.")
+	                    .build();
+	            responseObserver.onNext(pending);
+	            responseObserver.onCompleted();
+	            return;
+	        }
+	    }
 
-			selectedIdsBySlot.computeIfAbsent(slotId, k -> new HashSet<>()).add(placeId);
+	    // 0) DB에서 '이미 선택한 식당' 조회 (userId + scheduleId)
+	    List<RecommendationSelectionEntity> selectedRows =
+	            selectionRepo.findByUserIdAndScheduleId(userId, scheduleId);
 
-			PlaceInfo selectedPi = PlaceInfo.newBuilder().setId(placeId).setPlaceName(nvl(row.getPlaceName()))
-					.setReason(nvl(row.getReason())).setDistance(nvl(row.getDistance()))
-					.setScheduledTime(nvl(row.getScheduledTime()))
-					.setMealType(Optional.ofNullable(row.getMealType()).orElse(0)).setPlaceUrl(nvl(row.getPlaceUrl()))
-					.setAddressName(nvl(row.getAddressName()))
-					.setAverageRating(Optional.ofNullable(row.getAverageRating()).orElse(0d))
-					.setRepresentativeReview(nvl(row.getRepresentativeReview())).build();
+	    // slotId -> Set<placeId> (후보 중복 제거용)
+	    Map<String, Set<String>> selectedIdsBySlot = new HashMap<>();
+	    // slotId -> List<PlaceInfo> (응답으로 보낼 '이전선택')
+	    Map<String, List<PlaceInfo>> selectedPlacesBySlot = new HashMap<>();
 
-			selectedPlacesBySlot.computeIfAbsent(slotId, k -> new ArrayList<>()).add(selectedPi);
-		}
+	    for (RecommendationSelectionEntity row : selectedRows) {
+	        String slotId = nvl(row.getSlotId());
+	        String placeId = nvl(row.getPlaceId());
 
-		// 1) Redis 후보 로딩 (키 포맷:
-		// recommend:{userId}:{scheduleId}:{slotId}:{MEAL|SNACK}:{placeN})
-		final String redisKeyPattern = String.format("recommend:%s:%s:*:*:place*", userId, scheduleId);
+	        selectedIdsBySlot.computeIfAbsent(slotId, k -> new HashSet<>()).add(placeId);
 
+	        PlaceInfo selectedPi = PlaceInfo.newBuilder()
+	                .setId(placeId)
+	                .setPlaceName(nvl(row.getPlaceName()))
+	                .setReason(nvl(row.getReason()))
+	                .setDistance(nvl(row.getDistance()))
+	                .setScheduledTime(nvl(row.getScheduledTime()))
+	                .setMealType(Optional.ofNullable(row.getMealType()).orElse(0))
+	                .setPlaceUrl(nvl(row.getPlaceUrl()))
+	                .setAddressName(nvl(row.getAddressName()))
+	                .setAverageRating(Optional.ofNullable(row.getAverageRating()).orElse(0d))
+	                .setRepresentativeReview(nvl(row.getRepresentativeReview()))
+	                .build();
 
-		Set<String> keys = redisTemplateString.keys(redisKeyPattern);
+	        selectedPlacesBySlot.computeIfAbsent(slotId, k -> new ArrayList<>()).add(selectedPi);
+	    }
 
-		// 2) Redis -> Slot별 후보 목록(PlaceWithOrder) 구성 + DB 중복 제거
-		class PlaceWithOrder {
-			final PlaceInfo place;
-			final int order;
+	    // 1) Redis 후보 로딩 (키 포맷: recommend:{userId}:{scheduleId}:{slotId}:{MEAL|SNACK}:{placeN})
+	    final String redisKeyPattern = String.format("recommend:%s:%s:*:*:place*", userId, scheduleId);
+	    Set<String> keys = redisTemplateString.keys(redisKeyPattern);
 
-			PlaceWithOrder(PlaceInfo p, int o) {
-				this.place = p;
-				this.order = o;
-			}
-		}
+	    // 2) Redis -> Slot별 후보 목록(PlaceWithOrder) 구성 + DB 중복 제거
+	    class PlaceWithOrder {
+	        final PlaceInfo place; final int order;
+	        PlaceWithOrder(PlaceInfo p, int o) { this.place = p; this.order = o; }
+	    }
 
-		Map<String, List<PlaceWithOrder>> slotMap = new HashMap<>();
-		ObjectMapper objectMapper = new ObjectMapper();
+	    Map<String, List<PlaceWithOrder>> slotMap = new HashMap<>();
+	    ObjectMapper objectMapper = new ObjectMapper();
 
-		List<String> sortedKeys = new ArrayList<>(keys == null ? List.of() : keys);
-		Collections.sort(sortedKeys);
+	    List<String> sortedKeys = new ArrayList<>(keys == null ? List.of() : keys);
+	    Collections.sort(sortedKeys);
 
-		for (String key : sortedKeys) {
-			String value = redisTemplate.opsForValue().get(key);
-			if (value == null)
-				continue;
+	    for (String key : sortedKeys) {
+	        String value = redisTemplate.opsForValue().get(key);
+	        if (value == null) continue;
 
-			try {
-				// key 파싱
-				String[] parts = key.split(":");
-				if (parts.length < 6) {
-					log.warn("키 형식 불일치: {}", key);
-					continue;
-				}
-				String slotId = parts[3];
-				String mealTypeToken = parts[4]; // MEAL | SNACK
-				String placeToken = parts[5]; // place3
+	        try {
+	            String[] parts = key.split(":");
+	            if (parts.length < 6) {
+	                log.warn("키 형식 불일치: {}", key);
+	                continue;
+	            }
+	            String slotId = parts[3];
+	            String mealTypeToken = parts[4]; // MEAL | SNACK
+	            String placeToken = parts[5];    // place3
 
-				int placeOrder = 0;
-				try {
-					placeOrder = Integer.parseInt(placeToken.replaceFirst("place", ""));
-				} catch (NumberFormatException ignore) {
-				}
+	            int placeOrder = 0;
+	            try {
+	                placeOrder = Integer.parseInt(placeToken.replaceFirst("place", ""));
+	            } catch (NumberFormatException ignore) {}
 
-				int mealTypeFromKey = "MEAL".equalsIgnoreCase(mealTypeToken) ? 0
-						: "SNACK".equalsIgnoreCase(mealTypeToken) ? 1 : 0;
+	            int mealTypeFromKey = "MEAL".equalsIgnoreCase(mealTypeToken) ? 0
+	                    : "SNACK".equalsIgnoreCase(mealTypeToken) ? 1 : 0;
 
-				// value(JSON) 파싱
-				JsonNode node = objectMapper.readTree(value);
-				String id = node.path("id").asText("");
+	            JsonNode node = objectMapper.readTree(value);
+	            String id = node.path("id").asText("");
 
-				// ✅ DB에서 이미 선택된 place는 후보에서 제거
-				if (selectedIdsBySlot.getOrDefault(slotId, Set.of()).contains(id)) {
-					continue;
-				}
+	            // DB에서 이미 선택된 place는 후보에서 제거
+	            if (selectedIdsBySlot.getOrDefault(slotId, Set.of()).contains(id)) {
+	                continue;
+	            }
 
-				int mealType = node.has("mealType") ? node.path("mealType").asInt(mealTypeFromKey) : mealTypeFromKey;
+	            int mealType = node.has("mealType")
+	                    ? node.path("mealType").asInt(mealTypeFromKey)
+	                    : mealTypeFromKey;
 
-				PlaceInfo place = PlaceInfo.newBuilder().setId(id).setPlaceName(node.path("placeName").asText(""))
-						.setReason(node.path("reason").asText("")).setDistance(node.path("distance").asText(""))
-						.setScheduledTime(node.path("scheduledTime").asText("")).setMealType(mealType)
-						.setPlaceUrl(node.path("placeUrl").asText(""))
-						.setAddressName(node.path("addressName").asText(""))
-						.setAverageRating(node.path("averageRating").asDouble(0))
-						.setRepresentativeReview(node.path("representativeReview").asText("")).build();
+	            PlaceInfo place = PlaceInfo.newBuilder()
+	                    .setId(id)
+	                    .setPlaceName(node.path("placeName").asText(""))
+	                    .setReason(node.path("reason").asText(""))
+	                    .setDistance(node.path("distance").asText(""))
+	                    .setScheduledTime(node.path("scheduledTime").asText(""))
+	                    .setMealType(mealType)
+	                    .setPlaceUrl(node.path("placeUrl").asText(""))
+	                    .setAddressName(node.path("addressName").asText(""))
+	                    .setAverageRating(node.path("averageRating").asDouble(0))
+	                    .setRepresentativeReview(node.path("representativeReview").asText(""))
+	                    .build();
 
-				slotMap.computeIfAbsent(slotId, k -> new ArrayList<>()).add(new PlaceWithOrder(place, placeOrder));
+	            slotMap.computeIfAbsent(slotId, k -> new ArrayList<>())
+	                   .add(new PlaceWithOrder(place, placeOrder));
 
-			} catch (Exception e) {
-				log.warn("❌ Redis 값 파싱 오류 - key: {}", key, e);
-			}
-		}
+	        } catch (Exception e) {
+	            log.warn("❌ Redis 값 파싱 오류 - key: {}", key, e);
+	        }
+	    }
 
-		// 3) 후보/이전선택을 SlotRecommendation으로 변환
-		List<SlotRecommendation> candidateSlots = slotMap.entrySet().stream().map(entry -> {
-			List<PlaceInfo> placesSorted = entry.getValue().stream().sorted(Comparator.comparingInt(p -> p.order))
-					.map(p -> p.place).toList();
-			return SlotRecommendation.newBuilder().setSlotId(entry.getKey()).addAllPlaces(placesSorted).build();
-		}).toList();
+	    // 3) 후보/이전선택을 SlotRecommendation으로 변환
+	    List<SlotRecommendation> candidateSlots = slotMap.entrySet().stream()
+	            .map(entry -> {
+	                List<PlaceInfo> placesSorted = entry.getValue().stream()
+	                        .sorted(Comparator.comparingInt(p -> p.order))
+	                        .map(p -> p.place)
+	                        .toList();
+	                return SlotRecommendation.newBuilder()
+	                        .setSlotId(entry.getKey())
+	                        .addAllPlaces(placesSorted)
+	                        .build();
+	            })
+	            .toList();
 
-		List<SlotRecommendation> selectedSlots = selectedPlacesBySlot.entrySet().stream()
-				.map(e -> SlotRecommendation.newBuilder().setSlotId(e.getKey()).addAllPlaces(e.getValue()).build())
-				.toList();
+	    List<SlotRecommendation> selectedSlots = selectedPlacesBySlot.entrySet().stream()
+	            .map(e -> SlotRecommendation.newBuilder()
+	                    .setSlotId(e.getKey())
+	                    .addAllPlaces(e.getValue())
+	                    .build())
+	            .toList();
 
-		// 4) 응답
-		boolean hasAny = !candidateSlots.isEmpty() || !selectedSlots.isEmpty();
+	    // 4) 응답 (runId 포함)
+	    boolean hasAny = !candidateSlots.isEmpty() || !selectedSlots.isEmpty();
 
-		GetRecommendationResultsResponse response = GetRecommendationResultsResponse.newBuilder()
-				.addAllSlotRecommendations(candidateSlots) // 새 후보
-				.addAllSelectedSlotPlaces(selectedSlots) // 이전 선택
-				.setRunId(runId)
-				.setStatus(hasAny ? "OK" : "PENDING")
-				.setMessage(hasAny ? "추천 결과를 성공적으로 불러왔습니다." : "추천 결과가 아직 준비되지 않았습니다.").build();
+	    GetRecommendationResultsResponse response = GetRecommendationResultsResponse.newBuilder()
+	            .addAllSlotRecommendations(candidateSlots)   // 새 후보
+	            .addAllSelectedSlotPlaces(selectedSlots)     // 이전 선택
+	            .setStatus(hasAny ? "OK" : "PENDING")
+	            .setMessage(hasAny ? "추천 결과를 성공적으로 불러왔습니다."
+	                               : "추천 결과가 아직 준비되지 않았습니다.")
+	            .build();
 
-		responseObserver.onNext(response);
-		responseObserver.onCompleted();
+	    responseObserver.onNext(response);
+	    responseObserver.onCompleted();
 	}
 
 	private static String nvl(String s) {
-		return s == null ? "" : s;
+	    return s == null ? "" : s;
 	}
+
 
 
 
