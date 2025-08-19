@@ -22,11 +22,11 @@ const extractDong = (addr?: string) => {
 const PinTile = ({ addressName, size = "small" }: { addressName?: string, size?: "small" | "large" }) => {
   const dong = extractDong(addressName)
   const sizeClasses = size === "large" 
-    ? "w-20 h-20" 
+    ? "w-12 h-12" 
     : "w-full h-full"
   const iconSize = size === "large" 
-    ? "w-7 h-7" 
-    : "w-6 h-6"
+    ? "w-5 h-5" 
+    : "w-4 h-4"
   
   return (
     <div className={`${sizeClasses} rounded-lg bg-blue-100 flex flex-col items-center justify-center relative overflow-hidden`}>
@@ -85,7 +85,14 @@ export default function VisitedRestaurantsScreen() {
   }
 
   const handleDeleteUnwritten = async (restaurantId: string, scheduledTime: string) => {
+    if (!restaurantId || !scheduledTime) {
+      alert('삭제에 필요한 정보가 누락되었습니다.')
+      console.error('Missing data:', { restaurantId, scheduledTime })
+      return
+    }
+
     try {
+      console.log('삭제 요청:', { restaurantId, scheduledTime })
       await visitedRestaurantApi.deletePendingReview(restaurantId, scheduledTime)
       setVisitedRestaurants((prev) => prev.filter((r) => (r.restaurantId || r.id) !== restaurantId))
       console.log('미작성 리뷰가 삭제되었습니다.')
@@ -226,7 +233,7 @@ export default function VisitedRestaurantsScreen() {
                         {restaurant.review && <p className="text-sm text-gray-700 mb-2">{restaurant.review}</p>}
                         <div className="flex gap-2">
                           <Button
-                            onClick={() => handleDeleteUnwritten(restaurant.restaurantId || restaurant.id, restaurant.scheduledTime || '12:00')}
+                            onClick={() => handleDeleteUnwritten(restaurant.restaurantId || restaurant.id, restaurant.scheduledTime)}
                             size="sm"
                             variant="outline"
                             className="text-red-600 border-red-200"

@@ -145,7 +145,11 @@ public class ReviewEntity implements java.io.Serializable {
     @DynamoDbSecondaryPartitionKey(indexNames = "StatusIndex")
     @DynamoDbAttribute("review_status")
     public String getReviewStatus() {
-        return reviewStatus != null ? reviewStatus : "PUBLISHED";
+        // null 안전성을 위한 기본값 반환 (기존 데이터와의 호환성)
+        if (reviewStatus == null || reviewStatus.isEmpty()) {
+            return "PUBLISHED";
+        }
+        return reviewStatus;
     }
 
     public void setReviewStatus(String reviewStatus) {

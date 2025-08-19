@@ -212,9 +212,10 @@ public class ReviewController {
             throw new IllegalArgumentException("페이지 크기는 1-100 사이여야 합니다.");
         }
         
-        // 실제 서비스 로직 호출
-        List<ReviewEntity> reviews = reviewService.getUserReviews(userId, page, size);
-        long totalCount = reviewService.getUserReviewsCount(userId);
+        try {
+            // 실제 서비스 로직 호출
+            List<ReviewEntity> reviews = reviewService.getUserReviews(userId, page, size);
+            long totalCount = reviewService.getUserReviewsCount(userId);
         
         // 다음 페이지 존재 여부 계산
         boolean hasNext = (page + 1) * size < totalCount;
@@ -238,14 +239,18 @@ public class ReviewController {
             })
             .collect(Collectors.toList());
         
-        return ResponseEntity.ok(Map.of(
-            "success", true,
-            "data", reviewData,
-            "totalCount", totalCount,
-            "currentPage", page,
-            "totalPages", (totalCount + size - 1) / size,  // 전체 페이지 수
-            "hasNext", hasNext
-        ));
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "data", reviewData,
+                "totalCount", totalCount,
+                "currentPage", page,
+                "totalPages", (totalCount + size - 1) / size,  // 전체 페이지 수
+                "hasNext", hasNext
+            ));
+        } catch (Exception e) {
+            logger.error("Failed to get user reviews for user: {}", userId, e);
+            throw new RuntimeException("사용자 리뷰 조회 중 오류가 발생했습니다", e);
+        }
     }
     
     // === 미작성 리뷰 관리 API ===
