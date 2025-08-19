@@ -191,11 +191,81 @@ public class OcrService {
     }
     
     private String extractVisitDate(String text) {
-        Matcher matcher = DATE_PATTERN.matcher(text);
-        if (matcher.find()) {
-            return matcher.group(1);
+        // 영수증에서 날짜 관련 키워드 근처에서 찾기
+        String[] dateKeywords = {"일시", "날짜", "date", "시간", "방문일", "거래일", "승인일시"};
+        String[] lines = text.split("\\n");
+        
+        // 1차: 키워드가 포함된 줄에서 날짜 찾기
+        for (String keyword : dateKeywords) {
+            for (String line : lines) {
+                if (line.toLowerCase().contains(keyword.toLowerCase())) {
+                    Matcher matcher = DATE_PATTERN.matcher(line);
+                    if (matcher.find()) {
+                        String dateStr = matcher.group(1);
+                        // 유효한 날짜인지 검증
+                        if (isValidDate(dateStr)) {
+                            return dateStr;
+                        }
+                    }
+                }
+            }
         }
-        return "";
+        
+        // 2차: 전체 텍스트에서 가장 적절한 날짜 찾기 (최근 1개월 이내)
+        List<String> allDates = new ArrayList<>();
+        Matcher matcher = DATE_PATTERN.matcher(text);
+        while (matcher.find()) {
+            String dateStr = matcher.group(1);
+            if (isValidDate(dateStr) && isRecentDate(dateStr)) {
+                allDates.add(dateStr);
+            }
+        }
+        
+        // 가장 최근 날짜 반환 (영수증 특성상 최근 날짜가 방문일일 가능성 높음)
+        return allDates.stream()
+            .max((d1, d2) -> {
+                try {
+                    LocalDate date1 = parseDate(d1);
+                    LocalDate date2 = parseDate(d2);
+                    if (date1 != null && date2 != null) {
+                        return date1.compareTo(date2);
+                    }
+                } catch (Exception e) {
+                    logger.debug("날짜 비교 중 오류: {}", e.getMessage());
+                }
+                return 0;
+            })
+            .orElse("");
+    }
+    
+    private boolean isValidDate(String dateStr) {
+        try {
+            LocalDate date = parseDate(dateStr);
+            if (date == null) return false;
+            
+            // 1990년 이후, 미래 1년 이내의 날짜만 유효
+            LocalDate minDate = LocalDate.of(1990, 1, 1);
+            LocalDate maxDate = LocalDate.now().plusYears(1);
+            
+            return !date.isBefore(minDate) && !date.isAfter(maxDate);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
+    private boolean isRecentDate(String dateStr) {
+        try {
+            LocalDate date = parseDate(dateStr);
+            if (date == null) return false;
+            
+            // 최근 3개월 이내의 날짜만 허용
+            LocalDate threeMonthsAgo = LocalDate.now().minusMonths(3);
+            LocalDate tomorrow = LocalDate.now().plusDays(1);
+            
+            return !date.isBefore(threeMonthsAgo) && !date.isAfter(tomorrow);
+        } catch (Exception e) {
+            return false;
+        }
     }
     
     private String extractTotalAmount(String text) {
@@ -357,7 +427,7 @@ public class OcrService {
         
         String cleanDate = dateStr.trim();
         
-        // 다양한 날짜 형식 시도
+        // 다양한 날짜 형식 시도 (2자리 년도 지원 추가)
         String[] patterns = {
             "yyyy-MM-dd",
             "yyyy/MM/dd", 
@@ -366,7 +436,15 @@ public class OcrService {
             "MM/dd/yyyy",
             "dd-MM-yyyy",
             "dd/MM/yyyy",
-            "dd.MM.yyyy"
+            "dd.MM.yyyy",
+            "yy-MM-dd",    // 24-08-19
+            "yy/MM/dd",    // 24/08/19
+            "yy.MM.dd",    // 24.08.19
+            "MM-dd-yy",    // 08-19-24
+            "MM/dd/yy",    // 08/19/24
+            "dd-MM-yy",    // 19-08-24
+            "dd/MM/yy",    // 19/08/24
+            "dd.MM.yy"     // 19.08.24
         };
         
         for (String pattern : patterns) {

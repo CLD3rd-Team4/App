@@ -23,7 +23,7 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
   const [rating, setRating] = useState(0)
   const [reviewText, setReviewText] = useState("")
   const [reviewImages, setReviewImages] = useState<string[]>([])
-  const [visitDate, setVisitDate] = useState(new Date().toISOString().split("T")[0])
+  const [visitDate, setVisitDate] = useState("")
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
@@ -113,7 +113,13 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
         const formattedDate = formatDateForInput(result.visitDate.trim())
         if (formattedDate) {
           setVisitDate(formattedDate)
+        } else {
+          // OCR 날짜 변환에 실패한 경우 오늘 날짜로 설정
+          setVisitDate(new Date().toISOString().split("T")[0])
         }
+      } else {
+        // OCR에서 날짜를 추출하지 못한 경우 오늘 날짜로 설정
+        setVisitDate(new Date().toISOString().split("T")[0])
       }
       
       setOcrResult(result)
