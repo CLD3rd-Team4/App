@@ -285,71 +285,67 @@ export default function ScheduleSummaryScreen() {
 
   // 추천 업데이트 전송
   const handleUpdate = async () => {
-    if (!vm?.scheduleId) {
-      alert("스케줄을 먼저 선택해주세요.")
-      return
-    }
-
-    // (1) ETA 선검사: 현재시각이 ETA 이후면 요청 중단
-    if (vm.calculatedArrivalTime) {
-      const eta = parseDisplayTimeToDate(vm.calculatedArrivalTime)
-      if (eta && new Date().getTime() > eta.getTime()) {
-        alert("도착 예상 시간을 이미 지났습니다. 추천 업데이트 요청을 보낼 수 없어요.")
-        return
-      }
-    }
-
-    if (!navigator.geolocation) {
-      alert("이 브라우저에서는 위치 정보 기능을 사용할 수 없습니다.")
-      return
-    }
-
-    setUpdating(true)
-    setIsPopupOpen(true)
-    setCurrentPopup("processing")
-    startPollingResults(vm.scheduleId)
-
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const { latitude, longitude } = pos.coords
-          const payload = {
-            scheduleId: vm.scheduleId,
-            clientNowIso: new Date().toISOString(),
-            currentLat: latitude,
-            currentLng: longitude,
-          }
-          await api.post(RECOMMEND_SEND_URL, payload)
-          // 성공 시 폴링이 알아서 상태 전환
-        } catch (err: any) {
-          console.error(err)
-          alert(err?.message || "업데이트 요청 중 오류가 발생했습니다.")
-          setUpdating(false)
-          stopPollingResults()
-          setIsPopupOpen(false)
-        }
-      },
-      (error) => {
-        let errorMessage = "위치 정보를 가져오는 데 실패했습니다."
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            errorMessage = "위치 정보 접근 권한이 거부되었습니다. 설정에서 권한을 허용해주세요."
-            break
-          case error.POSITION_UNAVAILABLE:
-            errorMessage = "현재 위치를 파악할 수 없습니다."
-            break
-          case error.TIMEOUT:
-            errorMessage = "위치 정보를 가져오는 데 시간이 초과되었습니다."
-            break
-        }
-        alert(errorMessage)
-        setUpdating(false)
-        stopPollingResults()
-        setIsPopupOpen(false)
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    )
+  if (!vm?.scheduleId) {
+    alert("스케줄을 먼저 선택해주세요.")
+    return
   }
+
+  // ETA 선검사
+  if (vm.calculatedArrivalTime) {
+    const eta = parseDisplayTimeToDate(vm.calculatedArrivalTime)
+    if (eta && new Date().getTime() > eta.getTime()) {
+      alert("도착 예상 시간을 이미 지났습니다. 추천 업데이트 요청을 보낼 수 없어요.")
+      return
+    }
+  }
+
+  setUpdating(true)
+  setIsPopupOpen(true)
+  setCurrentPopup("processing")
+  startPollingResults(vm.scheduleId)
+  const getCurrentPositionAsync = (opts?: PositionOptions) =>
+  new Promise<GeolocationPosition>((resolve, reject) => {
+    if (!navigator.geolocation) {
+      return reject(new Error("Geolocation not supported"))
+    }
+    navigator.geolocation.getCurrentPosition(resolve, reject, opts)
+  })
+  try {
+    // ✅ 위치 가져오기 (로그 포함)
+    const pos = await getCurrentPositionAsync({ enableHighAccuracy: true, timeout: 10000, maximumAge: 0 })
+    const { latitude, longitude } = pos.coords
+    const nowIso = new Date().toISOString()
+
+    // ✅ payload 로그로 찍어서 'Network 탭'과 일치 확인
+    const payload = {
+      scheduleId: vm.scheduleId,
+      clientNowIso: nowIso,   // camelCase
+      currentLat: latitude,
+      currentLng: longitude,
+    }
+    console.debug("[RecommendUpdate] sending payload:", payload)
+
+    await api.post(RECOMMEND_SEND_URL, payload, { headers: { "Content-Type": "application/json" } })
+    // 성공 → 폴링이 준비완료로 전환
+
+  } catch (err: any) {
+    console.error("[RecommendUpdate] failed before send or during send:", err)
+    // 지오로케이션 실패 사유 UI
+    if (err?.code === err?.PERMISSION_DENIED) {
+      alert("위치 정보 접근 권한이 거부되었습니다. 설정에서 권한을 허용해주세요.")
+    } else if (err?.code === err?.POSITION_UNAVAILABLE) {
+      alert("현재 위치를 파악할 수 없습니다.")
+    } else if (err?.code === err?.TIMEOUT) {
+      alert("위치 정보를 가져오는 데 시간이 초과되었습니다.")
+    } else {
+      alert(err?.message || "업데이트 요청 중 오류가 발생했습니다.")
+    }
+    setUpdating(false)
+    stopPollingResults()
+    setIsPopupOpen(false)
+  }
+}
+
 
   // 기존 포맷터 (표시용)
   const formatTime = (time: string) => toKoreanAmPm(time)
