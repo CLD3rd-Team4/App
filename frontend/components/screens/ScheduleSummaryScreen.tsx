@@ -1,3 +1,4 @@
+// components/screens/ScheduleSummaryScreen.tsx
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
@@ -13,6 +14,16 @@ import useSchedule from "@/hooks/useSchedule"
 // 팝업
 import ScheduleProcessingPopup from "@/components/modals/ScheduleProcessingPopup"
 import RecommendationReadyPopup from "@/components/modals/RecommendationReadyPopup"
+
+// 파일 로컬 전용 runId 생성기(공통 유틸 사용 안 함, export 안 함)
+const genRunId = () => {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID()
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+const LS_RUN_PREFIX = "recommend:lastRun:"
+const setLastRunId = (scheduleId: string, runId: string) => {
+  try { localStorage.setItem(`${LS_RUN_PREFIX}${scheduleId}`, runId) } catch {}
+}
 
 type TimelineItem = {
   type: "departure" | "waypoint" | "destination" | "restaurant" | "update"
@@ -35,7 +46,8 @@ type ScheduleDetailResp = {
     estimatedArrivalTime: string
     waypointNames: string[]
     waypointTimes: string[]
-    updateLocs?: Array<{ lat: string; lng: string; name: string; time: string }>
+    // ★ 서버 proto 변경: 업데이트는 시간만 전달
+    updates?: Array<{ time: string }>
   }
 }
 
@@ -46,7 +58,8 @@ type ViewModel = {
   destination?: { name: string }
   calculatedArrivalTime?: string
   waypoints?: Array<{ name: string; arrivalTime?: string }>
-  updates?: Array<{ name?: string; time: string }>
+  // ★ 업데이트는 시간만
+  updates?: Array<{ time: string }>
   mealSlots?: Array<{ slotId: string; mealType: number; scheduledTime?: string }>
   selectedRestaurants?: Array<{
     sectionId: string
@@ -58,17 +71,6 @@ const LAST_SUBMIT_KEY = "recommend:lastSubmit"
 const POLL_INTERVAL_MS = 1500
 const RECOMMEND_SEND_URL = "/recommend/request"
 const RECOMMEND_RESULT_URL = "/recommend/result"
-// runId: 한국시간 HHmm (예: 0214)
-const genRunId = () =>
-  new Intl.DateTimeFormat("ko-KR", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "Asia/Seoul",
-  })
-    .format(new Date())
-    .replace(":", "")
-
 
 type GetResultsResponse = {
   status: "PENDING" | "OK" | "ERROR" | string
@@ -223,11 +225,9 @@ export default function ScheduleSummaryScreen() {
             arrivalTime: d?.waypointTimes?.[i] || "",
           })) ?? []
 
+        // ★ 업데이트는 시간만
         const updates =
-          d?.updateLocs?.map(ul => ({
-            name: ul?.name,
-            time: ul?.time,
-          })) ?? []
+          d?.updates?.map(u => ({ time: u?.time })) ?? []
 
         const mealSlots = lastSubmit.selectedPlaces.map((p) => ({
           slotId: p.slotId,
@@ -269,45 +269,47 @@ export default function ScheduleSummaryScreen() {
         if (mounted) setLoading(false)
       }
     })()
-    return () => { mounted = false }
+    return () => {
+      mounted = false
+    }
   }, [])
 
   /** 폴링: 같은 scheduleId라도 runId가 일치할 때만 OK로 인정(서버 미지원 시 무시) */
-  // BEFORE: const startPollingResults = (scheduleId: string, runId: string | null) => {
-const startPollingResults = (scheduleId: string) => {
-  let active = true
-  let timer: any = null
+  const startPollingResults = (scheduleId: string) => {
+    let active = true
+    let timer: any = null
 
-  const tick = async () => {
-    if (!active) return
-    try {
-      // ★ 매 tick마다 최신 runId를 ref에서 읽음
-      const runId = currentRunIdRef.current
-      const params: any = { scheduleId }
-      if (runId) params.runId = runId
+    const tick = async () => {
+      if (!active) return
+      try {
+        const runId = currentRunIdRef.current
+        const params: any = { scheduleId }
+        if (runId) params.runId = runId
 
-      const res = await api.get<GetResultsResponse>(RECOMMEND_RESULT_URL, { params })
+        const res = await api.get<GetResultsResponse>(RECOMMEND_RESULT_URL, { params })
 
-      if (res.data.status === "OK") {
-        // 서버가 runId를 돌려주면, 현재 runId와 다르면 무시하고 계속 대기
-        if (runId && res.data.runId && res.data.runId !== runId) {
-          timer = setTimeout(tick, POLL_INTERVAL_MS)
+        if (res.data.status === "OK") {
+          if (runId && res.data.runId && res.data.runId !== runId) {
+            timer = setTimeout(tick, POLL_INTERVAL_MS)
+            return
+          }
+          setCurrentPopup("recommendation_ready")
+          setUpdating(false)
           return
         }
-        setCurrentPopup("recommendation_ready")
-        setUpdating(false)
-        return
+        timer = setTimeout(tick, POLL_INTERVAL_MS)
+      } catch {
+        timer = setTimeout(tick, POLL_INTERVAL_MS * 2)
       }
-      timer = setTimeout(tick, POLL_INTERVAL_MS)
-    } catch {
-      timer = setTimeout(tick, POLL_INTERVAL_MS * 2)
+    }
+
+    tick()
+    pollingStopRef.current = () => {
+      let _ = active
+      active = false
+      if (timer) clearTimeout(timer)
     }
   }
-
-  tick()
-  pollingStopRef.current = () => { active = false; if (timer) clearTimeout(timer) }
-}
-
   const stopPollingResults = () => pollingStopRef.current?.()
 
   const getCurrentPositionAsync = (opts?: PositionOptions) =>
@@ -316,70 +318,71 @@ const startPollingResults = (scheduleId: string) => {
       navigator.geolocation.getCurrentPosition(resolve, reject, opts)
     })
 
-  /** 업데이트 트리거: 객체 바디만 POST, runId는 헤더로(서버가 원하면 사용) */
-  // BEFORE: const triggerRecommendUpdate = async (scheduleId: string, runId: string) => {
-const triggerRecommendUpdate = async (scheduleId: string) => {
-  // 위치 먼저
-  const pos = await getCurrentPositionAsync({
-    enableHighAccuracy: true,
-    timeout: 10000,
-    maximumAge: 0,
-  })
+  /** 업데이트 트리거: 같은 runId로 POST */
+  const triggerRecommendUpdate = async (scheduleId: string) => {
+    const pos = await getCurrentPositionAsync({
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0,
+    })
 
-  // ★ ref에서 읽기
-  const runId = currentRunIdRef.current || genRunId()
+    const runId = currentRunIdRef.current || genRunId()
+    currentRunIdRef.current = runId
+    setLastRunId(scheduleId, runId)
 
-  const payload = {
-    scheduleId,
-    clientNowIso: new Date().toISOString(),
-    currentLat: pos.coords.latitude,
-    currentLng: pos.coords.longitude,
-    runId,
+    const payload = {
+      scheduleId,
+      clientNowIso: new Date().toISOString(),
+      currentLat: pos.coords.latitude,
+      currentLng: pos.coords.longitude,
+      runId,
+    }
+    await api.post(RECOMMEND_SEND_URL, payload)
   }
-  await api.post(RECOMMEND_SEND_URL, payload)
-}
-
 
   const handleUpdate = async () => {
-  if (!vm?.scheduleId) {
-    alert("스케줄을 먼저 선택해주세요.")
-    return
-  }
-
-  // ETA 선검사 (보정 로직 기존 유지)
-  if (vm.calculatedArrivalTime) {
-    const anchoredEta = anchorToScheduleDay(vm.calculatedArrivalTime, vm.departureTime)
-    if (anchoredEta && Date.now() > anchoredEta.getTime()) {
-      alert("도착 예상 시간을 이미 지났습니다. 추천 업데이트 요청을 보낼 수 없어요.")
+    if (!vm?.scheduleId) {
+      alert("스케줄을 먼저 선택해주세요.")
       return
     }
+
+    // ETA 선검사 (출발보다 이르면 다음날로 보정)
+    if (vm.calculatedArrivalTime) {
+      const anchoredEta = anchorToScheduleDay(vm.calculatedArrivalTime, vm.departureTime)
+      if (anchoredEta && Date.now() > anchoredEta.getTime()) {
+        alert("도착 예상 시간을 이미 지났습니다. 추천 업데이트 요청을 보낼 수 없어요.")
+        return
+      }
+    }
+
+    try {
+      setUpdating(true)
+      setIsPopupOpen(true)
+      setCurrentPopup("processing")
+
+      stopPollingResults()
+      currentRunIdRef.current = genRunId()
+      setLastRunId(vm.scheduleId, currentRunIdRef.current)
+
+      startPollingResults(vm.scheduleId)
+      await triggerRecommendUpdate(vm.scheduleId)
+    } catch (e: any) {
+      const code = typeof e?.code === "number" ? e.code : 0
+      const msg =
+        code === 1
+          ? "위치 정보 접근 권한이 거부되었습니다. 설정에서 권한을 허용해주세요."
+          : code === 2
+          ? "현재 위치를 파악할 수 없습니다."
+          : code === 3
+          ? "위치 정보를 가져오는 데 시간이 초과되었습니다."
+          : e?.message || "업데이트 요청 중 오류가 발생했습니다."
+      console.error("[RecommendUpdate] failed:", e)
+      alert(msg)
+      setUpdating(false)
+      stopPollingResults()
+      setIsPopupOpen(false)
+    }
   }
-
-  try {
-    setUpdating(true)
-    setIsPopupOpen(true)
-    setCurrentPopup("processing")
-
-    // ★ 이전 폴링 종료 후 새 runId 발급
-    stopPollingResults()
-    const runId = genRunId()
-    currentRunIdRef.current = runId
-
-    // ★ 폴링 시작(이제 내부에서 ref의 runId 사용)
-    startPollingResults(vm.scheduleId)
-
-    // ★ 같은 runId로 POST (trigger 내부에서 ref 사용)
-    await triggerRecommendUpdate(vm.scheduleId)
-    // 완료 전환은 폴링에서 처리
-  } catch (err: any) {
-    console.error("[RecommendUpdate] failed:", err)
-    alert(err?.message || "업데이트 요청 중 오류가 발생했습니다.")
-    setUpdating(false)
-    stopPollingResults()
-    setIsPopupOpen(false)
-  }
-}
-
 
   const timelineItems: TimelineItem[] = useMemo(() => {
     if (!vm) return []
@@ -395,12 +398,12 @@ const triggerRecommendUpdate = async (scheduleId: string) => {
       })
     }
 
+    // ★ 업데이트 항목: 시간만, 시각적 구분을 위해 보라색 + 배지
     vm.updates?.forEach((u) => {
       items.push({
         type: "update",
         time: u.time,
         title: "추천 업데이트",
-        description: u.name ? `도착지: ${u.name}` : undefined,
         icon: "업뎃",
         color: "purple",
       })
@@ -484,9 +487,7 @@ const triggerRecommendUpdate = async (scheduleId: string) => {
             <div className="bg-white rounded-lg p-4 shadow-sm">
               {error || timelineItems.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-gray-600 mb-4">
-                    {error ?? "스케줄 정보가 없습니다. 다시 선택해주세요."}
-                  </p>
+                  <p className="text-gray-600 mb-4">{error ?? "스케줄 정보가 없습니다. 다시 선택해주세요."}</p>
                   <Button
                     onClick={() => router.push("/schedule/")}
                     className="bg-blue-500 hover:bg-blue-600 text-white"
@@ -500,7 +501,11 @@ const triggerRecommendUpdate = async (scheduleId: string) => {
                     <div
                       key={index}
                       className={`flex items-center gap-3 ${
-                        item.type === "restaurant" ? "bg-orange-50 rounded-lg p-3 -mx-3" : ""
+                        item.type === "restaurant"
+                          ? "bg-orange-50 rounded-lg p-3 -mx-3"
+                          : item.type === "update"
+                          ? "bg-purple-50 rounded-lg p-3 -mx-3"
+                          : ""
                       }`}
                     >
                       <div
@@ -512,20 +517,18 @@ const triggerRecommendUpdate = async (scheduleId: string) => {
                             : item.color === "orange"
                             ? "bg-orange-500"
                             : item.color === "purple"
-                            ? "bg-purple-100"
+                            ? "bg-purple-500"
                             : "bg-green-100"
                         } rounded-full flex items-center justify-center`}
                       >
                         <span
                           className={`text-sm font-medium ${
-                            item.color === "orange"
+                            item.color === "orange" || item.color === "purple"
                               ? "text-white"
                               : item.color === "red"
                               ? "text-red-600"
                               : item.color === "blue"
                               ? "text-blue-600"
-                              : item.color === "purple"
-                              ? "text-purple-600"
                               : "text-green-600"
                           }`}
                         >
@@ -536,7 +539,14 @@ const triggerRecommendUpdate = async (scheduleId: string) => {
                         <p className="text-sm text-gray-500">
                           {item.time ? toKoreanAmPm(item.time) : "시간 미정"}
                         </p>
-                        <p className="font-medium">{item.title}</p>
+                        <p className="font-medium">
+                          {item.title}
+                          {item.type === "update" && (
+                            <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-purple-600 text-white align-middle">
+                              업데이트
+                            </span>
+                          )}
+                        </p>
 
                         {item.type === "restaurant" && (
                           <>
@@ -556,10 +566,6 @@ const triggerRecommendUpdate = async (scheduleId: string) => {
                               </div>
                             )}
                           </>
-                        )}
-
-                        {item.type === "update" && item.description && (
-                          <p className="text-sm text-gray-600">{item.description}</p>
                         )}
                       </div>
                     </div>
@@ -584,11 +590,7 @@ const triggerRecommendUpdate = async (scheduleId: string) => {
             }}
             scheduleTitle={vm?.destination?.name || vm?.departure?.name || "스케줄"}
             timelineItems={[]}
-            statusText={
-              currentPopup === "processing"
-                ? "맞춤 식당 추천 검색 중..."
-                : "맞춤 식당 추천 완료!"
-            }
+            statusText={currentPopup === "processing" ? "맞춤 식당 추천 검색 중..." : "맞춤 식당 추천 완료!"}
             isProcessing={currentPopup === "processing"}
           />
           <RecommendationReadyPopup
