@@ -326,9 +326,9 @@ export default function ScheduleSummaryScreen() {
       clientNowIso: new Date().toISOString(),
       currentLat: pos.coords.latitude,
       currentLng: pos.coords.longitude,
+      runId,
     }
     await api.post(RECOMMEND_SEND_URL, payload, {
-      headers: { "x-run-id": runId },
     })
   }
 
@@ -352,10 +352,15 @@ export default function ScheduleSummaryScreen() {
       setIsPopupOpen(true)
       setCurrentPopup("processing")
 
-      const runId = (typeof crypto !== "undefined" && "randomUUID" in crypto)
-        ? crypto.randomUUID()
-        : String(Date.now())
-      currentRunIdRef.current = runId
+      const runId = new Intl.DateTimeFormat("ko-KR", {
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+  timeZone: "Asia/Seoul",
+})
+  .format(new Date())
+  .replace(":", "")
+currentRunIdRef.current = runId
 
       startPollingResults(vm.scheduleId, runId)
       await triggerRecommendUpdate(vm.scheduleId, runId)
