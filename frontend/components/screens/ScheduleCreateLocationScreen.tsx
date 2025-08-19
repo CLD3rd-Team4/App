@@ -215,6 +215,12 @@ export default function ScheduleCreateLocationScreen({
   // 완료 처리
   const handleComplete = async () => {
     if (formData && formData.departure && formData.destination && !isLoading) {
+      // 경유지 선택 유효성 검사
+      if (formData.waypoints.some(wp => wp === null)) {
+        alert("주소를 검색하여 모든 경유지를 입력해주세요.");
+        return;
+      }
+
       // 위치 중복 유효성 검사
       const allLocations = [
         formData.departure,
@@ -333,7 +339,7 @@ export default function ScheduleCreateLocationScreen({
                   size="sm"
                   variant="ghost"
                   className="p-2 text-blue-600 hover:bg-blue-50 mr-2"
-                  disabled={(formData?.waypoints?.length || 0) >= 3}
+                  disabled={(formData?.waypoints?.length || 0) >= 2}
                 >
                   <Plus className="w-4 h-4" />
                 </Button>
