@@ -403,7 +403,7 @@ export default function ScheduleSummaryScreen() {
       items.push({
         type: "update",
         time: u.time,
-        title: "추천 업데이트",
+        title: "위치 갱신",
         icon: "업뎃",
         color: "purple",
       })
