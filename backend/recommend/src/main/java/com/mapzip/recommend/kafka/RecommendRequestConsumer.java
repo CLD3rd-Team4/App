@@ -14,6 +14,7 @@ import com.mapzip.recommend.mapper.RecommendRequestMapper;
 import com.mapzip.recommend.mapper.TmapRequestMapper;
 import com.mapzip.recommend.mapper.TmapResultMapper;
 import com.mapzip.recommend.mock.MockTmapScheduleRequestBuilder;
+import com.mapzip.recommend.service.CleanupDbService;
 import com.mapzip.recommend.service.KakaoApiService;
 import com.mapzip.recommend.service.RecommendRedisStoreService;
 import com.mapzip.recommend.service.RecommendService;
@@ -53,6 +54,7 @@ public class RecommendRequestConsumer {
     private final ScheduleDetailCache scheduleDetailCache;
     private final RecommendRedisStoreService recommendRedisStoreService;
     private final UpdateScheduleRequestBuilder updateScheduleRequestBuilder;
+    private final CleanupDbService cleanupDbService;
 
     private static final String NEXT_TOPIC = "recommend-result";
 
@@ -104,6 +106,8 @@ public class RecommendRequestConsumer {
 					IsUpdate,
 					runId
 			);
+            // 다른 스케줄 valkey에서 정리 
+            cleanupDbService.cleanupUserKeysExceptSchedule(recommendResultDto.getUserId(),recommendResultDto.getScheduleId());
             // scheduleId를 key, userId를 value로 다음 토픽으로 전송
             kafkaTemplate.send("recommend-result", recommendResultDto.getScheduleId(), recommendResultDto.getUserId());
             log.info("➡ recommend-result 발행 완료 ");
