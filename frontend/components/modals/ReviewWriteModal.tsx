@@ -101,6 +101,9 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
         restaurant.addressName || restaurant.address || ''
       )
       
+      console.log('OCR 전체 응답:', result)
+      console.log('OCR 추출된 방문날짜:', result.visitDate)
+      
       // OCR 결과에서 추출한 식당명, 주소, 방문날짜로 자동 업데이트
       if (result.restaurantName && result.restaurantName.trim()) {
         setRestaurantName(result.restaurantName.trim())
@@ -114,12 +117,12 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
         if (formattedDate) {
           setVisitDate(formattedDate)
         } else {
-          // OCR 날짜 변환에 실패한 경우 오늘 날짜로 설정
-          setVisitDate(new Date().toISOString().split("T")[0])
+          // OCR 날짜 변환에 실패한 경우 사용자가 직접 입력하도록 비워둠
+          setVisitDate("")
         }
       } else {
-        // OCR에서 날짜를 추출하지 못한 경우 오늘 날짜로 설정
-        setVisitDate(new Date().toISOString().split("T")[0])
+        // OCR에서 날짜를 추출하지 못한 경우 사용자가 직접 입력하도록 비워둠
+        setVisitDate("")
       }
       
       setOcrResult(result)

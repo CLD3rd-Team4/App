@@ -44,7 +44,7 @@ export default function VisitedRestaurantsScreen() {
 
   const loadCompletedReviews = async () => {
     try {
-      const response = await reviewApi.getUserReviews(1, 10)
+      const response = await reviewApi.getUserReviews(0, 10) // page=0부터 시작
       console.log('작성된 리뷰 데이터:', response) // 디버깅용
       setCompletedReviews(response.data || [])
     } catch (error: any) {
