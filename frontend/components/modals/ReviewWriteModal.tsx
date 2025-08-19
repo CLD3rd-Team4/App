@@ -35,7 +35,15 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
 
   // OCR 날짜를 HTML date input 형식(yyyy-MM-dd)으로 변환
   const formatDateForInput = (ocrDate: string): string | null => {
+    console.log('OCR 날짜 변환 시도:', ocrDate)
+    
     try {
+      // 이미 올바른 형식인지 확인 (yyyy-MM-dd)
+      if (/^\d{4}-\d{2}-\d{2}$/.test(ocrDate)) {
+        console.log('이미 올바른 형식:', ocrDate)
+        return ocrDate
+      }
+      
       // 다양한 날짜 형식 처리: 2024-08-11, 2024/08/11, 24-08-11, 08/11/2024 등
       const patterns = [
         /(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/, // 2024-08-11, 2024/08/11
@@ -43,33 +51,42 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
         /(\d{2})[-\/.](\d{1,2})[-\/.](\d{1,2})/, // 24-08-11, 24/08/11
       ]
       
-      for (let pattern of patterns) {
+      for (let i = 0; i < patterns.length; i++) {
+        const pattern = patterns[i]
         const match = ocrDate.match(pattern)
+        console.log(`패턴 ${i} 매칭 결과:`, match)
+        
         if (match) {
           let year: string, month: string, day: string
           
-          if (pattern === patterns[0]) { // yyyy-MM-dd 형식
+          if (i === 0) { // yyyy-MM-dd 형식
             [, year, month, day] = match
-          } else if (pattern === patterns[1]) { // MM/dd/yyyy 형식
+          } else if (i === 1) { // MM/dd/yyyy 형식
             [, month, day, year] = match
-          } else if (pattern === patterns[2]) { // yy-MM-dd 형식
+          } else if (i === 2) { // yy-MM-dd 형식
             [, year, month, day] = match
             year = parseInt(year) > 50 ? `19${year}` : `20${year}` // 50보다 크면 1900년대, 작으면 2000년대
-          } else {
-            continue // 매칭되지 않은 경우 다음 패턴으로
           }
           
+          console.log(`추출된 날짜 요소: year=${year}, month=${month}, day=${day}`)
+          
           // 모든 값이 존재하는지 확인
-          if (!year || !month || !day) continue
+          if (!year || !month || !day) {
+            console.log('날짜 요소 누락, 다음 패턴 시도')
+            continue
+          }
           
           // 월과 일을 2자리로 패딩
           month = month.padStart(2, '0')
           day = day.padStart(2, '0')
           
-          return `${year}-${month}-${day}`
+          const result = `${year}-${month}-${day}`
+          console.log('최종 변환된 날짜:', result)
+          return result
         }
       }
       
+      console.log('모든 패턴 매칭 실패')
       return null
     } catch (error) {
       console.error('날짜 변환 오류:', error)
@@ -112,16 +129,21 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
         setRestaurantAddress(result.address.trim())
       }
       if (result.visitDate && result.visitDate.trim()) {
+        console.log('OCR 날짜 변환 전:', result.visitDate.trim())
         // OCR에서 추출한 날짜를 yyyy-MM-dd 형식으로 변환
         const formattedDate = formatDateForInput(result.visitDate.trim())
+        console.log('OCR 날짜 변환 후:', formattedDate)
         if (formattedDate) {
           setVisitDate(formattedDate)
         } else {
-          // OCR 날짜 변환에 실패한 경우 사용자가 직접 입력하도록 비워둠
-          setVisitDate("")
+          // 변환 실패 시 원본 날짜로라도 설정 시도
+          const rawDate = result.visitDate.trim()
+          console.log('원본 날짜로 설정 시도:', rawDate)
+          setVisitDate(rawDate)
         }
       } else {
         // OCR에서 날짜를 추출하지 못한 경우 사용자가 직접 입력하도록 비워둠
+        console.log('OCR에서 날짜 추출되지 않음')
         setVisitDate("")
       }
       
@@ -354,8 +376,8 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
                 )}
                 <p>
                   <span className="font-medium">검증결과:</span>
-                  <span className={ocrResult.isValid ? "text-green-600" : "text-red-600"}>
-                    {ocrResult.isValid ? " 통과" : " 실패"}
+                  <span className={ocrResult.valid ? "text-green-600" : "text-red-600"}>
+                    {ocrResult.valid ? " 통과" : " 실패"}
                   </span>
                   <span className="text-gray-500 ml-2">
                     (신뢰도: {Math.round((ocrResult.confidence || 0) * 100)}%)
@@ -383,11 +405,11 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
                 disabled={!restaurantName.trim() || !restaurantAddress.trim()}
                 className="flex-1 bg-blue-500 hover:bg-blue-600 text-white disabled:bg-gray-400"
               >
-                다음 {!ocrResult.isValid && '(수동 입력)'}
+                다음 {!ocrResult.valid && '(수동 입력)'}
               </Button>
             </div>
             
-            {!ocrResult.isValid && (
+            {!ocrResult.valid && (
               <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                 <p className="text-sm text-yellow-800">
                   <strong>참고:</strong> OCR 검증이 실패했지만, 정보를 수정하여 계속 진행할 수 있습니다.
