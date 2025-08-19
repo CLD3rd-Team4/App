@@ -36,6 +36,9 @@ service RecommendService {
 
 message RecommendRequest {
   string scheduleId = 1;
+  optional string clientNowIso = 2; //추천 업데이트 시간
+  optional double currentLat = 3;   // 현재 위도
+  optional double currentLng = 4;  //현재 경도 
 }
 
 
