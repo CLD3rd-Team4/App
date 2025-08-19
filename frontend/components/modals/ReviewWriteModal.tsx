@@ -35,14 +35,13 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
 
   // OCR 날짜를 HTML date input 형식(yyyy-MM-dd)으로 변환
   const formatDateForInput = (ocrDate: string): string | null => {
-    console.log('OCR 날짜 변환 시도:', ocrDate)
-    
     try {
-      // 이미 올바른 형식인지 확인 (yyyy-MM-dd)
+      // 이미 올바른 형식인지 확인 (yyyy-MM-dd) - 조기 반환으로 로그 최소화
       if (/^\d{4}-\d{2}-\d{2}$/.test(ocrDate)) {
-        console.log('이미 올바른 형식:', ocrDate)
         return ocrDate
       }
+      
+      console.log('OCR 날짜 변환 시도:', ocrDate)
       
       // 다양한 날짜 형식 처리: 2024-08-11, 2024/08/11, 24-08-11, 08/11/2024 등
       const patterns = [
@@ -54,7 +53,6 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
       for (let i = 0; i < patterns.length; i++) {
         const pattern = patterns[i]
         const match = ocrDate.match(pattern)
-        console.log(`패턴 ${i} 매칭 결과:`, match)
         
         if (match) {
           let year: string = '', month: string = '', day: string = ''
@@ -68,11 +66,8 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
             year = parseInt(year) > 50 ? `19${year}` : `20${year}` // 50보다 크면 1900년대, 작으면 2000년대
           }
           
-          console.log(`추출된 날짜 요소: year=${year}, month=${month}, day=${day}`)
-          
           // 모든 값이 존재하는지 확인
           if (!year || !month || !day) {
-            console.log('날짜 요소 누락, 다음 패턴 시도')
             continue
           }
           
@@ -80,9 +75,7 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
           month = month.padStart(2, '0')
           day = day.padStart(2, '0')
           
-          const result = `${year}-${month}-${day}`
-          console.log('최종 변환된 날짜:', result)
-          return result
+          return `${year}-${month}-${day}`
         }
       }
       

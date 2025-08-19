@@ -119,6 +119,7 @@ public class ReviewService {
             review.setContent(content);
             review.setImageUrls(imageUrls);
             review.setIsVerified(isVerified);
+            review.setReviewStatus("PUBLISHED");  // 기본 상태 설정
             review.setCreatedAt(Instant.now());
             review.setUpdatedAt(Instant.now());
             
