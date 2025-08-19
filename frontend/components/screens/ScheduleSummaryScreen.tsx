@@ -19,6 +19,10 @@ const genRunId = () => {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID()
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 }
+const LS_RUN_PREFIX = "recommend:lastRun:";
+const setLastRunId = (scheduleId: string, runId: string) => {
+  try { localStorage.setItem(`${LS_RUN_PREFIX}${scheduleId}`, runId) } catch {}
+};
 
 type TimelineItem = {
   type: "departure" | "waypoint" | "destination" | "restaurant" | "update"
@@ -327,6 +331,7 @@ export default function ScheduleSummaryScreen() {
     // ref에서 최신 runId 사용(없으면 즉시 생성해서 사용)
     const runId = currentRunIdRef.current || genRunId()
     currentRunIdRef.current = runId
+    setLastRunId(scheduleId, runId)
 
     const payload = {
       scheduleId,
@@ -361,6 +366,9 @@ export default function ScheduleSummaryScreen() {
       // 이전 폴링 종료 후 새 runId 발급 & 저장
       stopPollingResults()
       currentRunIdRef.current = genRunId()
+      setLastRunId(vm.scheduleId, currentRunIdRef.current)
+      
+      
 
       // 폴링 시작(내부에서 ref의 runId 사용)
       startPollingResults(vm.scheduleId)
