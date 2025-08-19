@@ -57,7 +57,7 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
         console.log(`패턴 ${i} 매칭 결과:`, match)
         
         if (match) {
-          let year: string, month: string, day: string
+          let year: string = '', month: string = '', day: string = ''
           
           if (i === 0) { // yyyy-MM-dd 형식
             [, year, month, day] = match

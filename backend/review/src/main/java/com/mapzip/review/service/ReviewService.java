@@ -211,14 +211,14 @@ public class ReviewService {
         Optional<ReviewEntity> existingReview = reviewRepository.findByRestaurantIdAndReviewId(restaurantId, reviewId);
         
         if (existingReview.isEmpty()) {
-            throw new RuntimeException("리뷰를 찾을 수 없습니다.");
+            throw new IllegalStateException("리뷰를 찾을 수 없습니다.");
         }
         
         ReviewEntity review = existingReview.get();
         
         // 작성자 검증
         if (!review.getUserId().equals(userId)) {
-            throw new RuntimeException("리뷰 삭제 권한이 없습니다.");
+            throw new SecurityException("리뷰 삭제 권한이 없습니다.");
         }
         
         reviewRepository.deleteByRestaurantIdAndReviewId(restaurantId, reviewId);

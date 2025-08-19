@@ -143,9 +143,27 @@ export default function ReviewDetailPageClient() {
   }
 
   const handleDelete = async () => {
+    if (!review?.restaurantId || !review?.id) {
+      alert("리뷰 정보가 올바르지 않습니다.");
+      return;
+    }
+
     if (confirm("리뷰를 삭제하시겠습니까?")) {
-      // TODO: 실제 삭제 API 호출
-      router.push("/visited/")
+      try {
+        setIsLoading(true);
+        await reviewApi.deleteReview(review.restaurantId, review.id);
+        alert("리뷰가 삭제되었습니다.");
+        router.push("/visited/");
+      } catch (error: any) {
+        console.error("리뷰 삭제 실패:", error);
+        if (error.message.includes('권한이 없습니다')) {
+          alert('삭제 권한이 없습니다.');
+        } else {
+          alert('리뷰 삭제에 실패했습니다. 다시 시도해주세요.');
+        }
+      } finally {
+        setIsLoading(false);
+      }
     }
   }
 

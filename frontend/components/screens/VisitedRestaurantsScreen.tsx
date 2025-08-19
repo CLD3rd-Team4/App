@@ -4,11 +4,41 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useRouter } from "next/navigation"
-import { Camera, Star } from "lucide-react"
+import { Camera, Star, MapPin } from "lucide-react"
 import BottomNavigation from "@/components/common/BottomNavigation"
 import { visitedRestaurantApi, reviewApi } from "@/services/api"
 import type { VisitedRestaurant } from "@/types"
 import { ReviewWriteModal } from "@/components/modals/ReviewWriteModal"
+
+// 주소에서 동네 이름 추출 헬퍼 함수
+const extractDong = (addr?: string) => {
+  if (!addr) return ""
+  const tokens = addr.split(/\s+/)
+  const dongLike = [...tokens].reverse().find(t => /(동|가|읍|면|리)$/.test(t))
+  return dongLike || tokens[tokens.length - 2] || tokens[tokens.length - 1] || ""
+}
+
+// 사진이 없을 때 표시할 PIN 타일 컴포넌트
+const PinTile = ({ addressName, size = "small" }: { addressName?: string, size?: "small" | "large" }) => {
+  const dong = extractDong(addressName)
+  const sizeClasses = size === "large" 
+    ? "w-20 h-20" 
+    : "w-full h-full"
+  const iconSize = size === "large" 
+    ? "w-7 h-7" 
+    : "w-6 h-6"
+  
+  return (
+    <div className={`${sizeClasses} rounded-lg bg-blue-100 flex flex-col items-center justify-center relative overflow-hidden`}>
+      <MapPin className={`${iconSize} text-blue-600`} />
+      {dong ? (
+        <span className="absolute bottom-1 text-[10px] px-1 py-0.5 rounded-full bg-white/90 text-gray-700">
+          {dong}
+        </span>
+      ) : null}
+    </div>
+  )
+}
 
 export default function VisitedRestaurantsScreen() {
   const router = useRouter()
@@ -100,9 +130,9 @@ export default function VisitedRestaurantsScreen() {
     loadCompletedReviews()
   }
 
-  const handleReviewClick = (reviewId: string) => {
-    // 정적 환경에서 안전한 라우팅을 위해 trailing slash 추가
-    router.push(`/review/detail/${reviewId}/`)
+  const handleReviewClick = (review: any) => {
+    // 리뷰 상세 페이지로 이동 (기존 URL 구조 유지)
+    router.push(`/review/detail/${review.reviewId}/`)
   }
 
   const handleDeleteReview = async (restaurantId: string, reviewId: string) => {
@@ -170,11 +200,17 @@ export default function VisitedRestaurantsScreen() {
                 {visitedRestaurants.map((restaurant) => (
                   <div key={restaurant.id} className="bg-white p-4 rounded-lg shadow-sm">
                     <div className="flex items-start gap-3">
-                      <img
-                        src={restaurant.image || "/placeholder.svg?height=50&width=50&query=restaurant"}
-                        alt={restaurant.placeName || '식당'}
-                        className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
-                      />
+                      {restaurant.image ? (
+                        <img
+                          src={restaurant.image}
+                          alt={restaurant.placeName || '식당'}
+                          className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 flex-shrink-0">
+                          <PinTile addressName={restaurant.addressName} size="large" />
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0">
                         <h3 className="font-medium mb-1">{restaurant.placeName}</h3>
                         <p className="text-sm text-gray-500 mb-2">{restaurant.addressName}</p>
@@ -227,7 +263,7 @@ export default function VisitedRestaurantsScreen() {
                       >
                         <div 
                           className="cursor-pointer"
-                          onClick={() => handleReviewClick(review.reviewId || index)}
+                          onClick={() => handleReviewClick(review)}
                         >
                         {review.imageUrls && review.imageUrls.length > 0 ? (
                           <img
@@ -236,8 +272,8 @@ export default function VisitedRestaurantsScreen() {
                             className="w-full h-16 object-cover rounded mb-2"
                           />
                         ) : (
-                          <div className="w-full h-16 bg-gray-200 rounded mb-2 flex items-center justify-center">
-                            <span className="text-xs text-gray-500">이미지 없음</span>
+                          <div className="w-full h-16 rounded mb-2 flex items-center justify-center">
+                            <PinTile addressName={review.restaurantAddress} />
                           </div>
                         )}
                         <div className="flex items-center justify-between">
