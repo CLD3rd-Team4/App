@@ -52,7 +52,8 @@ public class ReviewClientService {
             log.info("Successfully stored {} places for review for user: {}", placeInfos.size(), userId);
         } catch (Exception e) {
             log.error("Failed to store places for review for user: {}", userId, e);
-            throw new RuntimeException("리뷰 서버 연동 실패: " + e.getMessage(), e);
+            // RuntimeException 대신 로그만 남기고 계속 진행
+            // throw new RuntimeException("리뷰 서버 연동 실패: " + e.getMessage(), e);
         }
     }
 
