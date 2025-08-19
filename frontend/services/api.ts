@@ -550,6 +550,7 @@ export const reviewApi = {
         message: response.data.message,
         review: response.data.reviewId ? {
           id: response.data.reviewId,
+          reviewId: response.data.reviewId,
           restaurantId: reviewData.restaurantId,
           restaurantName: reviewData.restaurantName,
           restaurantAddress: reviewData.restaurantAddress,
@@ -563,7 +564,7 @@ export const reviewApi = {
           updatedAt: new Date().toISOString()
         } : null,
         ocrResult: { 
-          isValid: response.data.isVerified || false,
+          valid: response.data.isVerified || false,
           restaurantName: reviewData.restaurantName,
           address: reviewData.restaurantAddress,
           visitDate: reviewData.visitDate || '',
