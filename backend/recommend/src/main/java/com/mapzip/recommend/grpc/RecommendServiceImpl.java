@@ -146,6 +146,7 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 			StreamObserver<GetRecommendationResultsResponse> responseObserver) {
 		final String userId = GrpcHeaderConfig.UserIdContext.USER_ID.get();
 		final String scheduleId = request.getScheduleId();
+		final String runId = request.getRunId();
 
 		// 0) DB에서 '이미 선택한 식당' 조회 (userId + scheduleId)
 		List<RecommendationSelectionEntity> selectedRows = selectionRepo.findByUserIdAndScheduleId(userId, scheduleId);
@@ -264,6 +265,7 @@ public class RecommendServiceImpl extends RecommendServiceGrpc.RecommendServiceI
 		GetRecommendationResultsResponse response = GetRecommendationResultsResponse.newBuilder()
 				.addAllSlotRecommendations(candidateSlots) // 새 후보
 				.addAllSelectedSlotPlaces(selectedSlots) // 이전 선택
+				.setRunId(runId)
 				.setStatus(hasAny ? "OK" : "PENDING")
 				.setMessage(hasAny ? "추천 결과를 성공적으로 불러왔습니다." : "추천 결과가 아직 준비되지 않았습니다.").build();
 

@@ -9,6 +9,8 @@ import api from "@/lib/interceptor"
 import type { Restaurant } from "@/types"
 import { MealType } from "@/types"
 import useSchedule from "@/hooks/useSchedule"
+
+// 팝업
 import ScheduleProcessingPopup from "@/components/modals/ScheduleProcessingPopup"
 import RecommendationReadyPopup from "@/components/modals/RecommendationReadyPopup"
 
@@ -60,7 +62,6 @@ const RECOMMEND_RESULT_URL = "/recommend/result"
 type GetResultsResponse = {
   status: "PENDING" | "OK" | "ERROR" | string
   message?: string
-  // 백엔드가 runId를 내려주면 여기 비교해서 최신 요청만 OK로 인정
   runId?: string
   slotRecommendations?: Array<{
     slotId: string
@@ -73,7 +74,6 @@ type PopupType = "processing" | "recommendation_ready"
 /** "오전/오후 HH:mm" | "HH:mm" | ISO → Date(오늘 날짜) */
 const parseDisplayTimeToDate = (time?: string): Date | null => {
   if (!time || typeof time !== "string") return null
-
   const ampm = time.match(/(오전|오후)\s*(\d{1,2}):(\d{2})/)
   if (ampm) {
     const [, period, hhStr, mmStr] = ampm
@@ -136,7 +136,7 @@ const anchorToScheduleDay = (time?: string, departureTime?: string): Date | null
   if (tMin == null || depMin == null) return t
   if (tMin < depMin) {
     const anchored = new Date(t)
-    anchored.setDate(anchored.getDate() + 1) // 다음날
+    anchored.setDate(anchored.getDate() + 1)
     return anchored
   }
   return t
@@ -261,7 +261,7 @@ export default function ScheduleSummaryScreen() {
     return () => { mounted = false }
   }, [])
 
-  /** 폴링: 같은 scheduleId라도 runId가 일치할 때만 OK로 인정 */
+  /** 폴링: 같은 scheduleId라도 runId가 일치할 때만 OK로 인정(서버 미지원 시 무시) */
   const startPollingResults = (scheduleId: string, runId: string | null) => {
     let active = true
     let timer: any = null
@@ -270,12 +270,12 @@ export default function ScheduleSummaryScreen() {
       if (!active) return
       try {
         const params: any = { scheduleId }
-        if (runId) params.runId = runId // 백이 지원하면 비교, 아니면 무시됨
+        if (runId) params.runId = runId
         const res = await api.get<GetResultsResponse>(RECOMMEND_RESULT_URL, { params })
 
         if (res.data.status === "OK") {
-          // 백이 runId를 내려주면 일치할 때만 완료 처리
           if (runId && res.data.runId && res.data.runId !== runId) {
+            // 다른 요청의 완료 → 계속 대기
             timer = setTimeout(tick, POLL_INTERVAL_MS)
             return
           }
@@ -300,13 +300,27 @@ export default function ScheduleSummaryScreen() {
       navigator.geolocation.getCurrentPosition(resolve, reject, opts)
     })
 
-  /** 업데이트 트리거: runId 생성 → 헤더로 runId 전달(백 proto 수정 없이) */
+  /** 업데이트 트리거: 객체 바디만 POST, runId는 헤더로(서버가 원하면 사용) */
   const triggerRecommendUpdate = async (scheduleId: string, runId: string) => {
-    const pos = await getCurrentPositionAsync({
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 0,
-    })
+    // 1) 위치 먼저(에러는 여기서만 처리)
+    let pos: GeolocationPosition
+    try {
+      pos = await getCurrentPositionAsync({
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      })
+    } catch (e: any) {
+      const code = typeof e?.code === "number" ? e.code : 0
+      const msg =
+        code === 1 ? "위치 정보 접근 권한이 거부되었습니다. 설정에서 권한을 허용해주세요."
+      : code === 2 ? "현재 위치를 파악할 수 없습니다."
+      : code === 3 ? "위치 정보를 가져오는 데 시간이 초과되었습니다."
+      : (e?.message || "위치 정보를 가져오는 중 오류가 발생했습니다.")
+      throw new Error(msg)
+    }
+
+    // 2) POST 전송(axios가 Content-Type: application/json 자동 지정)
     const payload = {
       scheduleId,
       clientNowIso: new Date().toISOString(),
@@ -314,7 +328,7 @@ export default function ScheduleSummaryScreen() {
       currentLng: pos.coords.longitude,
     }
     await api.post(RECOMMEND_SEND_URL, payload, {
-      headers: { "x-run-id": runId }, // proto 수정 없이 요청 식별
+      headers: { "x-run-id": runId },
     })
   }
 
@@ -348,15 +362,7 @@ export default function ScheduleSummaryScreen() {
       // 완료 전환은 폴링이 담당
     } catch (err: any) {
       console.error("[RecommendUpdate] failed:", err)
-      if (err?.code === err?.PERMISSION_DENIED) {
-        alert("위치 정보 접근 권한이 거부되었습니다. 설정에서 권한을 허용해주세요.")
-      } else if (err?.code === err?.POSITION_UNAVAILABLE) {
-        alert("현재 위치를 파악할 수 없습니다.")
-      } else if (err?.code === err?.TIMEOUT) {
-        alert("위치 정보를 가져오는 데 시간이 초과되었습니다.")
-      } else {
-        alert(err?.message || "업데이트 요청 중 오류가 발생했습니다.")
-      }
+      alert(err?.message || "업데이트 요청 중 오류가 발생했습니다.")
       setUpdating(false)
       stopPollingResults()
       setIsPopupOpen(false)
@@ -428,7 +434,6 @@ export default function ScheduleSummaryScreen() {
       const d = anchorToScheduleDay(t, vm.departureTime)
       return d ? d.getTime() : Number.MAX_SAFE_INTEGER
     }
-
     return items.sort((a, b) => sortKey(a.time) - sortKey(b.time))
   }, [vm])
 
