@@ -137,8 +137,7 @@ public class ReviewEntity implements java.io.Serializable {
         this.isVerified = isVerified;
     }
 
-    @DynamoDbAttribute("created_at")
-    @DynamoDbSecondarySortKey(indexNames = {"UserIdIndex"})
+    @DynamoDbAttribute("created_at_instant")
     public Instant getCreatedAt() {
         return createdAt;
     }
@@ -147,9 +146,15 @@ public class ReviewEntity implements java.io.Serializable {
         this.createdAt = createdAt;
     }
     
-    // GSI를 위한 ISO 문자열 형태의 created_at
-    public String getCreatedAtString() {
+    // GSI를 위한 ISO 문자열 형태의 created_at (Terraform과 일치시킴)
+    @DynamoDbSecondarySortKey(indexNames = {"UserIdIndex", "StatusIndex", "RatingIndex", "RecommendationIndex", "AddressIndex"})
+    @DynamoDbAttribute("created_at")
+    public String getCreatedAtForGsi() {
         return createdAt != null ? createdAt.toString() : null;
+    }
+    
+    public void setCreatedAtForGsi(String createdAtForGsi) {
+        // DynamoDB Enhanced Client를 위한 setter (실제로는 사용하지 않음)
     }
     
     // 추천용 GSI를 위한 검증상태와 평점 결합 필드 (NPE 방지 강화)

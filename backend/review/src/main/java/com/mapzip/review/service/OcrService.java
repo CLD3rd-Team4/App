@@ -192,19 +192,25 @@ public class OcrService {
     }
     
     private String extractVisitDate(String text) {
+        logger.info("OCR 방문날짜 추출 시작. 입력 텍스트 길이: {}", text.length());
+        
         // 영수증에서 날짜 관련 키워드 근처에서 찾기
         String[] dateKeywords = {"일시", "날짜", "date", "시간", "방문일", "거래일", "승인일시"};
         String[] lines = text.split("\\n");
+        logger.info("텍스트를 {}줄로 분할함", lines.length);
         
         // 1차: 키워드가 포함된 줄에서 날짜 찾기
         for (String keyword : dateKeywords) {
             for (String line : lines) {
                 if (line.toLowerCase().contains(keyword.toLowerCase())) {
+                    logger.info("키워드 '{}' 발견된 줄: '{}'", keyword, line);
                     Matcher matcher = DATE_PATTERN.matcher(line);
                     if (matcher.find()) {
                         String dateStr = matcher.group(1);
+                        logger.info("키워드 줄에서 날짜 패턴 발견: '{}'", dateStr);
                         // 유효한 날짜인지 검증
                         if (isValidDate(dateStr)) {
+                            logger.info("유효한 날짜로 확인: '{}'", dateStr);
                             return dateStr;
                         }
                     }
@@ -213,17 +219,24 @@ public class OcrService {
         }
         
         // 2차: 전체 텍스트에서 가장 적절한 날짜 찾기 (최근 1개월 이내)
+        logger.info("2차 검색: 전체 텍스트에서 날짜 패턴 검색");
         List<String> allDates = new ArrayList<>();
         Matcher matcher = DATE_PATTERN.matcher(text);
         while (matcher.find()) {
             String dateStr = matcher.group(1);
+            logger.info("전체 텍스트에서 날짜 패턴 발견: '{}'", dateStr);
             if (isValidDate(dateStr) && isRecentDate(dateStr)) {
+                logger.info("유효하고 최근 날짜로 확인: '{}'", dateStr);
                 allDates.add(dateStr);
+            } else {
+                logger.info("유효하지 않거나 최근이 아닌 날짜: '{}'", dateStr);
             }
         }
         
+        logger.info("추출된 유효한 날짜 개수: {}", allDates.size());
+        
         // 가장 최근 날짜 반환 (영수증 특성상 최근 날짜가 방문일일 가능성 높음)
-        return allDates.stream()
+        String result = allDates.stream()
             .max((d1, d2) -> {
                 try {
                     LocalDate date1 = parseDate(d1);
@@ -237,6 +250,9 @@ public class OcrService {
                 return 0;
             })
             .orElse("");
+            
+        logger.info("최종 추출된 방문날짜: '{}'", result);
+        return result;
     }
     
     private boolean isValidDate(String dateStr) {
