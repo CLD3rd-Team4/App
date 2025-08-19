@@ -19,12 +19,14 @@ public class TmapRequestMapper {
             String clientNowIso,
             Double currentLat,
             Double currentLng,
-            boolean IsUpdate) {
+            boolean IsUpdate,
+            String runId) {
         
         TmapScheduleRequest request = new TmapScheduleRequest();
         request.setScheduleId(scheduleId);
         request.setUserId(userId);
         request.setDepartureTime(detail.getDepartureTime());
+        request.setRunId(runId);
 
         // 출발지 (double → String 변환)
         LocationDto departure = convertLocation(

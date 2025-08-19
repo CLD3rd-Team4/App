@@ -19,6 +19,7 @@ public class TmapScheduleRequest {
     private String userNote;
     private String purpose;
     private List<String> companions;
+    private String runId;
 
     // 도착 여유 시간
     private Integer arrivalBufferMinutes;

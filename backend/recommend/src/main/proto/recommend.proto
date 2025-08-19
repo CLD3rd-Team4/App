@@ -39,6 +39,7 @@ message RecommendRequest {
   optional string clientNowIso = 2; //추천 업데이트 시간
   optional double currentLat = 3;   // 현재 위도
   optional double currentLng = 4;  //현재 경도 
+  optional string runId = 5;
 }
 
 
@@ -75,7 +76,8 @@ message SubmitResponse {
 
 message GetRecommendationResultsRequest {
   string scheduleId = 1;
-  optional string runId = 2;
+  string runId=2;
+  
 }
 
 
@@ -104,7 +106,6 @@ message GetRecommendationResultsResponse {
   string status = 2;
   string message = 3;
   repeated SlotRecommendation selectedSlotPlaces = 4;
-  optional string runId = 5;
 }
 
 

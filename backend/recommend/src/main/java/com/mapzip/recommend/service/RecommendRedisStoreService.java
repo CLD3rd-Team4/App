@@ -37,7 +37,8 @@ public class RecommendRedisStoreService {
             List<String> slotIds,
             List<String> scheduledTimes,
             Map<String, Integer> slotMealTypeMap,
-            boolean isUpdate
+            boolean isUpdate,
+           String runId
     ) {
         try {
             JsonNode root = objectMapper.readTree(recommendPlaceListJson);
@@ -111,6 +112,11 @@ public class RecommendRedisStoreService {
                     );
                 }
             }
+            String lastRunKey = "recommend:run:last:" + scheduleId;
+            redis.opsForValue().set(lastRunKey, runId, secondsUntilMidnight, TimeUnit.SECONDS);
+
+            log.info("[Recommend][Redis] last run saved: key={}, runId={}, isUpdate={}",
+                    lastRunKey, runId, isUpdate);
         } catch (Exception e) {
             throw new RuntimeException("❌ Redis 추천 저장 중 오류 발생", e);
         }
