@@ -298,7 +298,6 @@ public class ReviewService {
         return reviewRepository.save(review);
     }
     
-    @Cacheable(value = "ocrResults", key = "T(java.util.Arrays).hashCode(#receiptImage) + '_' + #expectedRestaurantName")
     public OcrResultDto verifyReceipt(byte[] receiptImage, String expectedRestaurantName, String expectedAddress) {
         logger.info("Processing OCR for restaurant: {}", expectedRestaurantName);
         
