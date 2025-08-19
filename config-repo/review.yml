@@ -76,7 +76,7 @@ google:
   cloud:
     vision:
       # 서비스 계정 키 JSON 전체를 암호화하여 저장
-      api-key: '{cipher}e7c473e64683cc9d6c319202a7977bb709e54167b83ea3b2df71bec75b10d577'
+      api-key: '{cipher}798530495fe60a86b7bd81222828d6e3a13431e512e4c5a66f521bb86f202aee'
       # 이거아니면 또는 Kubernetes Secret을 통한 파일 경로 방식도 가능
       # credentials-path: ${GOOGLE_APPLICATION_CREDENTIALS:/var/secrets/google/service-account-key.json}
 
