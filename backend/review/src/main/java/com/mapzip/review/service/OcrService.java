@@ -48,15 +48,7 @@ public class OcrService {
                 // Config Server 암호화된 서비스 계정 키 JSON 사용
                 try {
                     logger.info("Config Server 인증 방식 사용");
-                    logger.info("Service account key length: {}, full value: [{}]", 
-                               serviceAccountKey.length(), serviceAccountKey);
-                    
-                    // JSON 형식인지 간단 체크
-                    if (!serviceAccountKey.trim().startsWith("{")) {
-                        logger.error("Service account key is not valid JSON format. Key is still encrypted or malformed: [{}]", serviceAccountKey);
-                        throw new IllegalStateException("Config Server에서 받은 서비스 계정 키가 유효한 JSON 형식이 아닙니다. 복호화가 실패했을 수 있습니다.");
-                    }
-                    
+                    logger.debug("Service account key received from config server");
                     credentials = ServiceAccountCredentials.fromStream(
                         new ByteArrayInputStream(serviceAccountKey.getBytes())
                     );
@@ -388,4 +380,5 @@ public class OcrService {
         logger.warn("지원되지 않는 날짜 형식: {}", cleanDate);
         return null;
     }
+    
 }
