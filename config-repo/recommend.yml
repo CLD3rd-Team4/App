@@ -62,6 +62,7 @@ spring:
       group-id: recommend-service
       auto-offset-reset: earliest
       max-partition-fetch-bytes: 5242880
+      
 
   cloud:
     kubernetes:
