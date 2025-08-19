@@ -133,6 +133,8 @@ public class XssProtectionFilter extends AbstractGatewayFilterFactory<XssProtect
             return sanitizeJsonBody(body);
         } else if (MediaType.APPLICATION_FORM_URLENCODED.isCompatibleWith(contentType)) {
             return sanitizeFormBody(body);
+        } else if (MediaType.MULTIPART_FORM_DATA.isCompatibleWith(contentType)) {
+            return sanitizeMultipartBody(body, contentType);
         }
 
         return sanitizeXss(body);
@@ -170,6 +172,63 @@ public class XssProtectionFilter extends AbstractGatewayFilterFactory<XssProtect
         } catch (Exception e) {
             log.warn("[XSS Filter] Form parsing failed, fallback to text sanitize: {}", e.getMessage());
             return sanitizeXss(formBody);
+        }
+    }
+
+    private String sanitizeMultipartBody(String body, MediaType contentType) {
+        try {
+            log.debug("[XSS Filter] Processing multipart body");
+            String boundary = contentType.getParameter("boundary");
+            if (boundary == null) {
+                log.warn("[XSS Filter] No boundary found in multipart content");
+                return body;
+            }
+            log.debug("[XSS Filter] Boundary: {}", boundary);
+
+            String[] parts = body.split("--" + boundary);
+            log.debug("[XSS Filter] Found {} parts in multipart body", parts.length);
+            StringBuilder result = new StringBuilder();
+
+            for (int i = 0; i < parts.length; i++) {
+                String part = parts[i];
+                log.debug("[XSS Filter] Processing part {}: length={}", i, part.length());
+                
+                if (part.trim().isEmpty() || part.equals("--")) {
+                    result.append("--").append(boundary).append(part);
+                    continue;
+                }
+
+                // 헤더와 바디 분리
+                String[] headerAndBody = part.split("\r\n\r\n", 2);
+                if (headerAndBody.length == 2) {
+                    String headers = headerAndBody[0];
+                    String partBody = headerAndBody[1];
+                    log.debug("[XSS Filter] Part {} headers: {}", i, headers.replaceAll("\r\n", " | "));
+
+                    // Content-Type이 text인 경우만 sanitize
+                    if (headers.contains("Content-Type:") &&
+                            !headers.toLowerCase().contains("content-type: text")) {
+                        log.debug("[XSS Filter] Part {} is binary data, skipping sanitization", i);
+                        // 바이너리 데이터는 그대로 유지
+                        result.append("--").append(boundary).append(part);
+                    } else {
+                        log.debug("[XSS Filter] Part {} is text data, applying sanitization", i);
+                        // 텍스트 필드는 sanitize
+                        String sanitizedBody = sanitizeXss(partBody);
+                        log.debug("[XSS Filter] Part {} body: '{}' -> '{}'", i, partBody.trim(), sanitizedBody.trim());
+                        result.append("--").append(boundary).append(headers)
+                                .append("\r\n\r\n").append(sanitizedBody);
+                    }
+                } else {
+                    log.debug("[XSS Filter] Part {} has no body separator, keeping as-is", i);
+                    result.append("--").append(boundary).append(part);
+                }
+            }
+
+            return result.toString();
+        } catch (Exception e) {
+            log.warn("[XSS Filter] Multipart parsing failed: {}", e.getMessage());
+            return body; // multipart는 실패시 원본 유지 (바이너리 손상 방지)
         }
     }
 
