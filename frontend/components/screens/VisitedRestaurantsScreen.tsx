@@ -233,7 +233,7 @@ export default function VisitedRestaurantsScreen() {
                         {restaurant.review && <p className="text-sm text-gray-700 mb-2">{restaurant.review}</p>}
                         <div className="flex gap-2">
                           <Button
-                            onClick={() => handleDeleteUnwritten(restaurant.restaurantId || restaurant.id, restaurant.scheduledTime)}
+                            onClick={() => handleDeleteUnwritten(restaurant.restaurantId || restaurant.id, restaurant.scheduledTime || '')}
                             size="sm"
                             variant="outline"
                             className="text-red-600 border-red-200"
