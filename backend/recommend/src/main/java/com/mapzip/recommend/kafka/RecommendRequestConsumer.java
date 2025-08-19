@@ -18,6 +18,7 @@ import com.mapzip.recommend.service.KakaoApiService;
 import com.mapzip.recommend.service.RecommendRedisStoreService;
 import com.mapzip.recommend.service.RecommendService;
 import com.mapzip.recommend.service.TmapRouteCalculator;
+import com.mapzip.recommend.service.UpdateScheduleRequestBuilder;
 import com.mapzip.schedule.grpc.GetScheduleDetailRequest;
 import com.mapzip.schedule.grpc.GetScheduleDetailResponse;
 import com.mapzip.schedule.grpc.ScheduleServiceGrpc;
@@ -51,6 +52,7 @@ public class RecommendRequestConsumer {
     private final StringRedisTemplate redis;
     private final ScheduleDetailCache scheduleDetailCache;
     private final RecommendRedisStoreService recommendRedisStoreService;
+    private final UpdateScheduleRequestBuilder updateScheduleRequestBuilder;
 
     private static final String NEXT_TOPIC = "recommend-result";
 
@@ -61,6 +63,10 @@ public class RecommendRequestConsumer {
             log.info("📩 recommend-request 토픽 수신");
             
             TmapScheduleRequest tmapScheduleRequest = objectMapper.readValue(payload, TmapScheduleRequest.class);
+            boolean IsUpdate = tmapScheduleRequest.getRecommendUpdateContext().getIsUpdate();
+            if(IsUpdate==true) {
+            	tmapScheduleRequest = updateScheduleRequestBuilder.build(tmapScheduleRequest);
+            }
             
             //tmap api 요청 
             Map<String, Object> tmapResult = tmapRouteCalculator.calculate(tmapScheduleRequest);
@@ -72,7 +78,8 @@ public class RecommendRequestConsumer {
             scheduleDetailCache.saveScheduleDetail(
                     tmapScheduleRequest,
                     estimatedArrivalTime,
-                    waypointTimes
+                    waypointTimes,
+                    IsUpdate
             );
             
             //tmap 응답 -> 카카오 api 요청 dto
@@ -93,7 +100,8 @@ public class RecommendRequestConsumer {
 					recommendResultDto.getScheduleId(), recommendResultDto.getRecommendPlaceListJson(),
 					recommendResultDto.getRecommendationRequestIds(), 
 					recommendResultDto.getScheduledTimes(),
-					slotMealTypeMap
+					slotMealTypeMap,
+					IsUpdate
 			);
             // scheduleId를 key, userId를 value로 다음 토픽으로 전송
             kafkaTemplate.send("recommend-result", recommendResultDto.getScheduleId(), recommendResultDto.getUserId());
