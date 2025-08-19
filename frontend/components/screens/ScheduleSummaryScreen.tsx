@@ -479,7 +479,7 @@ const triggerRecommendUpdate = async (scheduleId: string) => {
           </div>
         </div>
 
-        <div className="flex-1 content-with-bottom-nav">
+        <div className="flex-1 content-with-bottom-nav pb-24">
           <div className="p-4">
             <div className="bg-white rounded-lg p-4 shadow-sm">
               {error || timelineItems.length === 0 ? (
