@@ -103,6 +103,7 @@ export interface VisitedRestaurant {
 
 export interface Review {
   id: string
+  reviewId: string // 백엔드에서 생성되는 복합키
   restaurantId: string
   restaurantName: string
   restaurantAddress?: string
@@ -117,7 +118,7 @@ export interface Review {
 }
 
 export interface OCRResult {
-  isValid: boolean
+  valid: boolean // 백엔드 JSON 응답의 "valid" 필드와 일치
   restaurantName: string
   address: string
   visitDate: string
