@@ -140,9 +140,9 @@ export default function RecommendationScreen() {
       }
 
       activeScheduleIdRef.current = scheduleId
-
+      const runId = localStorage.getItem(`recommend:lastRun:${scheduleId}`)
       const { data } = await api.get<GetResultsResponse>("/recommend/result", {
-        params: { scheduleId },
+        params: { scheduleId,runId },
       })
 
       if (activeScheduleIdRef.current !== scheduleId) return

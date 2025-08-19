@@ -17,6 +17,10 @@ import api from "@/lib/interceptor"
 const POLL_INTERVAL_MS = 1500 // 폴링 주기(ms)
 const RESULT_URL = "/recommend/result"
 const REQUEST_URL = "/recommend/request"
+const LS_RUN_PREFIX = "recommend:lastRun:";
+const setLastRunId = (scheduleId: string, runId: string) => {
+  try { localStorage.setItem(`${LS_RUN_PREFIX}${scheduleId}`, runId) } catch {}
+};
 
 // 각 파일에서 독립적으로 쓰는 runId 생성기 (공유/내보내기 X)
 const genRunId = () =>
@@ -153,6 +157,7 @@ export default function ScheduleListScreen() {
     // runId 생성 및 고정
     const runId = genRunId()
     currentRunIdRef.current = runId
+    setLastRunId(schedule.id, runId)
 
     // 추천 분석 요청 & 결과 폴링 시작 (둘 다 같은 runId 사용)
     await triggerRecommendRequest(schedule.id, runId)
