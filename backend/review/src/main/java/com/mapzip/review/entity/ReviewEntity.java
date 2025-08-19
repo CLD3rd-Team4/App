@@ -7,7 +7,10 @@ import java.util.List;
 import java.util.UUID;
 
 @DynamoDbBean
-public class ReviewEntity {
+public class ReviewEntity implements java.io.Serializable {
+
+    private static final long serialVersionUID = 1L;
+
 
     private String restaurantId;  
     private String createdAtUserId;  // 복합키: "2024-01-01T12:00:00Z#{userId}"      

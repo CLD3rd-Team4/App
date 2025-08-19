@@ -1,3 +1,4 @@
+// components/screens/ScheduleSummaryScreen.tsx
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
@@ -19,10 +20,10 @@ const genRunId = () => {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID()
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 }
-const LS_RUN_PREFIX = "recommend:lastRun:";
+const LS_RUN_PREFIX = "recommend:lastRun:"
 const setLastRunId = (scheduleId: string, runId: string) => {
   try { localStorage.setItem(`${LS_RUN_PREFIX}${scheduleId}`, runId) } catch {}
-};
+}
 
 type TimelineItem = {
   type: "departure" | "waypoint" | "destination" | "restaurant" | "update"
@@ -45,7 +46,8 @@ type ScheduleDetailResp = {
     estimatedArrivalTime: string
     waypointNames: string[]
     waypointTimes: string[]
-    updateLocs?: Array<{ lat: string; lng: string; name: string; time: string }>
+    // ★ 서버 proto 변경: 업데이트는 시간만 전달
+    updates?: Array<{ time: string }>
   }
 }
 
@@ -56,7 +58,8 @@ type ViewModel = {
   destination?: { name: string }
   calculatedArrivalTime?: string
   waypoints?: Array<{ name: string; arrivalTime?: string }>
-  updates?: Array<{ name?: string; time: string }>
+  // ★ 업데이트는 시간만
+  updates?: Array<{ time: string }>
   mealSlots?: Array<{ slotId: string; mealType: number; scheduledTime?: string }>
   selectedRestaurants?: Array<{
     sectionId: string
@@ -222,11 +225,9 @@ export default function ScheduleSummaryScreen() {
             arrivalTime: d?.waypointTimes?.[i] || "",
           })) ?? []
 
+        // ★ 업데이트는 시간만
         const updates =
-          d?.updateLocs?.map(ul => ({
-            name: ul?.name,
-            time: ul?.time,
-          })) ?? []
+          d?.updates?.map(u => ({ time: u?.time })) ?? []
 
         const mealSlots = lastSubmit.selectedPlaces.map((p) => ({
           slotId: p.slotId,
@@ -281,7 +282,6 @@ export default function ScheduleSummaryScreen() {
     const tick = async () => {
       if (!active) return
       try {
-        // 매 tick마다 최신 runId를 ref에서 읽음
         const runId = currentRunIdRef.current
         const params: any = { scheduleId }
         if (runId) params.runId = runId
@@ -289,7 +289,6 @@ export default function ScheduleSummaryScreen() {
         const res = await api.get<GetResultsResponse>(RECOMMEND_RESULT_URL, { params })
 
         if (res.data.status === "OK") {
-          // 서버가 runId를 내려주면 ref의 runId와 다를 시 무시
           if (runId && res.data.runId && res.data.runId !== runId) {
             timer = setTimeout(tick, POLL_INTERVAL_MS)
             return
@@ -306,7 +305,7 @@ export default function ScheduleSummaryScreen() {
 
     tick()
     pollingStopRef.current = () => {
-      let _ = active // keep linter quiet
+      let _ = active
       active = false
       if (timer) clearTimeout(timer)
     }
@@ -321,14 +320,12 @@ export default function ScheduleSummaryScreen() {
 
   /** 업데이트 트리거: 같은 runId로 POST */
   const triggerRecommendUpdate = async (scheduleId: string) => {
-    // 위치 먼저(에러는 여기서 throw해서 상위에서 처리)
     const pos = await getCurrentPositionAsync({
       enableHighAccuracy: true,
       timeout: 10000,
       maximumAge: 0,
     })
 
-    // ref에서 최신 runId 사용(없으면 즉시 생성해서 사용)
     const runId = currentRunIdRef.current || genRunId()
     currentRunIdRef.current = runId
     setLastRunId(scheduleId, runId)
@@ -363,19 +360,12 @@ export default function ScheduleSummaryScreen() {
       setIsPopupOpen(true)
       setCurrentPopup("processing")
 
-      // 이전 폴링 종료 후 새 runId 발급 & 저장
       stopPollingResults()
       currentRunIdRef.current = genRunId()
       setLastRunId(vm.scheduleId, currentRunIdRef.current)
-      
-      
 
-      // 폴링 시작(내부에서 ref의 runId 사용)
       startPollingResults(vm.scheduleId)
-
-      // 같은 runId로 POST
       await triggerRecommendUpdate(vm.scheduleId)
-      // 완료 전환은 폴링에서 처리
     } catch (e: any) {
       const code = typeof e?.code === "number" ? e.code : 0
       const msg =
@@ -408,12 +398,12 @@ export default function ScheduleSummaryScreen() {
       })
     }
 
+    // ★ 업데이트 항목: 시간만, 시각적 구분을 위해 보라색 + 배지
     vm.updates?.forEach((u) => {
       items.push({
         type: "update",
         time: u.time,
         title: "추천 업데이트",
-        description: u.name ? `도착지: ${u.name}` : undefined,
         icon: "업뎃",
         color: "purple",
       })
@@ -511,7 +501,11 @@ export default function ScheduleSummaryScreen() {
                     <div
                       key={index}
                       className={`flex items-center gap-3 ${
-                        item.type === "restaurant" ? "bg-orange-50 rounded-lg p-3 -mx-3" : ""
+                        item.type === "restaurant"
+                          ? "bg-orange-50 rounded-lg p-3 -mx-3"
+                          : item.type === "update"
+                          ? "bg-purple-50 rounded-lg p-3 -mx-3"
+                          : ""
                       }`}
                     >
                       <div
@@ -523,20 +517,18 @@ export default function ScheduleSummaryScreen() {
                             : item.color === "orange"
                             ? "bg-orange-500"
                             : item.color === "purple"
-                            ? "bg-purple-100"
+                            ? "bg-purple-500"
                             : "bg-green-100"
                         } rounded-full flex items-center justify-center`}
                       >
                         <span
                           className={`text-sm font-medium ${
-                            item.color === "orange"
+                            item.color === "orange" || item.color === "purple"
                               ? "text-white"
                               : item.color === "red"
                               ? "text-red-600"
                               : item.color === "blue"
                               ? "text-blue-600"
-                              : item.color === "purple"
-                              ? "text-purple-600"
                               : "text-green-600"
                           }`}
                         >
@@ -547,7 +539,14 @@ export default function ScheduleSummaryScreen() {
                         <p className="text-sm text-gray-500">
                           {item.time ? toKoreanAmPm(item.time) : "시간 미정"}
                         </p>
-                        <p className="font-medium">{item.title}</p>
+                        <p className="font-medium">
+                          {item.title}
+                          {item.type === "update" && (
+                            <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-purple-600 text-white align-middle">
+                              업데이트
+                            </span>
+                          )}
+                        </p>
 
                         {item.type === "restaurant" && (
                           <>
@@ -567,10 +566,6 @@ export default function ScheduleSummaryScreen() {
                               </div>
                             )}
                           </>
-                        )}
-
-                        {item.type === "update" && item.description && (
-                          <p className="text-sm text-gray-600">{item.description}</p>
                         )}
                       </div>
                     </div>

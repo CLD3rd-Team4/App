@@ -24,7 +24,10 @@ public class TmapClient {
 
     public TmapClient(WebClient.Builder webClientBuilder, ObjectMapper objectMapper,
                       @Value("${external.api.tmap.url}") String tmapApiUrl) {
-        this.webClient = webClientBuilder.baseUrl(tmapApiUrl).build();
+        this.webClient = webClientBuilder
+                .baseUrl(tmapApiUrl)
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(5 * 1024 * 1024)) // 5MB
+                .build();
         this.objectMapper = objectMapper;
     }
 

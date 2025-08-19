@@ -6,6 +6,8 @@ spring:
   application:
     name: recommend
 
+  
+
   datasource:
     url: jdbc:postgresql://recommend-db.mapzip.shop:5432/recommend_db 
     username: mapzip
@@ -62,6 +64,7 @@ spring:
       group-id: recommend-service
       auto-offset-reset: earliest
       max-partition-fetch-bytes: 5242880
+
 
   cloud:
     kubernetes:
