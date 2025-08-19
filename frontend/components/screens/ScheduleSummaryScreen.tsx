@@ -9,8 +9,6 @@ import api from "@/lib/interceptor"
 import type { Restaurant } from "@/types"
 import { MealType } from "@/types"
 import useSchedule from "@/hooks/useSchedule"
-
-// 팝업
 import ScheduleProcessingPopup from "@/components/modals/ScheduleProcessingPopup"
 import RecommendationReadyPopup from "@/components/modals/RecommendationReadyPopup"
 
@@ -62,11 +60,14 @@ const RECOMMEND_RESULT_URL = "/recommend/result"
 type GetResultsResponse = {
   status: "PENDING" | "OK" | "ERROR" | string
   message?: string
+  // 백엔드가 runId를 내려주면 여기 비교해서 최신 요청만 OK로 인정
+  runId?: string
   slotRecommendations?: Array<{
     slotId: string
     places: Array<{ id: string; placeName: string }>
   }>
 }
+
 type PopupType = "processing" | "recommendation_ready"
 
 /** "오전/오후 HH:mm" | "HH:mm" | ISO → Date(오늘 날짜) */
@@ -151,8 +152,10 @@ export default function ScheduleSummaryScreen() {
   const [isPopupOpen, setIsPopupOpen] = useState(false)
   const [currentPopup, setCurrentPopup] = useState<PopupType>("processing")
   const [updating, setUpdating] = useState(false)
+
+  // 폴링 및 요청 식별자
   const pollingStopRef = useRef<() => void>(() => {})
-  const resultsRef = useRef<GetResultsResponse | null>(null)
+  const currentRunIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     let mounted = true
@@ -258,15 +261,24 @@ export default function ScheduleSummaryScreen() {
     return () => { mounted = false }
   }, [])
 
-  const startPollingResults = (scheduleId: string) => {
+  /** 폴링: 같은 scheduleId라도 runId가 일치할 때만 OK로 인정 */
+  const startPollingResults = (scheduleId: string, runId: string | null) => {
     let active = true
     let timer: any = null
+
     const tick = async () => {
       if (!active) return
       try {
-        const res = await api.get<GetResultsResponse>(RECOMMEND_RESULT_URL, { params: { scheduleId } })
+        const params: any = { scheduleId }
+        if (runId) params.runId = runId // 백이 지원하면 비교, 아니면 무시됨
+        const res = await api.get<GetResultsResponse>(RECOMMEND_RESULT_URL, { params })
+
         if (res.data.status === "OK") {
-          resultsRef.current = res.data
+          // 백이 runId를 내려주면 일치할 때만 완료 처리
+          if (runId && res.data.runId && res.data.runId !== runId) {
+            timer = setTimeout(tick, POLL_INTERVAL_MS)
+            return
+          }
           setCurrentPopup("recommendation_ready")
           setUpdating(false)
           return
@@ -276,6 +288,7 @@ export default function ScheduleSummaryScreen() {
         timer = setTimeout(tick, POLL_INTERVAL_MS * 2)
       }
     }
+
     tick()
     pollingStopRef.current = () => { active = false; if (timer) clearTimeout(timer) }
   }
@@ -287,8 +300,8 @@ export default function ScheduleSummaryScreen() {
       navigator.geolocation.getCurrentPosition(resolve, reject, opts)
     })
 
-  /** 스케줄 리스트처럼 심플하게: 객체 바디만 전송 */
-  const triggerRecommendUpdate = async (scheduleId: string) => {
+  /** 업데이트 트리거: runId 생성 → 헤더로 runId 전달(백 proto 수정 없이) */
+  const triggerRecommendUpdate = async (scheduleId: string, runId: string) => {
     const pos = await getCurrentPositionAsync({
       enableHighAccuracy: true,
       timeout: 10000,
@@ -300,7 +313,9 @@ export default function ScheduleSummaryScreen() {
       currentLat: pos.coords.latitude,
       currentLng: pos.coords.longitude,
     }
-    await api.post(RECOMMEND_SEND_URL, payload)
+    await api.post(RECOMMEND_SEND_URL, payload, {
+      headers: { "x-run-id": runId }, // proto 수정 없이 요청 식별
+    })
   }
 
   const handleUpdate = async () => {
@@ -309,7 +324,7 @@ export default function ScheduleSummaryScreen() {
       return
     }
 
-    // ETA 선검사 (도착이 출발보다 이르면 '다음날 ETA'로 보정)
+    // ETA 선검사 (출발보다 이르면 다음날로 보정)
     if (vm.calculatedArrivalTime) {
       const anchoredEta = anchorToScheduleDay(vm.calculatedArrivalTime, vm.departureTime)
       if (anchoredEta && Date.now() > anchoredEta.getTime()) {
@@ -322,10 +337,15 @@ export default function ScheduleSummaryScreen() {
       setUpdating(true)
       setIsPopupOpen(true)
       setCurrentPopup("processing")
-      startPollingResults(vm.scheduleId)
 
-      await triggerRecommendUpdate(vm.scheduleId)
-      // 성공 시 폴링이 완료 팝업 전환
+      const runId = (typeof crypto !== "undefined" && "randomUUID" in crypto)
+        ? crypto.randomUUID()
+        : String(Date.now())
+      currentRunIdRef.current = runId
+
+      startPollingResults(vm.scheduleId, runId)
+      await triggerRecommendUpdate(vm.scheduleId, runId)
+      // 완료 전환은 폴링이 담당
     } catch (err: any) {
       console.error("[RecommendUpdate] failed:", err)
       if (err?.code === err?.PERMISSION_DENIED) {
@@ -404,7 +424,6 @@ export default function ScheduleSummaryScreen() {
       })
     }
 
-    // ✅ 정렬: 출발시간을 기준으로, 출발보다 이른 시각은 '다음날'로 보정하여 sort
     const sortKey = (t?: string) => {
       const d = anchorToScheduleDay(t, vm.departureTime)
       return d ? d.getTime() : Number.MAX_SAFE_INTEGER
