@@ -142,7 +142,6 @@ public class ReviewEntity implements java.io.Serializable {
         this.isVerified = isVerified;
     }
 
-    @DynamoDbSecondaryPartitionKey(indexNames = "StatusIndex")
     @DynamoDbAttribute("review_status")
     public String getReviewStatus() {
         // null 안전성을 위한 기본값 반환 (기존 데이터와의 호환성)
@@ -151,6 +150,9 @@ public class ReviewEntity implements java.io.Serializable {
         }
         return reviewStatus;
     }
+    
+    // StatusIndex GSI는 기존 데이터 호환성 문제로 비활성화
+    // 향후 필요시 데이터 마이그레이션 후 활성화 가능
 
     public void setReviewStatus(String reviewStatus) {
         this.reviewStatus = reviewStatus;

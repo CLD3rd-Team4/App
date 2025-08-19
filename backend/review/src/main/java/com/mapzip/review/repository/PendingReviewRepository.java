@@ -105,12 +105,22 @@ public class PendingReviewRepository {
         logger.info("Deleting pending review for user: {}, compositeKey: {}", userId, compositeKey);
         
         try {
+            // 삭제 전에 해당 데이터가 존재하는지 확인
+            Optional<PendingReviewEntity> existing = findByUserIdAndCompositeKey(userId, compositeKey);
+            if (existing.isEmpty()) {
+                logger.warn("Pending review not found for deletion - user: {}, compositeKey: {}", userId, compositeKey);
+                return false;
+            }
+            
+            logger.info("Found pending review to delete: {}", existing.get().getRestaurantId());
+            
             Key key = Key.builder()
                     .partitionValue(userId)
                     .sortValue(compositeKey)
                     .build();
                     
             pendingReviewTable.deleteItem(key);
+            logger.info("Successfully deleted pending review for user: {}, compositeKey: {}", userId, compositeKey);
             return true;
             
         } catch (Exception e) {

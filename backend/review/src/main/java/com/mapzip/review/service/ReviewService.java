@@ -150,12 +150,30 @@ public class ReviewService {
     @Cacheable(value = "userReviews", key = "#userId + '_' + #page + '_' + #size", unless = "#result == null or #result.isEmpty()")
     public List<ReviewEntity> getUserReviews(String userId, int page, int size) {
         logger.info("Fetching user reviews from database for userId: {}, page: {}, size: {}", userId, page, size);
-        return reviewRepository.findByUserId(userId, page, size);
+        
+        try {
+            List<ReviewEntity> reviews = reviewRepository.findByUserId(userId, page, size);
+            logger.info("Successfully fetched {} reviews for user: {}", reviews.size(), userId);
+            return reviews;
+        } catch (Exception e) {
+            logger.error("Error fetching user reviews for userId: {}, page: {}, size: {}", userId, page, size, e);
+            // 에러 발생 시 빈 리스트 반환하여 500 에러 방지
+            return new ArrayList<>();
+        }
     }
     
     public long getUserReviewsCount(String userId) {
         logger.info("Fetching user review count from database for userId: {}", userId);
-        return reviewRepository.countByUserId(userId);
+        
+        try {
+            long count = reviewRepository.countByUserId(userId);
+            logger.info("Successfully fetched review count {} for user: {}", count, userId);
+            return count;
+        } catch (Exception e) {
+            logger.error("Error fetching user review count for userId: {}", userId, e);
+            // 에러 발생 시 0 반환하여 500 에러 방지
+            return 0;
+        }
     }
     
     @Cacheable(value = "restaurantReviews", key = "#restaurantId + '_' + #page + '_' + #size", unless = "#result == null or #result.isEmpty()")

@@ -281,9 +281,11 @@ public class ReviewController {
             @PathVariable String restaurantId,
             @RequestParam String scheduledTime) throws Exception {
         
-        logger.info("Deleting pending review for user: {}, restaurant: {}", userId, restaurantId);
+        logger.info("Deleting pending review for user: {}, restaurant: {}, scheduledTime: {}", userId, restaurantId, scheduledTime);
         
         boolean success = reviewService.deletePendingReview(userId, scheduledTime, restaurantId);
+        
+        logger.info("Pending review deletion result: {}", success);
         
         if (success) {
             return ResponseEntity.ok(Map.of(
