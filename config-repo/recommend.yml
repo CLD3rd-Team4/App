@@ -131,3 +131,4 @@ management:
       application: ${spring.application.name}
       environment: ${ENVIRONMENT:prod}
       region: ${AWS_REGION:ap-northeast-2}
+      
