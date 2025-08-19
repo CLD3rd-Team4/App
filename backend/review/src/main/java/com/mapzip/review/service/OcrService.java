@@ -140,6 +140,7 @@ public class OcrService {
         // 방문 날짜 추출
         String visitDate = extractVisitDate(text);
         result.setVisitDate(visitDate);
+        logger.info("OCR 날짜 추출 결과: '{}'", visitDate);
         
         // 총 금액 추출
         String totalAmount = extractTotalAmount(text);
@@ -319,8 +320,17 @@ public class OcrService {
             addressSimilarity = calculateSimilarity(extractedAddress, expectedAddress);
         }
         
-        // 종합 점수가 0.6 이상이면 검증 통과
-        return (nameSimilarity * 0.8 + addressSimilarity * 0.2) >= 0.6;
+        double overallScore = nameSimilarity * 0.8 + addressSimilarity * 0.2;
+        
+        // 디버깅을 위한 로그 추가
+        logger.info("OCR 검증 - 추출된 식당명: '{}', 예상 식당명: '{}', 유사도: {}", 
+                   extractedRestaurantName, expectedRestaurantName, nameSimilarity);
+        logger.info("OCR 검증 - 추출된 주소: '{}', 예상 주소: '{}', 유사도: {}", 
+                   extractedAddress, expectedAddress, addressSimilarity);
+        logger.info("OCR 검증 - 종합 점수: {}, 임계값: 0.5", overallScore);
+        
+        // 종합 점수가 0.5 이상이면 검증 통과 (기존 0.6에서 완화)
+        return overallScore >= 0.5;
     }
     
     private double calculateConfidence(String extractedRestaurantName, String extractedAddress,
