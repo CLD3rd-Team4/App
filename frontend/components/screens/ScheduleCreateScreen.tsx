@@ -42,7 +42,7 @@ export default function ScheduleCreateScreen({ isEdit = false, initialData = nul
         scheduleName: initialData.title,
         departureTime: initialData.departureTime,
         targetMealTimes: initialData.mealSlots.map((ms: any) => ({
-          type: ms.mealType === MealType.MEAL ? '식사' : '간식',
+          type: ms.mealType === 'MEAL' ? '식사' : '간식',
           time: ms.scheduledTime,
           radius: `${ms.radius / 1000}km`,
         })),
