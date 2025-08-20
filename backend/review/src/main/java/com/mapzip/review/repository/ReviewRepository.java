@@ -14,15 +14,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Repository
 public class ReviewRepository {
+    
+    private static final Logger logger = LoggerFactory.getLogger(ReviewRepository.class);
 
     private final DynamoDbTable<ReviewEntity> reviewTable;
     private final TableSchema<ReviewEntity> reviewTableSchema;
-    private final ReadWriteLock tableLock = new ReentrantReadWriteLock();
 
     @Autowired
     public ReviewRepository(DynamoDbEnhancedClient enhancedClient,
@@ -33,22 +34,16 @@ public class ReviewRepository {
     }
 
     public ReviewEntity save(ReviewEntity review) {
-        tableLock.writeLock().lock();
-        try {
-            if (review.getCreatedAt() == null) {
-                review.setCreatedAt(Instant.now());
-            }
-            review.setUpdatedAt(Instant.now());
-            
-            reviewTable.putItem(review);
-            return review;
-        } finally {
-            tableLock.writeLock().unlock();
+        if (review.getCreatedAt() == null) {
+            review.setCreatedAt(Instant.now());
         }
+        review.setUpdatedAt(Instant.now());
+        
+        reviewTable.putItem(review);
+        return review;
     }
 
     public Optional<ReviewEntity> findByRestaurantIdAndReviewId(String restaurantId, String reviewId) {
-        tableLock.readLock().lock();
         try {
             Key key = Key.builder()
                     .partitionValue(restaurantId)
@@ -57,13 +52,13 @@ public class ReviewRepository {
                     
             ReviewEntity review = reviewTable.getItem(key);
             return Optional.ofNullable(review);
-        } finally {
-            tableLock.readLock().unlock();
+        } catch (Exception e) {
+            logger.error("리뷰 조회 실패 - restaurantId: {}, reviewId: {}", restaurantId, reviewId, e);
+            return Optional.empty();
         }
     }
 
     public List<ReviewEntity> findByRestaurantId(String restaurantId, int page, int size) {
-        tableLock.readLock().lock();
         try {
             QueryConditional queryConditional = QueryConditional
                     .keyEqualTo(Key.builder().partitionValue(restaurantId).build());
@@ -81,8 +76,9 @@ public class ReviewRepository {
                     .skip((long) page * size)
                     .limit(size)
                     .collect(Collectors.toList());
-        } finally {
-            tableLock.readLock().unlock();
+        } catch (Exception e) {
+            logger.error("식당 리뷰 조회 실패 - restaurantId: {}, page: {}, size: {}", restaurantId, page, size, e);
+            return new ArrayList<>();
         }
     }
 
