@@ -67,30 +67,50 @@ public class ReviewRepository {
         try {
             // 입력값 검증
             if (userId == null || userId.trim().isEmpty()) {
-                System.err.println("=== INVALID USERID ===");
-                System.err.println("UserId is null or empty");
                 return new ArrayList<>();
             }
             
-            System.out.println("=== 사용자 리뷰 조회 시작 (테이블 스캔 방식) ===");
-            System.out.println("UserId: " + userId + ", Page: " + page + ", Size: " + size);
+            // 1. GSI(UserIdIndex) 우선 시도
+            try {
+                List<ReviewEntity> gsiResults = findByUserIdWithGSI(userId, page, size);
+                
+                if (gsiResults != null && !gsiResults.isEmpty()) {
+                    return gsiResults;
+                }
+            } catch (Exception gsiError) {
+                // GSI 실패 시 폴백으로 진행
+            }
             
-            // GSI 대신 테이블 스캔 방식을 기본으로 사용 (데이터 일관성 문제 해결)
+            // 2. GSI 실패 시 테이블 스캔 폴백
             return findByUserIdWithScan(userId, page, size);
             
         } catch (Exception e) {
             // 모든 예외를 잡아서 빈 리스트 반환 (500 에러 방지)
-            System.err.println("=== 사용자 리뷰 조회 실패 ===");
-            System.err.println("UserId: " + userId + ", Page: " + page + ", Size: " + size);
-            System.err.println("Exception type: " + e.getClass().getSimpleName());
-            System.err.println("Exception message: " + e.getMessage());
-            if (e.getCause() != null) {
-                System.err.println("Cause: " + e.getCause().getClass().getSimpleName() + " - " + e.getCause().getMessage());
-            }
-            e.printStackTrace();
-            System.err.println("모든 예외를 처리하여 빈 목록 반환");
             return new ArrayList<>();
         }
+    }
+    
+    /**
+     * GSI(UserIdIndex)를 사용한 사용자 리뷰 조회
+     */
+    private List<ReviewEntity> findByUserIdWithGSI(String userId, int page, int size) {
+        DynamoDbIndex<ReviewEntity> index = reviewTable.index("UserIdIndex");
+        
+        // UserIdIndex GSI 쿼리: user_id를 파티션 키로 사용
+        QueryConditional queryConditional = QueryConditional
+                .keyEqualTo(Key.builder().partitionValue(userId).build());
+        
+        QueryEnhancedRequest queryRequest = QueryEnhancedRequest.builder()
+                .queryConditional(queryConditional)
+                .scanIndexForward(false)  // created_at 역순 (최신순)
+                .build();
+        
+        return index.query(queryRequest)
+                .stream()
+                .flatMap(queryPage -> queryPage.items().stream())
+                .skip((long) page * size)
+                .limit(size)
+                .collect(Collectors.toList());
     }
     
     /**
@@ -98,75 +118,57 @@ public class ReviewRepository {
      */
     private List<ReviewEntity> findByUserIdWithScan(String userId, int page, int size) {
         try {
-            System.out.println("=== 테이블 스캔으로 사용자 리뷰 조회 시작 ===");
-            System.out.println("UserId: " + userId + ", Page: " + page + ", Size: " + size);
-            
-            // 더 안전한 스캔 방식 - 필터 없이 전체 스캔 후 필터링
             ScanEnhancedRequest scanRequest = ScanEnhancedRequest.builder().build();
-            
             List<ReviewEntity> results = new ArrayList<>();
             
-            try {
-                // 전체 테이블 스캔 후 userId로 필터링
-                reviewTable.scan(scanRequest).forEach(scanPage -> {
+            // 전체 테이블 스캔 후 userId로 필터링
+            reviewTable.scan(scanRequest).forEach(scanPage -> {
+                try {
                     List<ReviewEntity> pageItems = scanPage.items();
-                    System.out.println("스캔 페이지: " + pageItems.size() + "개 항목");
                     
-                    // 안전한 userId 필터링
-                    for (ReviewEntity item : pageItems) {
+                    // 안전한 userId 필터링 - 타입 체크 추가
+                    for (Object rawItem : pageItems) {
                         try {
-                            if (item != null && item.getUserId() != null && 
-                                userId.equals(item.getUserId())) {
-                                results.add(item);
+                            // ReviewEntity로 타입 확인
+                            if (rawItem instanceof ReviewEntity) {
+                                ReviewEntity item = (ReviewEntity) rawItem;
+                                if (item != null && item.getUserId() != null && 
+                                    userId.equals(item.getUserId())) {
+                                    results.add(item);
+                                }
                             }
                         } catch (Exception itemError) {
-                            System.err.println("개별 아이템 처리 중 오류: " + itemError.getMessage());
                             // 개별 아이템 오류는 무시하고 계속 진행
                         }
                     }
-                });
-                
-                System.out.println("필터링된 결과: " + results.size() + "개 리뷰");
-                
-                // 안전한 정렬
-                results.sort((r1, r2) -> {
-                    try {
-                        if (r1.getCreatedAt() == null && r2.getCreatedAt() == null) return 0;
-                        if (r1.getCreatedAt() == null) return 1;
-                        if (r2.getCreatedAt() == null) return -1;
-                        return r2.getCreatedAt().compareTo(r1.getCreatedAt());
-                    } catch (Exception sortError) {
-                        System.err.println("정렬 중 오류: " + sortError.getMessage());
-                        return 0;
-                    }
-                });
-                
-                // 페이징 적용
-                int startIndex = page * size;
-                int endIndex = Math.min(startIndex + size, results.size());
-                
-                if (startIndex >= results.size()) {
-                    System.out.println("페이지 범위를 벗어남 - 빈 결과 반환");
-                    return new ArrayList<>();
+                } catch (Exception pageError) {
+                    // 페이지 처리 오류는 무시하고 계속 진행
                 }
-                
-                List<ReviewEntity> paginatedResults = results.subList(startIndex, endIndex);
-                
-                System.out.println("=== 테이블 스캔 완료 ===");
-                System.out.println("페이징 적용 결과: " + paginatedResults.size() + "개 리뷰");
-                
-                return paginatedResults;
-                
-            } catch (Exception scanLoopError) {
-                System.err.println("스캔 루프 중 오류: " + scanLoopError.getMessage());
-                scanLoopError.printStackTrace();
+            });
+            
+            // 정렬
+            results.sort((r1, r2) -> {
+                try {
+                    if (r1.getCreatedAt() == null && r2.getCreatedAt() == null) return 0;
+                    if (r1.getCreatedAt() == null) return 1;
+                    if (r2.getCreatedAt() == null) return -1;
+                    return r2.getCreatedAt().compareTo(r1.getCreatedAt());
+                } catch (Exception sortError) {
+                    return 0;
+                }
+            });
+            
+            // 페이징 적용
+            int startIndex = page * size;
+            int endIndex = Math.min(startIndex + size, results.size());
+            
+            if (startIndex >= results.size()) {
                 return new ArrayList<>();
             }
             
-        } catch (Exception scanError) {
-            System.err.println("=== 테이블 스캔 전체 실패 ===");
-            System.err.println("Scan Error: " + scanError.getMessage());
-            scanError.printStackTrace();
+            return results.subList(startIndex, endIndex);
+            
+        } catch (Exception e) {
             return new ArrayList<>();
         }
     }
@@ -175,30 +177,43 @@ public class ReviewRepository {
         try {
             // 입력값 검증
             if (userId == null || userId.trim().isEmpty()) {
-                System.err.println("=== INVALID USERID FOR COUNT ===");
-                System.err.println("UserId is null or empty");
                 return 0;
             }
             
-            System.out.println("=== 사용자 리뷰 개수 조회 시작 (테이블 스캔 방식) ===");
-            System.out.println("UserId: " + userId);
+            // 1. GSI(UserIdIndex) 우선 시도
+            try {
+                return countByUserIdWithGSI(userId);
+            } catch (Exception gsiError) {
+                // GSI 실패 시 폴백으로 진행
+            }
             
-            // GSI 대신 테이블 스캔 방식을 기본으로 사용 (데이터 일관성 문제 해결)
+            // 2. GSI 실패 시 테이블 스캔 폴백
             return countByUserIdWithScan(userId);
             
         } catch (Exception e) {
             // 모든 예외를 잡아서 0 반환 (500 에러 방지)
-            System.err.println("=== 사용자 리뷰 개수 조회 실패 ===");
-            System.err.println("UserId: " + userId);
-            System.err.println("Exception type: " + e.getClass().getSimpleName());
-            System.err.println("Exception message: " + e.getMessage());
-            if (e.getCause() != null) {
-                System.err.println("Cause: " + e.getCause().getClass().getSimpleName() + " - " + e.getCause().getMessage());
-            }
-            e.printStackTrace();
-            System.err.println("모든 예외를 처리하여 0 반환");
             return 0;
         }
+    }
+    
+    /**
+     * GSI(UserIdIndex)를 사용한 사용자 리뷰 개수 조회
+     */
+    private long countByUserIdWithGSI(String userId) {
+        DynamoDbIndex<ReviewEntity> index = reviewTable.index("UserIdIndex");
+        
+        // UserIdIndex GSI 쿼리: user_id를 파티션 키로 사용
+        QueryConditional queryConditional = QueryConditional
+                .keyEqualTo(Key.builder().partitionValue(userId).build());
+        
+        QueryEnhancedRequest queryRequest = QueryEnhancedRequest.builder()
+                .queryConditional(queryConditional)
+                .build();
+        
+        return index.query(queryRequest)
+                .stream()
+                .mapToLong(page -> page.items().size())
+                .sum();
     }
     
     /**
@@ -206,49 +221,37 @@ public class ReviewRepository {
      */
     private long countByUserIdWithScan(String userId) {
         try {
-            System.out.println("=== 테이블 스캔으로 사용자 리뷰 카운트 시작 ===");
-            System.out.println("UserId: " + userId);
-            
-            // 더 안전한 스캔 방식 - 필터 없이 전체 스캔 후 카운트
             ScanEnhancedRequest scanRequest = ScanEnhancedRequest.builder().build();
-            
             long count = 0;
             
-            try {
-                // 전체 테이블 스캔 후 userId로 필터링하여 카운트
-                for (Page<ReviewEntity> scanPage : reviewTable.scan(scanRequest)) {
+            // 전체 테이블 스캔 후 userId로 필터링하여 카운트
+            for (Page<ReviewEntity> scanPage : reviewTable.scan(scanRequest)) {
+                try {
                     List<ReviewEntity> pageItems = scanPage.items();
-                    System.out.println("스캔 페이지: " + pageItems.size() + "개 항목");
                     
-                    // 안전한 userId 필터링 및 카운트
-                    for (ReviewEntity item : pageItems) {
+                    // 안전한 userId 필터링 및 카운트 - 타입 체크 추가
+                    for (Object rawItem : pageItems) {
                         try {
-                            if (item != null && item.getUserId() != null && 
-                                userId.equals(item.getUserId())) {
-                                count++;
+                            // ReviewEntity로 타입 확인
+                            if (rawItem instanceof ReviewEntity) {
+                                ReviewEntity item = (ReviewEntity) rawItem;
+                                if (item != null && item.getUserId() != null && 
+                                    userId.equals(item.getUserId())) {
+                                    count++;
+                                }
                             }
                         } catch (Exception itemError) {
-                            System.err.println("개별 아이템 카운트 중 오류: " + itemError.getMessage());
                             // 개별 아이템 오류는 무시하고 계속 진행
                         }
                     }
+                } catch (Exception pageError) {
+                    // 페이지 처리 오류는 무시하고 계속 진행
                 }
-                
-                System.out.println("=== 테이블 스캔 카운트 완료 ===");
-                System.out.println("총 개수: " + count);
-                
-                return count;
-                
-            } catch (Exception scanLoopError) {
-                System.err.println("스캔 루프 중 오류: " + scanLoopError.getMessage());
-                scanLoopError.printStackTrace();
-                return 0;
             }
             
-        } catch (Exception scanError) {
-            System.err.println("=== 테이블 스캔 카운트 전체 실패 ===");
-            System.err.println("Scan Error: " + scanError.getMessage());
-            scanError.printStackTrace();
+            return count;
+            
+        } catch (Exception e) {
             return 0;
         }
     }
@@ -276,31 +279,89 @@ public class ReviewRepository {
 
     public Optional<ReviewEntity> findByReviewId(String reviewId) {
         try {
-            String userId = ReviewEntity.extractUserIdFromCompositeKey(reviewId);
-            Instant createdAt = ReviewEntity.extractCreatedAtFromCompositeKey(reviewId);
-
-            if (userId == null || createdAt == null) {
-                return Optional.empty();
+            // 1. GSI(UserIdIndex) 우선 시도
+            try {
+                Optional<ReviewEntity> gsiResult = findByReviewIdWithGSI(reviewId);
+                
+                if (gsiResult.isPresent()) {
+                    return gsiResult;
+                }
+            } catch (Exception gsiError) {
+                // GSI 실패 시 폴백으로 진행
             }
-
-            DynamoDbIndex<ReviewEntity> index = reviewTable.index("UserIdIndex");
-            Key key = Key.builder().partitionValue(userId).sortValue(createdAt.toString()).build();
-            QueryConditional queryConditional = QueryConditional.keyEqualTo(key);
-
-            QueryEnhancedRequest queryRequest = QueryEnhancedRequest.builder()
-                    .queryConditional(queryConditional)
-                    .build();
-
-            List<ReviewEntity> items = index.query(queryRequest)
-                    .stream()
-                    .flatMap(page -> page.items().stream())
-                    .collect(Collectors.toList());
-
-            return items.stream()
-                        .filter(item -> reviewId.equals(item.getCreatedAtUserId()))
-                        .findFirst();
+            
+            // 2. GSI 실패 시 테이블 스캔 폴백
+            return findByReviewIdWithScan(reviewId);
+            
         } catch (Exception e) {
-            System.err.println("UserIdIndex GSI query by reviewId failed: " + e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * GSI(UserIdIndex)를 사용한 리뷰 ID 조회
+     */
+    private Optional<ReviewEntity> findByReviewIdWithGSI(String reviewId) {
+        String userId = ReviewEntity.extractUserIdFromCompositeKey(reviewId);
+        Instant createdAt = ReviewEntity.extractCreatedAtFromCompositeKey(reviewId);
+
+        if (userId == null || createdAt == null) {
+            return Optional.empty();
+        }
+
+        DynamoDbIndex<ReviewEntity> index = reviewTable.index("UserIdIndex");
+        Key key = Key.builder().partitionValue(userId).sortValue(createdAt.toString()).build();
+        QueryConditional queryConditional = QueryConditional.keyEqualTo(key);
+
+        QueryEnhancedRequest queryRequest = QueryEnhancedRequest.builder()
+                .queryConditional(queryConditional)
+                .build();
+
+        List<ReviewEntity> items = index.query(queryRequest)
+                .stream()
+                .flatMap(page -> page.items().stream())
+                .collect(Collectors.toList());
+
+        return items.stream()
+                    .filter(item -> reviewId.equals(item.getCreatedAtUserId()))
+                    .findFirst();
+    }
+    
+    /**
+     * 테이블 스캔을 사용한 리뷰 ID 조회 폴백
+     */
+    private Optional<ReviewEntity> findByReviewIdWithScan(String reviewId) {
+        try {
+            // 전체 테이블 스캔 후 reviewId로 필터링
+            ScanEnhancedRequest scanRequest = ScanEnhancedRequest.builder().build();
+            
+            // 전체 테이블 스캔 후 reviewId로 매칭
+            for (Page<ReviewEntity> scanPage : reviewTable.scan(scanRequest)) {
+                try {
+                    List<ReviewEntity> pageItems = scanPage.items();
+                    
+                    // 안전한 reviewId 필터링 - 타입 체크 추가
+                    for (Object rawItem : pageItems) {
+                        try {
+                            // ReviewEntity로 타입 확인
+                            if (rawItem instanceof ReviewEntity) {
+                                ReviewEntity item = (ReviewEntity) rawItem;
+                                if (item != null && reviewId.equals(item.getCreatedAtUserId())) {
+                                    return Optional.of(item);
+                                }
+                            }
+                        } catch (Exception itemError) {
+                            // 개별 아이템 오류는 무시하고 계속 진행
+                        }
+                    }
+                } catch (Exception pageError) {
+                    // 페이지 처리 오류는 무시하고 계속 진행
+                }
+            }
+            
+            return Optional.empty();
+            
+        } catch (Exception e) {
             return Optional.empty();
         }
     }
