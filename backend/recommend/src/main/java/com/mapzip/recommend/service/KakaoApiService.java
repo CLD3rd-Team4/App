@@ -27,13 +27,19 @@ public class KakaoApiService {
 
         for (SlotInfoDto slot : requestDto.getSlots()) {
             try {
-                KakaoSearchResponse response = kakaoClient
-                        .searchRestaurants(slot.getLat(), slot.getLon(), slot.getRadius())
-                        .block(); // blocking (나중에 비동기 전환 가능)
+            	KakaoSearchResponse response;
+                // 간식이면 카페 
+                if (slot.getMealType() == 1) { // 1 = snack
+                    response = kakaoClient.searchCafes(slot.getLat(), slot.getLon(), slot.getRadius()).block();
 
-                if (response == null) {
-                    log.warn("Kakao 응답이 null입니다. slotId: {}", slot.getSlotId());
-                    continue;
+                    // 카페가 하나도 없으면 음식점으로 폴백
+                    if (response == null || response.getDocuments() == null || response.getDocuments().isEmpty()) {
+                        log.info("No cafes found. Falling back to restaurants. slotId={}", slot.getSlotId());
+                        response = kakaoClient.searchRestaurants(slot.getLat(), slot.getLon(), slot.getRadius()).block();
+                    }
+                } else {
+                    // 기본: 식사 슬롯은 음식점
+                    response = kakaoClient.searchRestaurants(slot.getLat(), slot.getLon(), slot.getRadius()).block();
                 }
 
                 //  각 식당(Kakao Document)의 id로 리뷰 서버에서 별점/대표리뷰 조회 후 주입
