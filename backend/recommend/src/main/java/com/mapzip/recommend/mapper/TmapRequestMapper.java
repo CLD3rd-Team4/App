@@ -30,7 +30,8 @@ public class TmapRequestMapper {
         TmapScheduleRequest request = new TmapScheduleRequest();
         request.setScheduleId(scheduleId);
         request.setUserId(userId);
-        request.setDepartureTime(detail.getDepartureTime());
+        String KoreanDepartureTime=toKoreanAmPm(detail.getDepartureTime());
+        request.setDepartureTime(KoreanDepartureTime);
         request.setRunId(runId);
 
         // 출발지

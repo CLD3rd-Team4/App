@@ -14,23 +14,21 @@ import RecommendationReadyPopup from "@/components/modals/RecommendationReadyPop
 import api from "@/lib/interceptor"
 
 // ===== 상수 =====
-const POLL_INTERVAL_MS = 1500 // 폴링 주기(ms)
+const POLL_INTERVAL_MS = 1500
 const RESULT_URL = "/recommend/result"
 const REQUEST_URL = "/recommend/request"
 const LS_RUN_PREFIX = "recommend:lastRun:";
-const LS_SELECTED_KEY = "schedule:lastSelected"; // ✅ 오늘 표시용 선택 저장
+const LS_SELECTED_KEY = "schedule:lastSelected";
 
 const setLastRunId = (scheduleId: string, runId: string) => {
   try { localStorage.setItem(`${LS_RUN_PREFIX}${scheduleId}`, runId) } catch {}
 };
 
-// 각 파일에서 독립적으로 쓰는 runId 생성기 (공유/내보내기 X)
 const genRunId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 
-// 결과 응답(일부 필드만)
 type GetResultsResponse = {
   status: "PENDING" | "OK" | "ERROR" | string
   message?: string
@@ -41,9 +39,7 @@ type GetResultsResponse = {
   }>
 }
 
-// 팝업 상태
 type PopupType = "processing" | "recommendation_ready"
-
 type LastSelected = { scheduleId: string; date: string }
 
 const todayStr = () => {
@@ -59,7 +55,6 @@ const loadLastSelected = (): LastSelected | null => {
     if (!raw) return null
     const parsed = JSON.parse(raw) as LastSelected
     if (!parsed?.scheduleId || !parsed?.date) return null
-    // 날짜가 오늘이 아니면 폐기
     if (parsed.date !== todayStr()) {
       localStorage.removeItem(LS_SELECTED_KEY)
       return null
@@ -90,7 +85,6 @@ export default function ScheduleListScreen() {
 
   const [isClient, setIsClient] = useState(false)
 
-  // 팝업/타임라인 상태
   const [isPopupOpen, setIsPopupOpen] = useState(false)
   const [currentPopup, setCurrentPopup] = useState<PopupType>("processing")
   const [selectedScheduleForPopup, setSelectedScheduleForPopup] = useState<Schedule | null>(null)
@@ -108,22 +102,18 @@ export default function ScheduleListScreen() {
     setIsClient(true)
     loadSchedules()
 
-    // ✅ 오늘 표시용 선택 로드(다르면 자동 해제)
     const last = loadLastSelected()
     setSelectedTodayId(last?.scheduleId ?? null)
   }, [loadSchedules])
 
-  // ===== 추천 트리거 (runId 포함) =====
   const triggerRecommendRequest = async (scheduleId: string, runId: string) => {
     try {
       await api.post(REQUEST_URL, { scheduleId, runId })
     } catch (e) {
       console.error("POST /recommend/request failed:", e)
-      // 실패여도 폴링으로 대기 UX 유지
     }
   }
 
-  // ===== 결과 폴링 (runId 일치 확인) =====
   const startPollingResults = (scheduleId: string, runId: string) => {
     let active = true
     let timer: any = null
@@ -136,7 +126,6 @@ export default function ScheduleListScreen() {
         })
 
         if (res.data.status === "OK") {
-          // 서버가 돌려준 runId가 다르면 내 요청이 아님 → 계속 대기
           if (res.data.runId && res.data.runId !== runId) {
             timer = setTimeout(tick, POLL_INTERVAL_MS)
             return
@@ -152,14 +141,13 @@ export default function ScheduleListScreen() {
           )
           setCurrentPopup("recommendation_ready")
 
-          // ✅ 추천 완료 시 오늘자 선택으로 기록(이전 선택은 덮어씀)
+          // ✅ 오늘자 선택으로 기록
           saveLastSelected(scheduleId)
           setSelectedTodayId(scheduleId)
 
-          return // OK → 폴링 종료
+          return
         }
 
-        // PENDING이면 다음 틱 예약
         timer = setTimeout(tick, POLL_INTERVAL_MS)
       } catch (err) {
         console.error("GET /recommend/result polling error:", err)
@@ -176,37 +164,27 @@ export default function ScheduleListScreen() {
 
   const stopPollingResults = () => pollingStopRef.current?.()
 
-  // ===== 선택 클릭 =====
   const handleScheduleSelect = async (schedule: Schedule) => {
     if (!schedule?.id) return
-
-    // 기존 폴링 정리 후 새 요청 준비
     stopPollingResults()
 
-    // 팝업 오픈 + 타임라인 기본 세팅
     setSelectedScheduleForPopup(schedule)
-    setTimelineItems([]) // 상세 조회 후 채움
+    setTimelineItems([])
     setCurrentPopup("processing")
     setIsPopupOpen(true)
 
     try {
-      // 스케줄 상세(Valkey 저장)
       const fullSchedule = await selectSchedule(schedule.id)
-      if (fullSchedule) {
-        setTimelineItems(generateTimelineItems(fullSchedule))
-      } else {
-        throw new Error("selectSchedule did not return schedule details.")
-      }
+      if (fullSchedule) setTimelineItems(generateTimelineItems(fullSchedule))
+      else throw new Error("selectSchedule did not return schedule details.")
     } catch (e) {
       console.error("스케줄 선택 또는 상세 조회 실패:", e)
     }
 
-    // runId 생성 및 고정
     const runId = genRunId()
     currentRunIdRef.current = runId
     setLastRunId(schedule.id, runId)
 
-    // 추천 분석 요청 & 결과 폴링 시작 (둘 다 같은 runId 사용)
     await triggerRecommendRequest(schedule.id, runId)
     startPollingResults(schedule.id, runId)
   }
@@ -217,7 +195,6 @@ export default function ScheduleListScreen() {
 
   const handleDelete = async (id: string) => {
     await deleteSchedule(id)
-    // 삭제된 항목이 강조중이라면 해제
     if (selectedTodayId === id) {
       localStorage.removeItem(LS_SELECTED_KEY)
       setSelectedTodayId(null)
@@ -233,11 +210,10 @@ export default function ScheduleListScreen() {
     currentRunIdRef.current = null
   }
 
-  // 추천 완료 팝업 → “결과 보기”
   const handleViewResults = async () => {
     if (!selectedScheduleForPopup?.id) return
     try {
-      await selectSchedule(selectedScheduleForPopup.id) // 훅 상태 갱신
+      await selectSchedule(selectedScheduleForPopup.id)
       closePopup()
       router.push("/recommendations/")
     } catch (error) {
@@ -256,6 +232,13 @@ export default function ScheduleListScreen() {
     )
   }
 
+  // ✅ 선택된 스케줄을 최상단으로 정렬
+  const orderedSchedules = selectedTodayId
+    ? [...schedules].sort((a, b) =>
+        a.id === selectedTodayId ? -1 : b.id === selectedTodayId ? 1 : 0
+      )
+    : schedules
+
   return (
     <>
       <div className="min-h-screen bg-gray-100 flex flex-col">
@@ -265,7 +248,7 @@ export default function ScheduleListScreen() {
 
         <div className="flex-1 content-with-bottom-nav">
           <div className="p-4 pb-24">
-            {schedules.length === 0 ? (
+            {orderedSchedules.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-gray-600 mb-4">생성된 스케줄이 없습니다.</p>
                 <Button
@@ -277,7 +260,7 @@ export default function ScheduleListScreen() {
               </div>
             ) : (
               <div className="space-y-3">
-                {schedules.map((schedule) => {
+                {orderedSchedules.map((schedule) => {
                   const isSelectedToday = selectedTodayId === schedule.id
                   return (
                     <div
@@ -287,7 +270,18 @@ export default function ScheduleListScreen() {
                         (isSelectedToday ? "border-2 border-blue-500" : "border border-transparent")
                       }
                     >
-                      <h3 className="font-medium mb-3">{schedule.title}</h3>
+                      {/* 제목 + 배지 한 줄 */}
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-medium">{schedule.title}</h3>
+                          {isSelectedToday && (
+                            <span className="inline-flex items-center h-5 px-2 rounded-full bg-blue-100 text-blue-600 text-xs">
+                              현재 선택
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
                       <div className="flex gap-2">
                         <Button
                           onClick={() => handleDelete(schedule.id!)}
@@ -305,14 +299,18 @@ export default function ScheduleListScreen() {
                         >
                           수정
                         </Button>
-                        <Button
-                          onClick={() => handleScheduleSelect(schedule)}
-                          size="sm"
-                          className="flex-1 bg-blue-500 hover:bg-blue-600 text-white"
-                          disabled={isProcessing}
-                        >
-                          {isProcessing ? "처리 중..." : (isSelectedToday ? "다시 선택" : "선택")}
-                        </Button>
+
+                        {/* ✅ 선택된 카드에는 '선택/다시 선택' 버튼 숨김 */}
+                        {!isSelectedToday && (
+                          <Button
+                            onClick={() => handleScheduleSelect(schedule)}
+                            size="sm"
+                            className="flex-1 bg-blue-500 hover:bg-blue-600 text-white"
+                            disabled={isProcessing}
+                          >
+                            {isProcessing ? "처리 중..." : "선택"}
+                          </Button>
+                        )}
                       </div>
                     </div>
                   )

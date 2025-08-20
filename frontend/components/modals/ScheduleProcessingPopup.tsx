@@ -1,14 +1,27 @@
+"use client"
 
-import { X, RefreshCw } from "lucide-react";
-import type { TimelineItem } from "@/lib/timeline";
+import { RefreshCw, X } from "lucide-react"
+import React from "react"
 
-interface ScheduleProcessingPopupProps {
-  isOpen: boolean;
-  onClose: () => void;
-  scheduleTitle: string;
-  timelineItems: TimelineItem[];
-  statusText: string;
-  isProcessing: boolean;
+type TimelineItem = {
+  time?: string
+  title: string
+  // ...필요시 확장
+}
+
+type Props = {
+  isOpen: boolean
+  onClose: () => void
+  scheduleTitle: string
+  timelineItems: TimelineItem[]
+  statusText: string
+  isProcessing?: boolean
+
+  /** ⬇️ 새 옵션들 */
+  titleAlign?: "left" | "center"
+  statusAlign?: "left" | "center"
+  showLocation?: boolean
+  coordText?: string // 예: "현재 위치: 37.598007, 126.931804"
 }
 
 export default function ScheduleProcessingPopup({
@@ -17,57 +30,50 @@ export default function ScheduleProcessingPopup({
   scheduleTitle,
   timelineItems,
   statusText,
-  isProcessing,
-}: ScheduleProcessingPopupProps) {
-  if (!isOpen) return null;
+  isProcessing = true,
+  titleAlign = "left",
+  statusAlign = "left",
+  showLocation = false,
+  coordText = "",
+}: Props) {
+  if (!isOpen) return null
+
+  const titleCls =
+    "text-xl font-semibold " + (titleAlign === "center" ? "text-center" : "")
+  const statusBoxCls =
+    "px-6 py-4 " + (statusAlign === "center" ? "flex flex-col items-center text-center" : "")
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-md w-full max-h-[60vh] overflow-hidden flex flex-col">
-        <div className="bg-white border-b p-4 flex items-center justify-between rounded-t-lg">
-          <h2 className="text-lg font-medium">{scheduleTitle}</h2>
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
+      <div className="w-[90%] max-w-xl bg-white rounded-2xl shadow-lg overflow-hidden">
+        <div className="p-5 relative">
+          <button
+            aria-label="닫기"
+            onClick={onClose}
+            className="absolute right-4 top-4 text-gray-400 hover:text-gray-600"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <h2 className={titleCls}>{scheduleTitle}</h2>
         </div>
-        <div className="flex-1 overflow-y-auto p-4" style={{ scrollbarWidth: "thin" }}>
-          <div className="space-y-3 pb-4">
-            {timelineItems.map((item, index) => (
-              <div key={index} className={`flex items-center gap-3 ${item.type === "meal_plan" ? "bg-orange-50 rounded-lg p-3 -mx-3" : ""}`}>
-                <div className={`w-8 h-8 ${
-                    item.color === "red" ? "bg-red-100" :
-                    item.color === "blue" ? "bg-blue-100" :
-                    item.color === "orange" ? "bg-orange-500" : "bg-green-100"
-                  } rounded-full flex items-center justify-center relative`}>
-                  {item.status === "calculating" && <RefreshCw className={`w-4 h-4 animate-spin ${item.color === "orange" ? "text-white" : "text-blue-600"}`} />}
-                  {item.status === "completed" && <span className={`text-sm font-medium ${
-                        item.color === "orange" ? "text-white" :
-                        item.color === "red" ? "text-red-600" :
-                        item.color === "blue" ? "text-blue-600" : "text-green-600"
-                      }`}>{item.icon}</span>}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm text-gray-500">{item.time || (item.status === "calculating" ? "검색 중..." : "")}</p>
-                    {item.status === "calculating" && (
-                      <div className="flex space-x-1">
-                        <div className="w-1 h-1 rounded-full animate-bounce bg-orange-500"></div>
-                        <div className="w-1 h-1 rounded-full animate-bounce bg-orange-500" style={{ animationDelay: "0.1s" }}></div>
-                        <div className="w-1 h-1 rounded-full animate-bounce bg-orange-500" style={{ animationDelay: "0.2s" }}></div>
-                      </div>
-                    )}
-                  </div>
-                  <p className="font-medium">{item.title}</p>
-                  {item.description && <p className="text-sm text-gray-600">{item.description}</p>}
-                </div>
-              </div>
-            ))}
+
+        {/* 본문: 타임라인이 있으면 기존 표시, 없으면 상태만 중앙 표시 */}
+        {timelineItems?.length ? (
+          <div className="px-6 pb-4">
+            {/* 타임라인 렌더 (필요 시 기존 코드 유지) */}
           </div>
-        </div>
-        <div className="p-4 border-t">
-          <div className="flex items-center justify-center gap-2 text-gray-600">
-            {isProcessing && <RefreshCw className="w-5 h-5 animate-spin" />}
-            <span className="text-sm">{statusText}</span>
+        ) : (
+          <div className={statusBoxCls}>
+            {showLocation && coordText && (
+              <div className="text-gray-600 mb-2">{coordText}</div>
+            )}
+            <div className="flex items-center gap-2">
+              <RefreshCw className={`w-5 h-5 ${isProcessing ? "animate-spin" : ""} text-gray-500`} />
+              <span className="text-gray-700">{statusText}</span>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
-  );
+  )
 }
