@@ -78,7 +78,7 @@ public class CustomRouteLocator {
                        .filters(f -> f
                                 .filter(xssProtectionFilter.apply(new XssProtectionFilter.Config()))
                                 .filter(jwtAuthenticationFilter.apply(new JwtAuthenticationFilter.Config())))
-                       .uri("http://review.service-review:50051"))
+                       .uri("http://review.service-review:8080"))
 
                 // gRPC (port 50051): 일반 조회 API 
                 .route("review-grpc", r -> r.path("/review/**")
