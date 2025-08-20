@@ -121,7 +121,9 @@ public class CacheConfig {
         // 안전한 직렬화를 위한 ObjectMapper 설정
         ObjectMapper cacheObjectMapper = new ObjectMapper();
         cacheObjectMapper.registerModule(new JavaTimeModule());
-        cacheObjectMapper.deactivateDefaultTyping();
+        // 타입 정보를 포함하여 직렬화하여 ClassCastException 방지
+        cacheObjectMapper.activateDefaultTyping(
+            ObjectMapper.DefaultTyping.NON_FINAL, JsonTypeInfo.As.PROPERTY);
         cacheObjectMapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         cacheObjectMapper.configure(com.fasterxml.jackson.databind.SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
         

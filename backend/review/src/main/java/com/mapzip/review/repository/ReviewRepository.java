@@ -14,55 +14,76 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 @Repository
 public class ReviewRepository {
 
     private final DynamoDbTable<ReviewEntity> reviewTable;
+    private final TableSchema<ReviewEntity> reviewTableSchema;
+    private final ReadWriteLock tableLock = new ReentrantReadWriteLock();
 
     @Autowired
     public ReviewRepository(DynamoDbEnhancedClient enhancedClient,
                            @Value("${aws.dynamodb.table-name}") String tableName) {
-        this.reviewTable = enhancedClient.table(tableName, TableSchema.fromBean(ReviewEntity.class));
+        // 스레드 안전성을 위해 TableSchema를 재사용
+        this.reviewTableSchema = TableSchema.fromBean(ReviewEntity.class);
+        this.reviewTable = enhancedClient.table(tableName, this.reviewTableSchema);
     }
 
     public ReviewEntity save(ReviewEntity review) {
-        if (review.getCreatedAt() == null) {
-            review.setCreatedAt(Instant.now());
+        tableLock.writeLock().lock();
+        try {
+            if (review.getCreatedAt() == null) {
+                review.setCreatedAt(Instant.now());
+            }
+            review.setUpdatedAt(Instant.now());
+            
+            reviewTable.putItem(review);
+            return review;
+        } finally {
+            tableLock.writeLock().unlock();
         }
-        review.setUpdatedAt(Instant.now());
-        
-        reviewTable.putItem(review);
-        return review;
     }
 
     public Optional<ReviewEntity> findByRestaurantIdAndReviewId(String restaurantId, String reviewId) {
-        Key key = Key.builder()
-                .partitionValue(restaurantId)
-                .sortValue(reviewId)
-                .build();
-                
-        ReviewEntity review = reviewTable.getItem(key);
-        return Optional.ofNullable(review);
+        tableLock.readLock().lock();
+        try {
+            Key key = Key.builder()
+                    .partitionValue(restaurantId)
+                    .sortValue(reviewId)
+                    .build();
+                    
+            ReviewEntity review = reviewTable.getItem(key);
+            return Optional.ofNullable(review);
+        } finally {
+            tableLock.readLock().unlock();
+        }
     }
 
     public List<ReviewEntity> findByRestaurantId(String restaurantId, int page, int size) {
-        QueryConditional queryConditional = QueryConditional
-                .keyEqualTo(Key.builder().partitionValue(restaurantId).build());
+        tableLock.readLock().lock();
+        try {
+            QueryConditional queryConditional = QueryConditional
+                    .keyEqualTo(Key.builder().partitionValue(restaurantId).build());
 
-        var querySpec = QueryEnhancedRequest.builder()
-                .queryConditional(queryConditional)
-                .scanIndexForward(false) // 최신순 정렬 (review_id 기준)
-                .build();
+            var querySpec = QueryEnhancedRequest.builder()
+                    .queryConditional(queryConditional)
+                    .scanIndexForward(false) // 최신순 정렬 (review_id 기준)
+                    .build();
 
-        return reviewTable.query(querySpec)
-                .stream()
-                .flatMap(page1 -> page1.items().stream())
-                .filter(item -> item instanceof ReviewEntity) // 타입 체크 추가
-                .map(item -> (ReviewEntity) item)
-                .skip((long) page * size)
-                .limit(size)
-                .collect(Collectors.toList());
+            return reviewTable.query(querySpec)
+                    .stream()
+                    .flatMap(page1 -> page1.items().stream())
+                    .filter(item -> item instanceof ReviewEntity) // 타입 체크 추가
+                    .map(item -> (ReviewEntity) item)
+                    .skip((long) page * size)
+                    .limit(size)
+                    .collect(Collectors.toList());
+        } finally {
+            tableLock.readLock().unlock();
+        }
     }
 
     public List<ReviewEntity> findByUserId(String userId, int page, int size) {

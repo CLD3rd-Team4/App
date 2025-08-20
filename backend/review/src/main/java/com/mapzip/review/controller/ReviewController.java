@@ -232,7 +232,15 @@ public class ReviewController {
         
         // 리뷰 데이터를 Map으로 변환 (타입 안전성 확보)
         List<Map<String, Object>> reviewData = reviews.stream()
-            .filter(review -> review instanceof ReviewEntity) // 타입 체크 추가
+            .filter(review -> {
+                if (review instanceof ReviewEntity) {
+                    return true;
+                } else {
+                    logger.warn("Found non-ReviewEntity object in reviews list: {}", review.getClass().getSimpleName());
+                    return false;
+                }
+            }) // 타입 체크 추가 및 로깅
+            .map(review -> (ReviewEntity) review) // 명시적 캐스팅 추가
             .map(review -> {
                 Map<String, Object> reviewMap = new HashMap<>();
                 reviewMap.put("reviewId", review.getReviewId() != null ? review.getReviewId() : "");
