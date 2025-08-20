@@ -705,7 +705,7 @@ export const reviewApi = {
   getReview: async (restaurantId: string, reviewId: string): Promise<GetReviewResponse> => {
     try {
       // GET /review/{restaurantId}/{reviewId}
-      const response = await api.get(`/review/${restaurantId}/${reviewId}`);
+      const response = await api.get(`/review/${restaurantId}`,{ params: { reviewId }});
       
       // 응답 구조: { success: true, data: {...} }
       return response.data;
