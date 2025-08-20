@@ -129,6 +129,7 @@ public class PendingReviewRepository {
                        reviewToDelete.getRestaurantId(), reviewToDelete.getScheduledTime(), 
                        reviewToDelete.getRestaurantIdScheduledTime());
             
+            // DynamoDB Enhanced Client를 사용한 강제 삭제
             Key key = Key.builder()
                     .partitionValue(userId)
                     .sortValue(compositeKey)
@@ -136,15 +137,43 @@ public class PendingReviewRepository {
             
             logger.info("Using deletion key: partitionValue={}, sortValue={}", userId, compositeKey);
             
-            PendingReviewEntity deletedItem = pendingReviewTable.deleteItem(key);
+            // 삭제 요청 생성 및 실행
+            DeleteItemEnhancedRequest deleteRequest = DeleteItemEnhancedRequest.builder()
+                    .key(key)
+                    .build();
             
-            // 삭제 후 재확인
+            PendingReviewEntity deletedItem = pendingReviewTable.deleteItem(deleteRequest);
+            logger.info("DynamoDB deleteItem operation completed, returned item: {}", 
+                       deletedItem != null ? "present" : "null");
+            
+            // 강제로 짧은 대기 후 재확인 (eventual consistency 고려)
+            try {
+                Thread.sleep(100); // 100ms 대기
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+            }
+            
+            // 삭제 후 재확인 - 더 강력한 검증
             Optional<PendingReviewEntity> afterDeletion = findByUserIdAndCompositeKey(userId, compositeKey);
             
             if (afterDeletion.isEmpty()) {
                 logger.info("=== DELETION SUCCESSFUL ===");
                 logger.info("Successfully deleted pending review for user: {}, compositeKey: {}", userId, compositeKey);
-                return true;
+                
+                // 추가 검증: 전체 목록에서도 제거되었는지 확인
+                List<PendingReviewEntity> allReviewsAfterDeletion = findByUserId(userId);
+                boolean stillExists = allReviewsAfterDeletion.stream()
+                    .anyMatch(review -> compositeKey.equals(review.getRestaurantIdScheduledTime()));
+                
+                if (stillExists) {
+                    logger.error("=== DELETION VERIFICATION FAILED ===");
+                    logger.error("Item still exists in user's pending review list after deletion");
+                    return false;
+                } else {
+                    logger.info("=== DELETION VERIFIED ===");
+                    logger.info("Item successfully removed from user's pending review list");
+                    return true;
+                }
             } else {
                 logger.error("=== DELETION FAILED ===");
                 logger.error("Item still exists after deletion attempt. user: {}, compositeKey: {}", userId, compositeKey);
@@ -154,6 +183,7 @@ public class PendingReviewRepository {
         } catch (Exception e) {
             logger.error("=== DELETION EXCEPTION ===");
             logger.error("Error deleting pending review for user: {}, compositeKey: {}", userId, compositeKey, e);
+            e.printStackTrace();
             return false;
         }
     }

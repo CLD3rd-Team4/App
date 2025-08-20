@@ -646,11 +646,24 @@ public class ReviewService {
                 double averageRating = getRestaurantAverageRating(restaurantId);
                 long totalReviews = getRestaurantReviewCount(restaurantId);
                 
-                // 상위 3개 리뷰 조회 (평점 4점 이상, 최신순)
-                List<ReviewEntity> topReviews = reviewRepository.findByRestaurantId(restaurantId, 0, 10)
+                // 대표 리뷰 조회 (더 정교한 기준 적용)
+                List<ReviewEntity> topReviews = reviewRepository.findByRestaurantId(restaurantId, 0, 20)
                         .stream()
                         .filter(review -> review.getRating() != null && review.getRating() >= 4)
                         .filter(review -> review.getContent() != null && review.getContent().length() >= 10)
+                        .filter(review -> !isSpamReview(review.getContent())) // 스팸 필터링
+                        .sorted((r1, r2) -> {
+                            // 정렬 우선순위: 1) 검증된 리뷰 2) 높은 평점 3) 최신순
+                            boolean r1Verified = Boolean.TRUE.equals(r1.getIsVerified());
+                            boolean r2Verified = Boolean.TRUE.equals(r2.getIsVerified());
+                            int verifiedCompare = Boolean.compare(r2Verified, r1Verified);
+                            if (verifiedCompare != 0) return verifiedCompare;
+                            
+                            int ratingCompare = Integer.compare(r2.getRating(), r1.getRating());
+                            if (ratingCompare != 0) return ratingCompare;
+                            
+                            return r2.getCreatedAt().compareTo(r1.getCreatedAt());
+                        })
                         .limit(3)
                         .collect(Collectors.toList());
                 
