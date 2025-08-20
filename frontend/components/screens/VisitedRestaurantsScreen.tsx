@@ -141,8 +141,7 @@ export default function VisitedRestaurantsScreen() {
         
         setVisitedRestaurants(prev => 
           prev.filter(r => {
-            const rId = r.id;
-            return !(rId === restaurantId && r.scheduledTime === scheduledTime);
+            return !(r.restaurantId === restaurantId && r.scheduledTime === scheduledTime);
           })
         );
       } else {
