@@ -387,9 +387,12 @@ public class ReviewController {
             @PathVariable String restaurantId,
             @PathVariable String reviewId) throws Exception {
         
-        logger.info("Deleting review for user: {}, restaurant: {}, review: {}", userId, restaurantId, reviewId);
+        // URL 디코딩 처리
+        String decodedReviewId = java.net.URLDecoder.decode(reviewId, "UTF-8");
+        logger.info("Deleting review for user: {}, restaurant: {}, review: {} (decoded: {})", 
+                   userId, restaurantId, reviewId, decodedReviewId);
         
-        reviewService.deleteReview(restaurantId, reviewId, userId);
+        reviewService.deleteReview(restaurantId, decodedReviewId, userId);
         
         return ResponseEntity.ok(Map.of(
             "success", true,
@@ -445,9 +448,12 @@ public class ReviewController {
             @PathVariable String restaurantId,
             @PathVariable String reviewId) throws Exception {
         
-        logger.info("Getting review detail for user: {}, restaurant: {}, review: {}", userId, restaurantId, reviewId);
+        // URL 디코딩 처리
+        String decodedReviewId = java.net.URLDecoder.decode(reviewId, "UTF-8");
+        logger.info("Getting review detail for user: {}, restaurant: {}, review: {} (decoded: {})", 
+                   userId, restaurantId, reviewId, decodedReviewId);
         
-        Optional<ReviewEntity> reviewOpt = reviewService.getReviewById(restaurantId, reviewId);
+        Optional<ReviewEntity> reviewOpt = reviewService.getReviewById(restaurantId, decodedReviewId);
         
         if (reviewOpt.isEmpty()) {
             throw new IllegalStateException("리뷰를 찾을 수 없습니다.");
@@ -489,7 +495,10 @@ public class ReviewController {
             @RequestParam("content") String content,
             @RequestParam(value = "reviewImages", required = false) List<MultipartFile> reviewImages) throws Exception {
         
-        logger.info("Updating review for user: {}, restaurant: {}, review: {}", userId, restaurantId, reviewId);
+        // URL 디코딩 처리
+        String decodedReviewId = java.net.URLDecoder.decode(reviewId, "UTF-8");
+        logger.info("Updating review for user: {}, restaurant: {}, review: {} (decoded: {})", 
+                   userId, restaurantId, reviewId, decodedReviewId);
         
         // 입력값 검증
         if (rating < 1 || rating > 5) {
@@ -501,7 +510,7 @@ public class ReviewController {
         }
         
         // 권한 검증 (작성자만 수정 가능)
-        Optional<ReviewEntity> existingReview = reviewService.getReviewById(restaurantId, reviewId);
+        Optional<ReviewEntity> existingReview = reviewService.getReviewById(restaurantId, decodedReviewId);
         if (existingReview.isEmpty()) {
             throw new IllegalStateException("수정할 리뷰를 찾을 수 없습니다.");
         }
@@ -510,7 +519,7 @@ public class ReviewController {
             throw new SecurityException("리뷰 수정 권한이 없습니다.");
         }
         
-        ReviewEntity updatedReview = reviewService.updateReviewWithImages(restaurantId, reviewId, userId, rating, content, reviewImages);
+        ReviewEntity updatedReview = reviewService.updateReviewWithImages(restaurantId, decodedReviewId, userId, rating, content, reviewImages);
         
         // 완전한 리뷰 데이터 반환
         Map<String, Object> reviewData = new HashMap<>();
