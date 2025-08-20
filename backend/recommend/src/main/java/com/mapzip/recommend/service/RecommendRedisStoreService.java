@@ -59,7 +59,7 @@ public class RecommendRedisStoreService {
     	        }
 
     	        // 디버그용: 현재 매핑 상태를 한 번 로그로 확인
-    	        log.debug("[Recommend][Redis] slotIds={}, scheduledTimes={}, slotIdToTime={}",
+    	        log.info("[Recommend][Redis] slotIds={}, scheduledTimes={}, slotIdToTime={}",
     	                slotIds, scheduledTimes, slotIdToTime);
 
     	        for (int i = 0; i < recommendations.size(); i++) {
