@@ -784,13 +784,39 @@ public class ReviewService {
      * 미작성 리뷰 삭제 (사용자가 안간 경우)
      */
     public boolean deletePendingReview(String userId, String restaurantId, String scheduledTime) {
+        logger.info("=== STARTING SERVICE LAYER DELETION ===");
         logger.info("Deleting pending review for user: {}, restaurant: {}, scheduledTime: {}", userId, restaurantId, scheduledTime);
         
-        // 올바른 복합키 생성: restaurantId + "#" + scheduledTime (생성 시와 동일)
-        String compositeKey = restaurantId + "#" + scheduledTime;
-        logger.info("Generated composite key for deletion: {}", compositeKey);
+        // 먼저 사용자의 모든 미작성 리뷰를 조회해서 실제 키 패턴 확인
+        List<PendingReviewEntity> allReviews = pendingReviewRepository.findByUserId(userId);
+        logger.info("User {} has {} pending reviews total:", userId, allReviews.size());
         
-        return pendingReviewRepository.delete(userId, compositeKey);
+        for (PendingReviewEntity review : allReviews) {
+            logger.info("  Existing review: restaurantId={}, scheduledTime={}, compositeKey={}", 
+                       review.getRestaurantId(), review.getScheduledTime(), review.getRestaurantIdScheduledTime());
+        }
+        
+        // 정확한 매칭을 위해 기존 데이터에서 복합키 찾기
+        Optional<PendingReviewEntity> targetReview = allReviews.stream()
+            .filter(review -> restaurantId.equals(review.getRestaurantId()) && scheduledTime.equals(review.getScheduledTime()))
+            .findFirst();
+        
+        if (targetReview.isEmpty()) {
+            logger.error("=== NO MATCHING REVIEW FOUND ===");
+            logger.error("Looking for restaurantId: {}, scheduledTime: {}", restaurantId, scheduledTime);
+            allReviews.forEach(review -> 
+                logger.error("  Available: restaurantId={}, scheduledTime={}", review.getRestaurantId(), review.getScheduledTime()));
+            return false;
+        }
+        
+        // 실제 저장된 복합키 사용
+        String actualCompositeKey = targetReview.get().getRestaurantIdScheduledTime();
+        logger.info("=== USING ACTUAL STORED COMPOSITE KEY: {} ===", actualCompositeKey);
+        
+        boolean result = pendingReviewRepository.delete(userId, actualCompositeKey);
+        logger.info("=== SERVICE LAYER DELETION RESULT: {} ===", result);
+        
+        return result;
     }
     
     /**

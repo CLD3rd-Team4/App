@@ -57,7 +57,7 @@ public class ReviewEntity implements java.io.Serializable {
         return this.createdAtUserId;
     }
 
-    @DynamoDbSecondaryPartitionKey(indexNames = {"UserIdIndex", "RatingIndex"})
+    @DynamoDbSecondaryPartitionKey(indexNames = "UserIdIndex")
     @DynamoDbAttribute("user_id")
     public String getUserId() {
         return userId;
