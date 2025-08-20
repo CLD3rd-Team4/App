@@ -33,6 +33,16 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
   const fileInputRef = useRef<HTMLInputElement>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
 
+  // OCR 날짜 변환 결과를 메모화하여 무한 루프 방지
+  const formattedOcrDate = useMemo(() => {
+    return ocrResult?.visitDate ? formatDateForInput(ocrResult.visitDate) : null;
+  }, [ocrResult?.visitDate]);
+
+  // 날짜 일치 여부를 메모화
+  const isDateMatch = useMemo(() => {
+    return formattedOcrDate === visitDate;
+  }, [formattedOcrDate, visitDate]);
+
   // OCR 날짜를 HTML date input 형식(yyyy-MM-dd)으로 변환
   const formatDateForInput = (ocrDate: string): string | null => {
     try {
@@ -86,16 +96,6 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
       return null
     }
   }
-
-  // OCR 날짜 변환 결과를 메모화하여 무한 루프 방지
-  const formattedOcrDate = useMemo(() => {
-    return ocrResult?.visitDate ? formatDateForInput(ocrResult.visitDate) : null;
-  }, [ocrResult?.visitDate]);
-
-  // 날짜 일치 여부를 메모화
-  const isDateMatch = useMemo(() => {
-    return formattedOcrDate === visitDate;
-  }, [formattedOcrDate, visitDate]);
 
   const handleImageCapture = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
