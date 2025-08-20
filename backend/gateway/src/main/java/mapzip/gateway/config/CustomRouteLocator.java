@@ -75,6 +75,9 @@ public class CustomRouteLocator {
             
                 .route("review-http-detail", r -> r.path("/review/{restaurantId}/{reviewId}") // 상세조회 수정 삭제
                        .and().method("GET", "PUT", "DELETE")
+                       .filters(f -> f
+                                .filter(xssProtectionFilter.apply(new XssProtectionFilter.Config()))
+                                .filter(jwtAuthenticationFilter.apply(new JwtAuthenticationFilter.Config())))
                        .uri("http://review.service-review:50051"))
 
                 // gRPC (port 50051): 일반 조회 API 
