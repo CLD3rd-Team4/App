@@ -335,17 +335,19 @@ export default function ScheduleListScreen() {
       {isPopupOpen && selectedScheduleForPopup && (
         <>
           <ScheduleProcessingPopup
-            isOpen={currentPopup === "processing"}
-            onClose={closePopup}
-            scheduleTitle={selectedScheduleForPopup.title}
-            timelineItems={timelineItems}
-            statusText={
-              currentPopup === "processing"
-                ? "맞춤 식당 추천 검색 중..."
-                : "맞춤 식당 추천 완료!"
-            }
-            isProcessing={currentPopup === "processing"}
-          />
+  isOpen={currentPopup === "processing"}
+  onClose={closePopup}
+  scheduleTitle={selectedScheduleForPopup.title}
+  variant="timeline"                    // ✅ 일정 요약 모드
+  timelineItems={timelineItems}
+  statusText={
+    currentPopup === "processing"
+      ? "맞춤 식당 추천 검색 중..."
+      : "맞춤 식당 추천 완료!"
+  }
+  isProcessing={currentPopup === "processing"}
+/>
+
           <RecommendationReadyPopup
             isOpen={currentPopup === "recommendation_ready"}
             onViewResults={handleViewResults}

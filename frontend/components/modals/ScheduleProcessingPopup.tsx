@@ -6,42 +6,43 @@ import React from "react"
 type TimelineItem = {
   time?: string
   title: string
-  // ...필요시 확장
+  description?: string
 }
 
 type Props = {
   isOpen: boolean
   onClose: () => void
   scheduleTitle: string
-  timelineItems: TimelineItem[]
   statusText: string
   isProcessing?: boolean
 
-  /** ⬇️ 새 옵션들 */
-  titleAlign?: "left" | "center"
-  statusAlign?: "left" | "center"
-  showLocation?: boolean
-  coordText?: string // 예: "현재 위치: 37.598007, 126.931804"
+  /** 새 옵션 */
+  variant?: "timeline" | "location"
+
+  /** timeline 모드 */
+  timelineItems?: TimelineItem[]
+
+  /** location 모드 */
+  coordText?: string // 예: "37.598007, 126.931804"
 }
 
 export default function ScheduleProcessingPopup({
   isOpen,
   onClose,
   scheduleTitle,
-  timelineItems,
   statusText,
   isProcessing = true,
-  titleAlign = "left",
-  statusAlign = "left",
-  showLocation = false,
+  variant = "timeline",
+  timelineItems = [],
   coordText = "",
 }: Props) {
   if (!isOpen) return null
 
   const titleCls =
-    "text-xl font-semibold " + (titleAlign === "center" ? "text-center" : "")
-  const statusBoxCls =
-    "px-6 py-4 " + (statusAlign === "center" ? "flex flex-col items-center text-center" : "")
+    "text-xl font-semibold " + (variant === "location" ? "text-center" : "")
+  const Spinner = (
+    <RefreshCw className={`w-5 h-5 ${isProcessing ? "animate-spin" : ""} text-gray-500`} />
+  )
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
@@ -57,18 +58,40 @@ export default function ScheduleProcessingPopup({
           <h2 className={titleCls}>{scheduleTitle}</h2>
         </div>
 
-        {/* 본문: 타임라인이 있으면 기존 표시, 없으면 상태만 중앙 표시 */}
-        {timelineItems?.length ? (
-          <div className="px-6 pb-4">
-            {/* 타임라인 렌더 (필요 시 기존 코드 유지) */}
-          </div>
+        {variant === "timeline" ? (
+          <>
+            {/* 일정 요약 */}
+            <div className="px-6 pb-2">
+              <ul className="divide-y">
+                {(timelineItems || []).map((it, idx) => (
+                  <li key={idx} className="py-3 flex items-start gap-3">
+                    <div className="w-16 shrink-0 text-sm text-gray-500">
+                      {it.time || ""}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium">{it.title}</p>
+                      {it.description && (
+                        <p className="text-sm text-gray-600 mt-0.5">{it.description}</p>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            {/* 하단 상태줄 */}
+            <div className="px-6 py-4 border-t flex items-center gap-2">
+              {Spinner}
+              <span className="text-gray-700">{statusText}</span>
+            </div>
+          </>
         ) : (
-          <div className={statusBoxCls}>
-            {showLocation && coordText && (
-              <div className="text-gray-600 mb-2">{coordText}</div>
+          // location 모드: 중앙 정렬 + 현재 위치
+          <div className="px-6 py-8 text-center">
+            {coordText && (
+              <div className="text-gray-700 mb-3">현재 위치: {coordText}</div>
             )}
-            <div className="flex items-center gap-2">
-              <RefreshCw className={`w-5 h-5 ${isProcessing ? "animate-spin" : ""} text-gray-500`} />
+            <div className="inline-flex items-center gap-2">
+              {Spinner}
               <span className="text-gray-700">{statusText}</span>
             </div>
           </div>
