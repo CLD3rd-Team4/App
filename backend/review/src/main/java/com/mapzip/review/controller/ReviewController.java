@@ -381,7 +381,7 @@ public class ReviewController {
     /**
      * 작성된 리뷰 삭제
      */
-    @DeleteMapping("/{restaurantId}/{reviewId}")
+    @DeleteMapping("/http/{restaurantId}/{reviewId}")
     public ResponseEntity<Map<String, Object>> deleteReview(
             @RequestHeader("x-user-id") String userId,
             @PathVariable String restaurantId,
@@ -439,7 +439,7 @@ public class ReviewController {
     /**
      * 특정 리뷰 상세 조회
      */
-    @GetMapping("/{restaurantId}")
+    @GetMapping("/http/{restaurantId}/{reviewId}")
     public ResponseEntity<Map<String, Object>> getReview(
             @RequestHeader("x-user-id") String userId,
             @PathVariable String restaurantId,
@@ -480,7 +480,7 @@ public class ReviewController {
     /**
      * 리뷰 수정
      */
-    @PutMapping("/{restaurantId}/{reviewId}")
+    @PutMapping("/http/{restaurantId}/{reviewId}")
     public ResponseEntity<Map<String, Object>> updateReview(
             @RequestHeader("x-user-id") String userId,
             @PathVariable String restaurantId,
