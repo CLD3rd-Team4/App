@@ -168,7 +168,7 @@ public class ReviewEntity implements java.io.Serializable {
     }
     
     // GSI를 위한 ISO 문자열 형태의 created_at (Terraform과 일치시킴)
-    @DynamoDbSecondarySortKey(indexNames = {"UserIdIndex", "StatusIndex", "RatingIndex", "RecommendationIndex", "AddressIndex"})
+    @DynamoDbSecondarySortKey(indexNames = {"UserIdIndex", "StatusIndex", "RecommendationIndex", "AddressIndex"})
     @DynamoDbAttribute("created_at")
     public String getCreatedAtForGsi() {
         return createdAt != null ? createdAt.toString() : null;
