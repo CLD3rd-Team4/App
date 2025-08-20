@@ -108,19 +108,26 @@ public class PendingReviewRepository {
         try {
             // 삭제 전에 해당 데이터가 존재하는지 확인
             Optional<PendingReviewEntity> existing = findByUserIdAndCompositeKey(userId, compositeKey);
+            
+            // 디버깅을 위해 사용자의 모든 미작성 리뷰를 항상 조회
+            List<PendingReviewEntity> allPendingReviews = findByUserId(userId);
+            logger.info("=== DELETION DEBUG INFO ===");
+            logger.info("User {} has {} pending reviews total:", userId, allPendingReviews.size());
+            logger.info("Looking for compositeKey: {}", compositeKey);
+            
+            for (PendingReviewEntity review : allPendingReviews) {
+                logger.info("  - Available compositeKey: '{}', restaurantId: '{}', scheduledTime: '{}'", 
+                           review.getRestaurantIdScheduledTime(), 
+                           review.getRestaurantId(), 
+                           review.getScheduledTime());
+                
+                // 정확한 키 매칭 확인
+                boolean keyMatch = compositeKey.equals(review.getRestaurantIdScheduledTime());
+                logger.info("    Key match: {}", keyMatch);
+            }
+            
             if (existing.isEmpty()) {
                 logger.warn("Pending review not found for deletion - user: {}, compositeKey: {}", userId, compositeKey);
-                
-                // 디버깅을 위해 사용자의 모든 미작성 리뷰 조회
-                List<PendingReviewEntity> allPendingReviews = findByUserId(userId);
-                logger.info("User {} has {} pending reviews:", userId, allPendingReviews.size());
-                for (PendingReviewEntity review : allPendingReviews) {
-                    logger.info("  - compositeKey: {}, restaurantId: {}, scheduledTime: {}", 
-                               review.getRestaurantIdScheduledTime(), 
-                               review.getRestaurantId(), 
-                               review.getScheduledTime());
-                }
-                
                 return false;
             }
             
@@ -146,9 +153,9 @@ public class PendingReviewRepository {
             logger.info("DynamoDB deleteItem operation completed, returned item: {}", 
                        deletedItem != null ? "present" : "null");
             
-            // 강제로 짧은 대기 후 재확인 (eventual consistency 고려)
+            // eventual consistency를 위한 더 긴 대기
             try {
-                Thread.sleep(100); // 100ms 대기
+                Thread.sleep(500); // 500ms 대기로 증가
             } catch (InterruptedException ie) {
                 Thread.currentThread().interrupt();
             }
