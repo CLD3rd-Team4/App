@@ -230,8 +230,9 @@ public class ReviewController {
             // 다음 페이지 존재 여부 계산
             boolean hasNext = (page + 1) * size < totalCount;
         
-        // 리뷰 데이터를 Map으로 변환
+        // 리뷰 데이터를 Map으로 변환 (타입 안전성 확보)
         List<Map<String, Object>> reviewData = reviews.stream()
+            .filter(review -> review instanceof ReviewEntity) // 타입 체크 추가
             .map(review -> {
                 Map<String, Object> reviewMap = new HashMap<>();
                 reviewMap.put("reviewId", review.getReviewId() != null ? review.getReviewId() : "");
