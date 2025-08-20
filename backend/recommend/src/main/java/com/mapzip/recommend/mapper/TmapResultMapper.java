@@ -6,7 +6,11 @@ import java.util.Map;
 
 import com.mapzip.recommend.dto.MultiSlotRecommendRequestDto;
 import com.mapzip.recommend.dto.SlotInfoDto;
+import com.mapzip.recommend.kafka.RecommendRequestConsumer;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 public final class TmapResultMapper {
 
     @SuppressWarnings("unchecked")
@@ -32,7 +36,8 @@ public final class TmapResultMapper {
           
 
             Object mt = s.get("mealType");
-            //sb.mealType(asInt(mt, 0)); // fallback 0
+            log.info("[카카오요청]{} : 해당 mealType은 {}입니다 ",s.get("scheduledTime"),asInt(mt,0));
+            sb.mealType(asInt(mt, 0)); // fallback 0
 
             slots.add(sb.build());
         }
