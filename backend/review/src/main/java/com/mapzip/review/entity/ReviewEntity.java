@@ -53,15 +53,6 @@ public class ReviewEntity implements java.io.Serializable {
      * 형식: "2024-01-01T12:00:00Z_userId"
      */
     public String getReviewId() {
-        System.out.println("=== getReviewId() called ===");
-        System.out.println("createdAtUserId: " + this.createdAtUserId);
-        System.out.println("createdAt: " + this.createdAt);
-        System.out.println("userId: " + this.userId);
-        if (this.createdAtUserId == null && this.createdAt != null && this.userId != null) {
-            System.out.println("createdAtUserId is null, generating: " + this.createdAt.toString() + "_" + this.userId);
-            return this.createdAt.toString() + "_" + this.userId;
-        }
-        System.out.println("returning: " + this.createdAtUserId);
         return this.createdAtUserId;
     }
 
@@ -247,17 +238,15 @@ public class ReviewEntity implements java.io.Serializable {
             this.reviewStatus = "PUBLISHED";
         }
         
-        // 디버깅을 위한 로깅 추가 (더 상세하게)
+        // 디버깅을 위한 로깅 추가
         System.out.println("=== ReviewEntity.generateCompositeKey() ===");
         System.out.println("UserId: " + this.userId);
         System.out.println("CreatedAt: " + this.createdAt);
-        System.out.println("Generated CreatedAtUserId (SORT KEY): " + this.createdAtUserId);
+        System.out.println("CreatedAtUserId: " + this.createdAtUserId);
         System.out.println("CreatedAtForGsi: " + this.getCreatedAtForGsi());
         System.out.println("ReviewStatus: " + this.reviewStatus);
         System.out.println("Rating: " + this.rating);
         System.out.println("IsVerified: " + this.isVerified);
-        System.out.println("RestaurantId: " + this.restaurantId);
-        System.out.println("=== END generateCompositeKey() ===");
     }
     
     // 사용자 ID와 생성 시간에서 복합키 생성

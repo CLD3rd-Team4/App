@@ -401,19 +401,6 @@ public class ReviewService {
         // 4. reviewId만으로 전체 스캔 시도
         if (existingReview.isEmpty()) {
             logger.warn("모든 방식 실패, reviewId로 전체 스캔 시도");
-            
-            // 먼저 해당 restaurantId의 모든 리뷰를 확인 (디버깅용)
-            try {
-                List<ReviewEntity> allReviewsForRestaurant = reviewRepository.findByRestaurantId(restaurantId, 0, 100);
-                logger.info("Restaurant {} has {} total reviews:", restaurantId, allReviewsForRestaurant.size());
-                for (ReviewEntity r : allReviewsForRestaurant) {
-                    logger.info("  - reviewId(sort key): {}, createdAt: {}, userId: {}", 
-                               r.getCreatedAtUserId(), r.getCreatedAt(), r.getUserId());
-                }
-            } catch (Exception e) {
-                logger.warn("Failed to fetch restaurant reviews for debugging", e);
-            }
-            
             if (reviewId.contains("_") || reviewId.contains("#")) {
                 existingReview = reviewRepository.findByReviewId(reviewId);
             } else {
