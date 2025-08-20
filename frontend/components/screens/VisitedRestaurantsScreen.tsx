@@ -53,20 +53,43 @@ export default function VisitedRestaurantsScreen() {
   const [newRestaurantAddress, setNewRestaurantAddress] = useState('')
 
   useEffect(() => {
-    loadVisitedRestaurants()
-    loadCompletedReviews()
+    const initializeData = async () => {
+      try {
+        console.log('방문식당 페이지 초기화 시작')
+        await Promise.allSettled([
+          loadVisitedRestaurants(),
+          loadCompletedReviews()
+        ])
+        console.log('방문식당 페이지 초기화 완료')
+      } catch (error) {
+        console.error('방문식당 페이지 초기화 실패:', error)
+        setError('페이지를 불러오는 중 오류가 발생했습니다.')
+      }
+    }
+    
+    initializeData()
   }, [])
 
   const loadVisitedRestaurants = async () => {
     try {
       setIsLoading(true)
       setError(null)
+      console.log('미작성 리뷰 데이터 로드 시작')
+      
       const data = await visitedRestaurantApi.getVisitedRestaurants()
-      console.log('미작성 리뷰 데이터:', data) // 디버깅용
-      setVisitedRestaurants(data)
+      console.log('미작성 리뷰 데이터:', data)
+      
+      // 데이터 유효성 검증
+      if (Array.isArray(data)) {
+        setVisitedRestaurants(data)
+      } else {
+        console.warn('미작성 리뷰 데이터가 배열이 아님:', data)
+        setVisitedRestaurants([])
+      }
     } catch (error: any) {
       console.error("미작성 리뷰 목록 로드 실패:", error)
-      setError(error.message || '데이터를 불러오는 데 실패했습니다.')
+      setError(error.message || '미작성 리뷰 데이터를 불러오는 데 실패했습니다.')
+      setVisitedRestaurants([])
     } finally {
       setIsLoading(false)
     }
@@ -74,9 +97,17 @@ export default function VisitedRestaurantsScreen() {
 
   const loadCompletedReviews = async () => {
     try {
+      console.log('작성된 리뷰 데이터 로드 시작')
       const response = await reviewApi.getUserReviews(0, 10) // page=0부터 시작
-      console.log('작성된 리뷰 데이터:', response) // 디버깅용
-      setCompletedReviews(response.data || [])
+      console.log('작성된 리뷰 데이터:', response)
+      
+      // 응답 데이터 유효성 검증
+      if (response && Array.isArray(response.data)) {
+        setCompletedReviews(response.data)
+      } else {
+        console.warn('작성된 리뷰 응답 데이터가 예상 형식이 아님:', response)
+        setCompletedReviews([])
+      }
     } catch (error: any) {
       console.error("작성된 리뷰 목록 로드 실패:", error)
       // 에러가 있어도 미작성 리뷰는 표시하도록 함
@@ -186,13 +217,29 @@ export default function VisitedRestaurantsScreen() {
             </div>
           ) : error ? (
             <div className="text-center py-8">
-              <p className="text-red-600 mb-4">에러: {error}</p>
-              <Button
-                onClick={loadVisitedRestaurants}
-                className="bg-blue-500 hover:bg-blue-600 text-white"
-              >
-                다시 시도
-              </Button>
+              <p className="text-red-600 mb-2">⚠️ 로드 오류</p>
+              <p className="text-sm text-gray-600 mb-4">{error}</p>
+              <div className="flex gap-2 justify-center">
+                <Button
+                  onClick={() => {
+                    setError(null)
+                    loadVisitedRestaurants()
+                  }}
+                  className="bg-blue-500 hover:bg-blue-600 text-white"
+                >
+                  미작성 리뷰 다시 로드
+                </Button>
+                <Button
+                  onClick={() => {
+                    setError(null)
+                    loadCompletedReviews()
+                  }}
+                  variant="outline"
+                  className="border-blue-500 text-blue-500"
+                >
+                  작성된 리뷰 다시 로드
+                </Button>
+              </div>
             </div>
           ) : visitedRestaurants.length === 0 ? (
             <div className="text-center py-8">

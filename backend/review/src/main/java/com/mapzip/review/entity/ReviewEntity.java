@@ -233,6 +233,21 @@ public class ReviewEntity implements java.io.Serializable {
         if (this.userId != null) {
             this.createdAtUserId = this.createdAt.toString() + "#" + this.userId;
         }
+        
+        // GSI 필드들도 명시적으로 설정하여 null 값 방지
+        if (this.reviewStatus == null || this.reviewStatus.isEmpty()) {
+            this.reviewStatus = "PUBLISHED";
+        }
+        
+        // 디버깅을 위한 로깅 추가
+        System.out.println("=== ReviewEntity.generateCompositeKey() ===");
+        System.out.println("UserId: " + this.userId);
+        System.out.println("CreatedAt: " + this.createdAt);
+        System.out.println("CreatedAtUserId: " + this.createdAtUserId);
+        System.out.println("CreatedAtForGsi: " + this.getCreatedAtForGsi());
+        System.out.println("ReviewStatus: " + this.reviewStatus);
+        System.out.println("Rating: " + this.rating);
+        System.out.println("IsVerified: " + this.isVerified);
     }
     
     // 사용자 ID와 생성 시간에서 복합키 생성

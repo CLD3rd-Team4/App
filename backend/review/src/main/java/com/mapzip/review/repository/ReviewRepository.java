@@ -65,24 +65,22 @@ public class ReviewRepository {
 
     public List<ReviewEntity> findByUserId(String userId, int page, int size) {
         try {
-            DynamoDbIndex<ReviewEntity> index = reviewTable.index("UserIdIndex");
-            QueryConditional queryConditional = QueryConditional
-                    .keyEqualTo(Key.builder().partitionValue(userId).build());
-
-            QueryEnhancedRequest queryRequest = QueryEnhancedRequest.builder()
-                    .queryConditional(queryConditional)
-                    .scanIndexForward(false) // 최신순 정렬 (created_at 역순)
-                    .build();
-
-            return index.query(queryRequest)
-                    .stream()
-                    .flatMap(queryPage -> queryPage.items().stream())
-                    .skip((long) page * size)
-                    .limit(size)
-                    .collect(Collectors.toList());
+            // 입력값 검증
+            if (userId == null || userId.trim().isEmpty()) {
+                System.err.println("=== INVALID USERID ===");
+                System.err.println("UserId is null or empty");
+                return new ArrayList<>();
+            }
+            
+            System.out.println("=== 사용자 리뷰 조회 시작 (테이블 스캔 방식) ===");
+            System.out.println("UserId: " + userId + ", Page: " + page + ", Size: " + size);
+            
+            // GSI 대신 테이블 스캔 방식을 기본으로 사용 (데이터 일관성 문제 해결)
+            return findByUserIdWithScan(userId, page, size);
+            
         } catch (Exception e) {
-            // GSI 문제에 대한 상세 로깅
-            System.err.println("=== USERIDINDEX GSI 쿼리 실패 ===");
+            // 모든 예외를 잡아서 빈 리스트 반환 (500 에러 방지)
+            System.err.println("=== 사용자 리뷰 조회 실패 ===");
             System.err.println("UserId: " + userId + ", Page: " + page + ", Size: " + size);
             System.err.println("Exception type: " + e.getClass().getSimpleName());
             System.err.println("Exception message: " + e.getMessage());
@@ -90,26 +88,69 @@ public class ReviewRepository {
                 System.err.println("Cause: " + e.getCause().getClass().getSimpleName() + " - " + e.getCause().getMessage());
             }
             e.printStackTrace();
-            System.err.println("UserIdIndex GSI 쿼리 실패로 빈 목록 반환");
+            System.err.println("모든 예외를 처리하여 빈 목록 반환");
+            return new ArrayList<>();
+        }
+    }
+    
+    /**
+     * GSI가 실패할 경우 사용하는 테이블 스캔 폴백 메서드
+     */
+    private List<ReviewEntity> findByUserIdWithScan(String userId, int page, int size) {
+        try {
+            System.out.println("=== 테이블 스캔으로 사용자 리뷰 조회 시작 ===");
+            System.out.println("UserId: " + userId + ", Page: " + page + ", Size: " + size);
+            
+            ScanEnhancedRequest scanRequest = ScanEnhancedRequest.builder()
+                    .filterExpression(Expression.builder()
+                            .expression("user_id = :userId")
+                            .putExpressionValue(":userId", AttributeValue.builder().s(userId).build())
+                            .build())
+                    .build();
+            
+            List<ReviewEntity> results = reviewTable.scan(scanRequest)
+                    .stream()
+                    .flatMap(scanPage -> {
+                        List<ReviewEntity> pageItems = scanPage.items();
+                        System.out.println("테이블 스캔 페이지 결과: " + pageItems.size() + "개 항목");
+                        return pageItems.stream();
+                    })
+                    .sorted((r1, r2) -> r2.getCreatedAt().compareTo(r1.getCreatedAt())) // 최신순 정렬
+                    .skip((long) page * size)
+                    .limit(size)
+                    .collect(Collectors.toList());
+            
+            System.out.println("=== 테이블 스캔 완료 ===");
+            System.out.println("최종 결과: " + results.size() + "개 리뷰");
+            
+            return results;
+            
+        } catch (Exception scanError) {
+            System.err.println("=== 테이블 스캔도 실패 ===");
+            System.err.println("Scan Error: " + scanError.getMessage());
+            scanError.printStackTrace();
             return new ArrayList<>();
         }
     }
 
     public long countByUserId(String userId) {
         try {
-            DynamoDbIndex<ReviewEntity> index = reviewTable.index("UserIdIndex");
-            QueryConditional queryConditional = QueryConditional
-                    .keyEqualTo(Key.builder().partitionValue(userId).build());
-
-            return index.query(QueryEnhancedRequest.builder()
-                    .queryConditional(queryConditional)
-                    .build())
-                    .stream()
-                    .mapToLong(queryPage -> queryPage.items().size())
-                    .sum();
+            // 입력값 검증
+            if (userId == null || userId.trim().isEmpty()) {
+                System.err.println("=== INVALID USERID FOR COUNT ===");
+                System.err.println("UserId is null or empty");
+                return 0;
+            }
+            
+            System.out.println("=== 사용자 리뷰 개수 조회 시작 (테이블 스캔 방식) ===");
+            System.out.println("UserId: " + userId);
+            
+            // GSI 대신 테이블 스캔 방식을 기본으로 사용 (데이터 일관성 문제 해결)
+            return countByUserIdWithScan(userId);
+            
         } catch (Exception e) {
-            // GSI 문제에 대한 상세 로깅
-            System.err.println("=== USERIDINDEX GSI COUNT 쿼리 실패 ===");
+            // 모든 예외를 잡아서 0 반환 (500 에러 방지)
+            System.err.println("=== 사용자 리뷰 개수 조회 실패 ===");
             System.err.println("UserId: " + userId);
             System.err.println("Exception type: " + e.getClass().getSimpleName());
             System.err.println("Exception message: " + e.getMessage());
@@ -117,7 +158,44 @@ public class ReviewRepository {
                 System.err.println("Cause: " + e.getCause().getClass().getSimpleName() + " - " + e.getCause().getMessage());
             }
             e.printStackTrace();
-            System.err.println("UserIdIndex GSI count 쿼리 실패로 0 반환");
+            System.err.println("모든 예외를 처리하여 0 반환");
+            return 0;
+        }
+    }
+    
+    /**
+     * GSI가 실패할 경우 사용하는 테이블 스캔 카운트 폴백 메서드
+     */
+    private long countByUserIdWithScan(String userId) {
+        try {
+            System.out.println("=== 테이블 스캔으로 사용자 리뷰 카운트 시작 ===");
+            System.out.println("UserId: " + userId);
+            
+            ScanEnhancedRequest scanRequest = ScanEnhancedRequest.builder()
+                    .filterExpression(Expression.builder()
+                            .expression("user_id = :userId")
+                            .putExpressionValue(":userId", AttributeValue.builder().s(userId).build())
+                            .build())
+                    .build();
+            
+            long count = reviewTable.scan(scanRequest)
+                    .stream()
+                    .mapToLong(scanPage -> {
+                        long pageCount = scanPage.items().size();
+                        System.out.println("테이블 스캔 카운트 페이지: " + pageCount + "개 항목");
+                        return pageCount;
+                    })
+                    .sum();
+            
+            System.out.println("=== 테이블 스캔 카운트 완료 ===");
+            System.out.println("총 개수: " + count);
+            
+            return count;
+            
+        } catch (Exception scanError) {
+            System.err.println("=== 테이블 스캔 카운트도 실패 ===");
+            System.err.println("Scan Error: " + scanError.getMessage());
+            scanError.printStackTrace();
             return 0;
         }
     }

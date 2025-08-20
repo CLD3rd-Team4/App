@@ -587,13 +587,17 @@ export const reviewApi = {
   },
 
   // 사용자 리뷰 목록 조회 (JWT 토큰에서 userId 자동 추출)
-  getUserReviews: async (page: number = 1, size: number = 10): Promise<GetUserReviewsResponse> => {
+  getUserReviews: async (page: number = 0, size: number = 10): Promise<GetUserReviewsResponse> => {
     try {
+      // 백엔드는 0부터 시작하는 페이지 번호를 사용하므로 기본값을 0으로 설정
+      console.log('사용자 리뷰 조회 API 호출:', { page, size });
       const response = await api.get('/review/user', {
         params: { page, size }
       });
+      console.log('사용자 리뷰 조회 API 응답:', response.data);
       return response.data;
     } catch (error) {
+      console.error('사용자 리뷰 조회 API 에러:', error);
       if (error instanceof APIError) throw error;
       if (error instanceof Error) {
         throw new APIError('네트워크 오류가 발생했습니다: ' + error.message, 0, { originalError: error });
