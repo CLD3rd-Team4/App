@@ -244,6 +244,12 @@ public class ReviewController {
             .map(review -> {
                 Map<String, Object> reviewMap = new HashMap<>();
                 reviewMap.put("reviewId", review.getReviewId() != null ? review.getReviewId() : "");
+                String reviewId = review.getReviewId();
+                // reviewId에 #이 포함되어 있지 않다면, 잘못된 형식으로 간주하고 수정합니다.
+                if (reviewId != null && !reviewId.contains("#") && review.getCreatedAt() != null && review.getUserId() != null) {
+                    reviewId = review.getCreatedAt().toString() + "#" + review.getUserId();
+                }
+                reviewMap.put("reviewId", reviewId != null ? reviewId : "");
                 reviewMap.put("restaurantId", review.getRestaurantId() != null ? review.getRestaurantId() : "");
                 reviewMap.put("restaurantName", review.getRestaurantName() != null ? review.getRestaurantName() : "");
                 reviewMap.put("restaurantAddress", review.getRestaurantAddress() != null ? review.getRestaurantAddress() : "");
