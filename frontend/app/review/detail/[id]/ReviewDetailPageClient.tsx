@@ -34,21 +34,17 @@ export default function ReviewDetailPageClient() {
       try {
         setIsLoading(true)
         setError(null)
-        
-        // params.id는 실제로는 reviewId이고, restaurantId가 필요함
-        // URL 패턴을 /review/detail/{restaurantId}/{reviewId}로 변경하거나
-        // 임시로 reviewId만으로 조회 가능하도록 API 수정 필요
-        
-        // 현재는 reviewId만 있으므로 getUserReviews에서 해당 리뷰를 찾는 방식 사용
-        const userReviews = await reviewApi.getUserReviews(0, 100); // 많은 수 조회 (page=0부터 시작)
-        const targetReview = userReviews.data?.find((r: any) => r.reviewId === params.id);
-        
-        if (!targetReview) {
+
+        // ID로 리뷰를 직접 조회하는 새로운 API 호출
+        const response = await reviewApi.getReview(params.id as string);
+
+        if (!response.success || !response.data) {
           setError("리뷰를 찾을 수 없습니다.");
           return;
         }
-        
-        // 실제 API 데이터 구조에 맞게 변환
+
+        // API 응답 데이터를 UI에서 사용하는 형식으로 변환
+        const targetReview = response.data;
         const reviewData = {
           id: targetReview.reviewId,
           restaurantId: targetReview.restaurantId,
@@ -58,14 +54,14 @@ export default function ReviewDetailPageClient() {
           visitDate: targetReview.visitDate || targetReview.createdAt?.split('T')[0] || "",
           review: targetReview.content || "",
           images: targetReview.imageUrls || [],
-          isOwner: true // getUserReviews는 본인 리뷰만 조회하므로 항상 true
+          isOwner: (response.data as any).isOwner === true // isOwner 필드 사용
         };
-        
+
         setReview(reviewData)
         setEditedRating(reviewData.rating)
         setEditedReview(reviewData.review)
         setEditedImages([...reviewData.images])
-        
+
       } catch (error: any) {
         console.error("리뷰 상세 정보 로드 실패:", error)
         if (error instanceof APIError) {
