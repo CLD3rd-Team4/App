@@ -224,11 +224,11 @@ public class ReviewController {
         List<Map<String, Object>> reviewData = reviews.stream()
             .map(review -> {
                 Map<String, Object> reviewMap = new HashMap<>();
-                reviewMap.put("reviewId", review.getReviewId());
-                reviewMap.put("restaurantId", review.getRestaurantId());
+                reviewMap.put("reviewId", review.getReviewId() != null ? review.getReviewId() : "");
+                reviewMap.put("restaurantId", review.getRestaurantId() != null ? review.getRestaurantId() : "");
                 reviewMap.put("restaurantName", review.getRestaurantName() != null ? review.getRestaurantName() : "");
                 reviewMap.put("restaurantAddress", review.getRestaurantAddress() != null ? review.getRestaurantAddress() : "");
-                reviewMap.put("rating", review.getRating());
+                reviewMap.put("rating", review.getRating() != null ? review.getRating() : 0);
                 reviewMap.put("content", review.getContent() != null ? review.getContent() : "");
                 reviewMap.put("imageUrls", review.getImageUrls() != null ? review.getImageUrls() : List.of());
                 reviewMap.put("visitDate", review.getVisitDate() != null ? review.getVisitDate() : "");

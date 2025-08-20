@@ -119,9 +119,15 @@ public class PendingReviewRepository {
                     .sortValue(compositeKey)
                     .build();
                     
-            pendingReviewTable.deleteItem(key);
-            logger.info("Successfully deleted pending review for user: {}, compositeKey: {}", userId, compositeKey);
-            return true;
+            PendingReviewEntity deletedItem = pendingReviewTable.deleteItem(key);
+            
+            if (deletedItem != null) {
+                logger.info("Successfully deleted pending review for user: {}, compositeKey: {}", userId, compositeKey);
+                return true;
+            } else {
+                logger.warn("DeleteItem returned null. Deletion may have failed silently. user: {}, compositeKey: {}", userId, compositeKey);
+                return false;
+            }
             
         } catch (Exception e) {
             logger.error("Error deleting pending review for user: {}, compositeKey: {}", userId, compositeKey, e);
