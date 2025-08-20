@@ -58,7 +58,7 @@ public class TmapRequestMapper {
         List<MealSlotData> mealSlots = detail.getMealSlotsList().stream()
                 .map((MealTimeSlot slot) -> MealSlotData.builder()
                         .slotId(slot.getSlotId())
-                        .scheduledTime(slot.getScheduledTime())
+                        .scheduledTime(toKoreanAmPm(slot.getScheduledTime()))
                         .radius(slot.getRadius())
                         .mealType(slot.getMealType().getNumber()) // enum → int
                         .build())

@@ -1,4 +1,3 @@
-// components/screens/ScheduleSummaryScreen.tsx
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
@@ -46,7 +45,6 @@ type ScheduleDetailResp = {
     estimatedArrivalTime: string
     waypointNames: string[]
     waypointTimes: string[]
-    // 업데이트는 시간만 전달
     updates?: Array<{ time: string }>
   }
 }
@@ -80,7 +78,6 @@ type GetResultsResponse = {
     places: Array<{ id: string; placeName: string }>
   }>
 }
-
 type PopupType = "processing" | "recommendation_ready"
 
 /** "오전/오후 HH:mm" | "HH:mm" | ISO → Date(오늘 날짜) */
@@ -109,13 +106,10 @@ const parseDisplayTimeToDate = (time?: string): Date | null => {
   return isNaN(maybe.getTime()) ? null : maybe
 }
 
-/** 표시용: “오전/오후 HH:mm” (백에서 그대로 오면 그대로 사용) */
-const toKoreanAmPmRaw = (time?: string): string => {
-  if (!time) return "시간 미정"
-  return time
-}
+/** 백 문자열 그대로 표시 */
+const toKoreanAmPmRaw = (time?: string): string => (!time ? "시간 미정" : time)
 
-/** 분 단위 비교값(0~1439). 인식 실패 시 null */
+/** 분 단위 비교값 */
 const minutesOfDay = (time?: string): number | null => {
   const d = parseDisplayTimeToDate(time)
   if (!d) return null
@@ -159,8 +153,8 @@ export default function ScheduleSummaryScreen() {
   const [currentPopup, setCurrentPopup] = useState<PopupType>("processing")
   const [updating, setUpdating] = useState(false)
 
-  // 팝업에서 좌표 보여주기용
-  const [coordText, setCoordText] = useState<string>("") // "위치: 37.12345, 127.12345"
+  // 팝업에서 좌표 보여주기용 (값은 "37.123456, 127.123456")
+  const [coordText, setCoordText] = useState<string>("")
 
   // 폴링 및 요청 식별자
   const pollingStopRef = useRef<() => void>(() => {})
@@ -207,7 +201,7 @@ export default function ScheduleSummaryScreen() {
           return
         }
 
-        // 서버에서 스케줄 정보 조회 — 실패/없음이면 로컬 선택 내역 무시하고 에러 출력
+        // 스케줄 상세 조회
         let d: ScheduleDetailResp["scheduleDetail"] | undefined
         try {
           const { data } = await api.get<ScheduleDetailResp>(
@@ -264,7 +258,7 @@ export default function ScheduleSummaryScreen() {
         }
 
         if (mounted) setVm(nextVm)
-      } catch (e: any) {
+      } catch {
         if (mounted) {
           setError("선택 내역이 없습니다. 스케줄을 먼저 선택해주세요.")
           setVm(null)
@@ -278,7 +272,14 @@ export default function ScheduleSummaryScreen() {
     }
   }, [])
 
-  /** 폴링: 같은 scheduleId라도 runId가 일치할 때만 OK로 인정(서버 미지원 시 무시) */
+  /** 출발 전 여부 (버튼 비활성화에도 사용) */
+  const isBeforeDeparture = useMemo(() => {
+    if (!vm?.departureTime) return false
+    const dep = parseDisplayTimeToDate(vm.departureTime)
+    return dep ? Date.now() < dep.getTime() : false
+  }, [vm?.departureTime])
+
+  /** 폴링 */
   const startPollingResults = (scheduleId: string) => {
     let active = true
     let timer: any = null
@@ -291,7 +292,6 @@ export default function ScheduleSummaryScreen() {
         if (runId) params.runId = runId
 
         const res = await api.get<GetResultsResponse>(RECOMMEND_RESULT_URL, { params })
-
         if (res.data.status === "OK") {
           if (runId && res.data.runId && res.data.runId !== runId) {
             timer = setTimeout(tick, POLL_INTERVAL_MS)
@@ -309,7 +309,6 @@ export default function ScheduleSummaryScreen() {
 
     tick()
     pollingStopRef.current = () => {
-      let _ = active
       active = false
       if (timer) clearTimeout(timer)
     }
@@ -322,7 +321,7 @@ export default function ScheduleSummaryScreen() {
       navigator.geolocation.getCurrentPosition(resolve, reject, opts)
     })
 
-  /** 업데이트 트리거: 같은 runId로 POST */
+  /** 업데이트 트리거 */
   const triggerRecommendUpdate = async (scheduleId: string, lat: number, lng: number) => {
     const runId = currentRunIdRef.current || genRunId()
     currentRunIdRef.current = runId
@@ -339,12 +338,18 @@ export default function ScheduleSummaryScreen() {
   }
 
   const handleUpdate = async () => {
-    if (!vm?.scheduleId) {
-      alert("스케줄을 먼저 선택해주세요.")
-      return
-    }
+  if (!vm?.scheduleId) {
+    alert("스케줄을 먼저 선택해주세요.")
+    return
+  }
 
-    // ETA 선검사 (출발보다 이르면 다음날로 보정)
+  // ✅ 출발 전이면 즉시 차단 + 안내
+  if (isBeforeDeparture) {
+    alert("아직 출발 전입니다. 출발 이후에 추천 업데이트를 요청할 수 있어요.")
+    return
+  }
+
+    // ETA 선검사 (출발보다 이르면 다음날로 보정하여 비교)
     if (vm.calculatedArrivalTime) {
       const anchoredEta = anchorToScheduleDay(vm.calculatedArrivalTime, vm.departureTime)
       if (anchoredEta && Date.now() > anchoredEta.getTime()) {
@@ -354,7 +359,7 @@ export default function ScheduleSummaryScreen() {
     }
 
     try {
-      // 먼저 현재 위치 받아와서 팝업에 표시
+      // 위치 먼저 받아서 팝업에 표시
       const pos = await getCurrentPositionAsync({
         enableHighAccuracy: true,
         timeout: 10000,
@@ -362,7 +367,7 @@ export default function ScheduleSummaryScreen() {
       })
       const lat = +pos.coords.latitude.toFixed(6)
       const lng = +pos.coords.longitude.toFixed(6)
-      setCoordText(`위치: ${lat}, ${lng}`)
+      setCoordText(`${lat}, ${lng}`) // 저장은 좌표만
 
       setUpdating(true)
       setIsPopupOpen(true)
@@ -406,7 +411,6 @@ export default function ScheduleSummaryScreen() {
       })
     }
 
-    // 업데이트 히스토리 (시간만)
     vm.updates?.forEach((u) => {
       items.push({
         type: "update",
@@ -477,16 +481,45 @@ export default function ScheduleSummaryScreen() {
         <div className="bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between">
             <h1 className="text-lg font-medium">나의 스케줄 요약</h1>
-            <Button
-              onClick={handleUpdate}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2 border-blue-200 text-blue-600 hover:bg-blue-50"
-              disabled={isProcessing || updating}
-            >
-              <RefreshCw className={`w-4 h-4 ${isProcessing || updating ? "animate-spin" : ""}`} />
-              {isProcessing || updating ? "업데이트 중..." : "추천 업데이트"}
-            </Button>
+            <div className="flex flex-col items-end">
+              <Button
+  onClick={handleUpdate}
+  variant="outline"
+  size="sm"
+  className="flex items-center gap-2 border-blue-200 text-blue-600 hover:bg-blue-50"
+  disabled={isProcessing || updating}   // ← isBeforeDeparture 제거
+  title={isBeforeDeparture ? "아직 출발 전이에요. 클릭하면 안내를 드려요." : undefined}
+>
+  <RefreshCw className={`w-4 h-4 ${isProcessing || updating ? "animate-spin" : ""}`} />
+  {isProcessing || updating ? "업데이트 중..." : "추천 업데이트"}
+</Button>
+
+{/* 안내 문구는 그대로 유지해도 좋음 */}
+{isBeforeDeparture && (
+  <span className="mt-1 text-xs text-red-500">
+    아직 출발 전입니다. 출발 후 요청해 주세요.
+  </span>
+)}
+<Button
+  onClick={handleUpdate}
+  variant="outline"
+  size="sm"
+  className="flex items-center gap-2 border-blue-200 text-blue-600 hover:bg-blue-50"
+  disabled={isProcessing || updating}   // ← isBeforeDeparture 제거
+  title={isBeforeDeparture ? "아직 출발 전이에요. 클릭하면 안내를 드려요." : undefined}
+>
+  <RefreshCw className={`w-4 h-4 ${isProcessing || updating ? "animate-spin" : ""}`} />
+  {isProcessing || updating ? "업데이트 중..." : "추천 업데이트"}
+</Button>
+
+{/* 안내 문구는 그대로 유지해도 좋음 */}
+{isBeforeDeparture && (
+  <span className="mt-1 text-xs text-red-500">
+    아직 출발 전입니다. 출발 후 요청해 주세요.
+  </span>
+)}
+
+            </div>
           </div>
         </div>
 
@@ -590,23 +623,19 @@ export default function ScheduleSummaryScreen() {
       {isPopupOpen && (
         <>
           <ScheduleProcessingPopup
-            isOpen={currentPopup === "processing"}
-            onClose={() => {
-              setIsPopupOpen(false)
-              setUpdating(false)
-              stopPollingResults()
-            }}
-            // ✅ 제목을 ‘위치 업데이트 중’으로 (도착지명 대신)
-            scheduleTitle={"위치 업데이트 중"}
-            // ✅ 중앙 정렬에 좌표 표시
-            timelineItems={[]}
-            statusText={
-              coordText
-                ? `${coordText}\n맞춤 식당 추천 검색 중...`
-                : "맞춤 식당 추천 검색 중..."
-            }
-            isProcessing={currentPopup === "processing"}
-          />
+  isOpen={currentPopup === "processing"}
+  onClose={() => {
+    setIsPopupOpen(false)
+    setUpdating(false)
+    stopPollingResults()
+  }}
+  scheduleTitle="위치 업데이트 중"
+  variant="location"                    // ✅ 위치 모드(중앙 정렬)
+  coordText={coordText}                 // "37.598007, 126.931804"
+  statusText="맞춤 식당 추천 검색 중..."
+  isProcessing={currentPopup === "processing"}
+/>
+
           <RecommendationReadyPopup
             isOpen={currentPopup === "recommendation_ready"}
             onViewResults={async () => {
