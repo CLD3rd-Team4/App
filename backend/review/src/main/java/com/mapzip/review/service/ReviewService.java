@@ -365,33 +365,34 @@ public class ReviewService {
     })
     public void deleteReview(String restaurantId, String reviewId, String userId) {
         logger.info("리뷰 삭제 시작 - restaurantId: {}, reviewId: {}, userId: {}", restaurantId, reviewId, userId);
-        
+
         // 사용자 인증 검증
         validateUserAuthentication(userId);
-        
+
         // 여러 방법으로 리뷰 찾기 시도
         Optional<ReviewEntity> existingReview = reviewRepository.findByRestaurantIdAndReviewId(restaurantId, reviewId);
-        
+
         if (existingReview.isEmpty()) {
             logger.warn("기본 방식으로 리뷰를 찾을 수 없음, reviewId로 다시 시도: {}", reviewId);
             // reviewId로도 찾아보기
             existingReview = reviewRepository.findByReviewId(reviewId);
-            
+
             if (existingReview.isEmpty()) {
                 logger.error("리뷰를 찾을 수 없음 - restaurantId: {}, reviewId: {}, userId: {}", restaurantId, reviewId, userId);
                 throw new IllegalStateException("리뷰를 찾을 수 없습니다.");
             }
         }
-        
+
         ReviewEntity review = existingReview.get();
         logger.info("리뷰 발견 - 실제 restaurantId: {}, userId: {}", review.getRestaurantId(), review.getUserId());
-        
+
         // 작성자 검증
         if (!review.getUserId().equals(userId)) {
             throw new SecurityException("리뷰 삭제 권한이 없습니다.");
         }
-        
-        reviewRepository.deleteByRestaurantIdAndReviewId(restaurantId, reviewId);
+
+        // reviewId로 찾았을 경우, 찾은 엔티티의 restaurantId를 사용
+        reviewRepository.deleteByRestaurantIdAndReviewId(review.getRestaurantId(), reviewId);
     }
     
     @Cacheable(value = "reviewStats", key = "'count_' + #restaurantId")
