@@ -63,31 +63,59 @@ public class ReviewService {
      */
     private List<ReviewEntity> safeCastToReviewEntityList(Object cachedData) {
         if (cachedData == null) {
+            logger.debug("캐시 데이터가 null입니다");
             return new ArrayList<>();
         }
+        
+        logger.debug("캐시에서 받은 데이터 타입: {}", cachedData.getClass().getSimpleName());
         
         if (cachedData instanceof List<?>) {
             List<?> rawList = (List<?>) cachedData;
             List<ReviewEntity> result = new ArrayList<>();
             
-            for (Object item : rawList) {
+            logger.debug("캐시에서 {} 개의 아이템 처리 중", rawList.size());
+            
+            for (int i = 0; i < rawList.size(); i++) {
+                Object item = rawList.get(i);
                 try {
                     if (item instanceof ReviewEntity) {
                         result.add((ReviewEntity) item);
+                        logger.debug("아이템 {}: ReviewEntity로 직접 캐스팅 성공", i);
                     } else if (item instanceof LinkedHashMap) {
                         // LinkedHashMap을 ReviewEntity로 변환
                         @SuppressWarnings("unchecked")
                         LinkedHashMap<String, Object> map = (LinkedHashMap<String, Object>) item;
                         ReviewEntity entity = objectMapper.convertValue(map, ReviewEntity.class);
                         result.add(entity);
+                        logger.debug("아이템 {}: LinkedHashMap에서 ReviewEntity로 변환 성공", i);
+                    } else if (item instanceof java.util.Map) {
+                        // 일반 Map도 처리
+                        @SuppressWarnings("unchecked")
+                        java.util.Map<String, Object> map = (java.util.Map<String, Object>) item;
+                        ReviewEntity entity = objectMapper.convertValue(map, ReviewEntity.class);
+                        result.add(entity);
+                        logger.debug("아이템 {}: Map에서 ReviewEntity로 변환 성공", i);
                     } else {
-                        logger.warn("캐시에서 예상치 못한 타입 발견: {}", item.getClass().getSimpleName());
+                        logger.warn("아이템 {}: 예상치 못한 타입 발견: {}, toString: {}", 
+                                i, item.getClass().getSimpleName(), item.toString().substring(0, Math.min(100, item.toString().length())));
+                        // JSON 문자열일 가능성도 체크
+                        if (item instanceof String) {
+                            try {
+                                ReviewEntity entity = objectMapper.readValue((String) item, ReviewEntity.class);
+                                result.add(entity);
+                                logger.debug("아이템 {}: JSON 문자열에서 ReviewEntity로 변환 성공", i);
+                            } catch (Exception jsonError) {
+                                logger.error("아이템 {}: JSON 변환 실패: {}", i, jsonError.getMessage());
+                            }
+                        }
                     }
                 } catch (Exception e) {
-                    logger.error("캐시 데이터 변환 실패: {}", e.getMessage());
+                    logger.error("아이템 {} 캐시 데이터 변환 실패: {}, 원본 타입: {}", 
+                            i, e.getMessage(), item != null ? item.getClass().getSimpleName() : "null", e);
                 }
             }
             
+            logger.info("캐시에서 {} 개의 ReviewEntity 변환 완료", result.size());
             return result;
         }
         
@@ -195,10 +223,22 @@ public class ReviewService {
             Object cachedData = valkeyTemplate.opsForValue().get(cacheKey);
             if (cachedData != null) {
                 logger.info("Cache hit for user reviews: {}", cacheKey);
-                return safeCastToReviewEntityList(cachedData);
+                List<ReviewEntity> cachedResult = safeCastToReviewEntityList(cachedData);
+                if (!cachedResult.isEmpty()) {
+                    return cachedResult;
+                } else {
+                    logger.warn("캐시 데이터 변환 결과가 비어있음, 캐시 삭제 후 DB에서 조회");
+                    valkeyTemplate.delete(cacheKey);
+                }
             }
         } catch (Exception e) {
             logger.warn("캐시 조회 실패, DB에서 조회: {}", e.getMessage());
+            // 캐시에 문제가 있으면 삭제
+            try {
+                valkeyTemplate.delete(cacheKey);
+            } catch (Exception deleteError) {
+                logger.warn("캐시 삭제 실패: {}", deleteError.getMessage());
+            }
         }
         
         // 캐시 미스 시 DB에서 조회
@@ -207,10 +247,10 @@ public class ReviewService {
             List<ReviewEntity> reviews = reviewRepository.findByUserId(userId, page, size);
             logger.info("Successfully fetched {} reviews for user: {}", reviews.size(), userId);
             
-            // 결과를 캐시에 저장
+            // 결과를 캐시에 저장 (TTL을 30분으로 단축)
             if (!reviews.isEmpty()) {
                 try {
-                    valkeyTemplate.opsForValue().set(cacheKey, reviews, java.time.Duration.ofHours(1));
+                    valkeyTemplate.opsForValue().set(cacheKey, reviews, java.time.Duration.ofMinutes(30));
                     logger.debug("Cached user reviews: {}", cacheKey);
                 } catch (Exception cacheError) {
                     logger.warn("캐시 저장 실패: {}", cacheError.getMessage());
@@ -259,10 +299,10 @@ public class ReviewService {
         try {
             List<ReviewEntity> reviews = reviewRepository.findByRestaurantId(restaurantId, page, size);
             
-            // 결과를 캐시에 저장
+            // 결과를 캐시에 저장 (TTL을 30분으로 단축)
             if (!reviews.isEmpty()) {
                 try {
-                    valkeyTemplate.opsForValue().set(cacheKey, reviews, java.time.Duration.ofHours(2));
+                    valkeyTemplate.opsForValue().set(cacheKey, reviews, java.time.Duration.ofMinutes(30));
                     logger.debug("Cached restaurant reviews: {}", cacheKey);
                 } catch (Exception cacheError) {
                     logger.warn("캐시 저장 실패: {}", cacheError.getMessage());
@@ -324,16 +364,27 @@ public class ReviewService {
         @CacheEvict(value = "reviewStats", allEntries = true)
     })
     public void deleteReview(String restaurantId, String reviewId, String userId) {
+        logger.info("리뷰 삭제 시작 - restaurantId: {}, reviewId: {}, userId: {}", restaurantId, reviewId, userId);
+        
         // 사용자 인증 검증
         validateUserAuthentication(userId);
         
+        // 여러 방법으로 리뷰 찾기 시도
         Optional<ReviewEntity> existingReview = reviewRepository.findByRestaurantIdAndReviewId(restaurantId, reviewId);
         
         if (existingReview.isEmpty()) {
-            throw new IllegalStateException("리뷰를 찾을 수 없습니다.");
+            logger.warn("기본 방식으로 리뷰를 찾을 수 없음, reviewId로 다시 시도: {}", reviewId);
+            // reviewId로도 찾아보기
+            existingReview = reviewRepository.findByReviewId(reviewId);
+            
+            if (existingReview.isEmpty()) {
+                logger.error("리뷰를 찾을 수 없음 - restaurantId: {}, reviewId: {}, userId: {}", restaurantId, reviewId, userId);
+                throw new IllegalStateException("리뷰를 찾을 수 없습니다.");
+            }
         }
         
         ReviewEntity review = existingReview.get();
+        logger.info("리뷰 발견 - 실제 restaurantId: {}, userId: {}", review.getRestaurantId(), review.getUserId());
         
         // 작성자 검증
         if (!review.getUserId().equals(userId)) {
