@@ -192,13 +192,8 @@ export default function VisitedRestaurantsScreen() {
 
   const handleReviewClick = (review: any) => {
     // 쿼리 파라미터를 사용하여 상세 페이지로 이동하는 올바른 방식
-    console.log("Review click - review data:", review);
-    console.log("restaurantId:", review.restaurantId, "reviewId:", review.reviewId);
-    
     if (review.restaurantId && review.reviewId) {
-      const url = `/review/detail?restaurantId=${review.restaurantId}&reviewId=${review.reviewId}`;
-      console.log("Navigating to:", url);
-      router.push(url);
+      router.push(`/review/detail?restaurantId=${review.restaurantId}&reviewId=${review.reviewId}`);
     } else {
       console.error("리뷰 상세 정보에 필요한 ID가 없습니다:", review);
       alert("리뷰 정보를 여는 데 실패했습니다.");
@@ -361,16 +356,13 @@ export default function VisitedRestaurantsScreen() {
                             <PinTile addressName={review.restaurantAddress} />
                           </div>
                         )}
-                        <div>
-                          <div className="flex items-center mb-1">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center">
                             {'★'.repeat(review.rating || 0)}<span className="text-gray-300">{'★'.repeat(5 - (review.rating || 0))}</span>
                           </div>
-                          <div className="text-xs text-gray-700 font-medium truncate mb-1">
+                          <span className="text-xs text-gray-500 truncate ml-2">
                             {review.restaurantName || '식당'}
-                          </div>
-                          <div className="text-xs text-gray-500 truncate">
-                            {review.restaurantAddress || '주소 정보 없음'}
-                          </div>
+                          </span>
                         </div>
                         </div>
                         {/* 삭제 버튼 */}
