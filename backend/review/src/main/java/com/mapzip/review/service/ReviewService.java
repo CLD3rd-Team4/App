@@ -777,10 +777,13 @@ public class ReviewService {
     /**
      * 미작성 리뷰 삭제 (사용자가 안간 경우)
      */
-    public boolean deletePendingReview(String userId, String scheduledTime, String restaurantId) {
-        logger.info("Deleting pending review for user: {}, restaurant: {}", userId, restaurantId);
+    public boolean deletePendingReview(String userId, String restaurantId, String scheduledTime) {
+        logger.info("Deleting pending review for user: {}, restaurant: {}, scheduledTime: {}", userId, restaurantId, scheduledTime);
         
-        String compositeKey = scheduledTime + "#" + restaurantId;
+        // 올바른 복합키 생성: restaurantId + "#" + scheduledTime (생성 시와 동일)
+        String compositeKey = restaurantId + "#" + scheduledTime;
+        logger.info("Generated composite key for deletion: {}", compositeKey);
+        
         return pendingReviewRepository.delete(userId, compositeKey);
     }
     
@@ -790,7 +793,7 @@ public class ReviewService {
     public boolean markPendingReviewAsCompleted(String userId, String restaurantId, String scheduledTime) {
         logger.info("Marking pending review as completed for user: {}, restaurant: {}", userId, restaurantId);
         
-        String compositeKey = scheduledTime + "#" + restaurantId;
+        String compositeKey = restaurantId + "#" + scheduledTime;
         return pendingReviewRepository.markAsCompleted(userId, compositeKey);
     }
     
@@ -800,7 +803,7 @@ public class ReviewService {
     public Optional<PendingReviewEntity> getPendingReviewDetail(String userId, String scheduledTime, String restaurantId) {
         logger.info("Getting pending review detail for user: {}, restaurant: {}", userId, restaurantId);
         
-        String compositeKey = scheduledTime + "#" + restaurantId;
+        String compositeKey = restaurantId + "#" + scheduledTime;
         return pendingReviewRepository.findByUserIdAndCompositeKey(userId, compositeKey);
     }
     

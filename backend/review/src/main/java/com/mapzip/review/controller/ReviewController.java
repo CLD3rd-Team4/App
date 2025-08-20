@@ -283,7 +283,7 @@ public class ReviewController {
         
         logger.info("Deleting pending review for user: {}, restaurant: {}, scheduledTime: {}", userId, restaurantId, scheduledTime);
         
-        boolean success = reviewService.deletePendingReview(userId, scheduledTime, restaurantId);
+        boolean success = reviewService.deletePendingReview(userId, restaurantId, scheduledTime);
         
         logger.info("Pending review deletion result: {}", success);
         
