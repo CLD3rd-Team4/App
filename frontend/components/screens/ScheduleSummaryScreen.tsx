@@ -15,7 +15,7 @@ import useSchedule from "@/hooks/useSchedule"
 import ScheduleProcessingPopup from "@/components/modals/ScheduleProcessingPopup"
 import RecommendationReadyPopup from "@/components/modals/RecommendationReadyPopup"
 
-// 파일 로컬 전용 runId 생성기(공통 유틸 사용 안 함, export 안 함)
+// 파일 로컬 전용 runId 생성기
 const genRunId = () => {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID()
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
@@ -46,7 +46,7 @@ type ScheduleDetailResp = {
     estimatedArrivalTime: string
     waypointNames: string[]
     waypointTimes: string[]
-    // ★ 서버 proto 변경: 업데이트는 시간만 전달
+    // 업데이트는 시간만 전달
     updates?: Array<{ time: string }>
   }
 }
@@ -58,7 +58,6 @@ type ViewModel = {
   destination?: { name: string }
   calculatedArrivalTime?: string
   waypoints?: Array<{ name: string; arrivalTime?: string }>
-  // ★ 업데이트는 시간만
   updates?: Array<{ time: string }>
   mealSlots?: Array<{ slotId: string; mealType: number; scheduledTime?: string }>
   selectedRestaurants?: Array<{
@@ -110,26 +109,10 @@ const parseDisplayTimeToDate = (time?: string): Date | null => {
   return isNaN(maybe.getTime()) ? null : maybe
 }
 
-/** 표시용: “오전/오후 HH:mm” */
-const toKoreanAmPm = (time?: string): string => {
+/** 표시용: “오전/오후 HH:mm” (백에서 그대로 오면 그대로 사용) */
+const toKoreanAmPmRaw = (time?: string): string => {
   if (!time) return "시간 미정"
-  if (/(오전|오후)\s*\d{1,2}:\d{2}/.test(time)) return time
-  const h24 = time.match(/^(\d{1,2}):(\d{2})$/)
-  if (h24) {
-    let h = parseInt(h24[1], 10)
-    const mm = h24[2]
-    const period = h >= 12 ? "오후" : "오전"
-    const displayHour = h === 0 ? 12 : h > 12 ? h - 12 : h
-    return `${period} ${displayHour}:${mm}`
-  }
-  const d = parseDisplayTimeToDate(time)
-  if (!d) return "시간 미정"
-  const h = d.getHours()
-  const m = d.getMinutes()
-  const period = h >= 12 ? "오후" : "오전"
-  const displayHour = h === 0 ? 12 : h > 12 ? h - 12 : h
-  const mm = String(m).padStart(2, "0")
-  return `${period} ${displayHour}:${mm}`
+  return time
 }
 
 /** 분 단위 비교값(0~1439). 인식 실패 시 null */
@@ -139,7 +122,17 @@ const minutesOfDay = (time?: string): number | null => {
   return d.getHours() * 60 + d.getMinutes()
 }
 
-/** 출발시간을 기준으로, 시각이 출발보다 이르면 +1일 보정된 Date 반환 */
+/** 출발시간 기준, t가 출발보다 이르면 "익일 " 접두어를 붙여 표시 */
+const displayWithNextDayPrefix = (t?: string, departureTime?: string): string => {
+  if (!t) return "시간 미정"
+  if (!departureTime) return toKoreanAmPmRaw(t)
+  const tMin = minutesOfDay(t)
+  const depMin = minutesOfDay(departureTime)
+  if (tMin == null || depMin == null) return toKoreanAmPmRaw(t)
+  return (tMin < depMin ? "익일 " : "") + toKoreanAmPmRaw(t)
+}
+
+/** 출발시간을 기준으로 정렬 비교용 timestamp (익일 보정) */
 const anchorToScheduleDay = (time?: string, departureTime?: string): Date | null => {
   const t = parseDisplayTimeToDate(time)
   if (!t) return null
@@ -165,6 +158,9 @@ export default function ScheduleSummaryScreen() {
   const [isPopupOpen, setIsPopupOpen] = useState(false)
   const [currentPopup, setCurrentPopup] = useState<PopupType>("processing")
   const [updating, setUpdating] = useState(false)
+
+  // 팝업에서 좌표 보여주기용
+  const [coordText, setCoordText] = useState<string>("") // "위치: 37.12345, 127.12345"
 
   // 폴링 및 요청 식별자
   const pollingStopRef = useRef<() => void>(() => {})
@@ -206,18 +202,28 @@ export default function ScheduleSummaryScreen() {
 
         const scheduleId = lastSubmit.scheduleId
         if (!scheduleId) {
-          setError("scheduleId가 없습니다. 스케줄을 다시 선택해주세요.")
+          setError("선택 내역이 없습니다. 스케줄을 먼저 선택해주세요.")
           setVm(null)
           return
         }
 
+        // 서버에서 스케줄 정보 조회 — 실패/없음이면 로컬 선택 내역 무시하고 에러 출력
         let d: ScheduleDetailResp["scheduleDetail"] | undefined
         try {
           const { data } = await api.get<ScheduleDetailResp>(
             `/recommend/schedule/${encodeURIComponent(scheduleId)}`
           )
-          if (data.status === "OK" && data.scheduleDetail) d = data.scheduleDetail
-        } catch {}
+          if (data.status !== "OK" || !data.scheduleDetail) {
+            setError("선택 내역이 없습니다. 스케줄을 먼저 선택해주세요.")
+            setVm(null)
+            return
+          }
+          d = data.scheduleDetail
+        } catch {
+          setError("선택 내역이 없습니다. 스케줄을 먼저 선택해주세요.")
+          setVm(null)
+          return
+        }
 
         const waypoints =
           d?.waypointNames?.map((name, i) => ({
@@ -225,9 +231,7 @@ export default function ScheduleSummaryScreen() {
             arrivalTime: d?.waypointTimes?.[i] || "",
           })) ?? []
 
-        // ★ 업데이트는 시간만
-        const updates =
-          d?.updates?.map(u => ({ time: u?.time })) ?? []
+        const updates = d?.updates?.map(u => ({ time: u?.time })) ?? []
 
         const mealSlots = lastSubmit.selectedPlaces.map((p) => ({
           slotId: p.slotId,
@@ -262,7 +266,7 @@ export default function ScheduleSummaryScreen() {
         if (mounted) setVm(nextVm)
       } catch (e: any) {
         if (mounted) {
-          setError(e?.message || "알 수 없는 오류가 발생했습니다.")
+          setError("선택 내역이 없습니다. 스케줄을 먼저 선택해주세요.")
           setVm(null)
         }
       } finally {
@@ -319,13 +323,7 @@ export default function ScheduleSummaryScreen() {
     })
 
   /** 업데이트 트리거: 같은 runId로 POST */
-  const triggerRecommendUpdate = async (scheduleId: string) => {
-    const pos = await getCurrentPositionAsync({
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 0,
-    })
-
+  const triggerRecommendUpdate = async (scheduleId: string, lat: number, lng: number) => {
     const runId = currentRunIdRef.current || genRunId()
     currentRunIdRef.current = runId
     setLastRunId(scheduleId, runId)
@@ -333,8 +331,8 @@ export default function ScheduleSummaryScreen() {
     const payload = {
       scheduleId,
       clientNowIso: new Date().toISOString(),
-      currentLat: pos.coords.latitude,
-      currentLng: pos.coords.longitude,
+      currentLat: lat,
+      currentLng: lng,
       runId,
     }
     await api.post(RECOMMEND_SEND_URL, payload)
@@ -356,6 +354,16 @@ export default function ScheduleSummaryScreen() {
     }
 
     try {
+      // 먼저 현재 위치 받아와서 팝업에 표시
+      const pos = await getCurrentPositionAsync({
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      })
+      const lat = +pos.coords.latitude.toFixed(6)
+      const lng = +pos.coords.longitude.toFixed(6)
+      setCoordText(`위치: ${lat}, ${lng}`)
+
       setUpdating(true)
       setIsPopupOpen(true)
       setCurrentPopup("processing")
@@ -365,7 +373,7 @@ export default function ScheduleSummaryScreen() {
       setLastRunId(vm.scheduleId, currentRunIdRef.current)
 
       startPollingResults(vm.scheduleId)
-      await triggerRecommendUpdate(vm.scheduleId)
+      await triggerRecommendUpdate(vm.scheduleId, lat, lng)
     } catch (e: any) {
       const code = typeof e?.code === "number" ? e.code : 0
       const msg =
@@ -398,7 +406,7 @@ export default function ScheduleSummaryScreen() {
       })
     }
 
-    // ★ 업데이트 항목: 시간만, 시각적 구분을 위해 보라색 + 배지
+    // 업데이트 히스토리 (시간만)
     vm.updates?.forEach((u) => {
       items.push({
         type: "update",
@@ -537,7 +545,7 @@ export default function ScheduleSummaryScreen() {
                       </div>
                       <div className="flex-1">
                         <p className="text-sm text-gray-500">
-                          {item.time ? toKoreanAmPm(item.time) : "시간 미정"}
+                          {displayWithNextDayPrefix(item.time, vm!.departureTime)}
                         </p>
                         <p className="font-medium">
                           {item.title}
@@ -588,9 +596,15 @@ export default function ScheduleSummaryScreen() {
               setUpdating(false)
               stopPollingResults()
             }}
-            scheduleTitle={vm?.destination?.name || vm?.departure?.name || "스케줄"}
+            // ✅ 제목을 ‘위치 업데이트 중’으로 (도착지명 대신)
+            scheduleTitle={"위치 업데이트 중"}
+            // ✅ 중앙 정렬에 좌표 표시
             timelineItems={[]}
-            statusText={currentPopup === "processing" ? "맞춤 식당 추천 검색 중..." : "맞춤 식당 추천 완료!"}
+            statusText={
+              coordText
+                ? `${coordText}\n맞춤 식당 추천 검색 중...`
+                : "맞춤 식당 추천 검색 중..."
+            }
             isProcessing={currentPopup === "processing"}
           />
           <RecommendationReadyPopup

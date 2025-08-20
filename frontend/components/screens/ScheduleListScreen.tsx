@@ -18,6 +18,8 @@ const POLL_INTERVAL_MS = 1500 // 폴링 주기(ms)
 const RESULT_URL = "/recommend/result"
 const REQUEST_URL = "/recommend/request"
 const LS_RUN_PREFIX = "recommend:lastRun:";
+const LS_SELECTED_KEY = "schedule:lastSelected"; // ✅ 오늘 표시용 선택 저장
+
 const setLastRunId = (scheduleId: string, runId: string) => {
   try { localStorage.setItem(`${LS_RUN_PREFIX}${scheduleId}`, runId) } catch {}
 };
@@ -42,6 +44,39 @@ type GetResultsResponse = {
 // 팝업 상태
 type PopupType = "processing" | "recommendation_ready"
 
+type LastSelected = { scheduleId: string; date: string }
+
+const todayStr = () => {
+  const d = new Date()
+  const mm = String(d.getMonth() + 1).padStart(2, "0")
+  const dd = String(d.getDate()).padStart(2, "0")
+  return `${d.getFullYear()}-${mm}-${dd}`
+}
+
+const loadLastSelected = (): LastSelected | null => {
+  try {
+    const raw = localStorage.getItem(LS_SELECTED_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as LastSelected
+    if (!parsed?.scheduleId || !parsed?.date) return null
+    // 날짜가 오늘이 아니면 폐기
+    if (parsed.date !== todayStr()) {
+      localStorage.removeItem(LS_SELECTED_KEY)
+      return null
+    }
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+const saveLastSelected = (scheduleId: string) => {
+  try {
+    const payload: LastSelected = { scheduleId, date: todayStr() }
+    localStorage.setItem(LS_SELECTED_KEY, JSON.stringify(payload))
+  } catch {}
+}
+
 export default function ScheduleListScreen() {
   const router = useRouter()
   const {
@@ -61,6 +96,9 @@ export default function ScheduleListScreen() {
   const [selectedScheduleForPopup, setSelectedScheduleForPopup] = useState<Schedule | null>(null)
   const [timelineItems, setTimelineItems] = useState<TimelineItem[]>([])
 
+  // ✅ 오늘 기준 강조 표시할 scheduleId
+  const [selectedTodayId, setSelectedTodayId] = useState<string | null>(null)
+
   // 폴링 제어
   const pollingStopRef = useRef<() => void>(() => {})
   const resultsRef = useRef<GetResultsResponse | null>(null)
@@ -69,6 +107,10 @@ export default function ScheduleListScreen() {
   useEffect(() => {
     setIsClient(true)
     loadSchedules()
+
+    // ✅ 오늘 표시용 선택 로드(다르면 자동 해제)
+    const last = loadLastSelected()
+    setSelectedTodayId(last?.scheduleId ?? null)
   }, [loadSchedules])
 
   // ===== 추천 트리거 (runId 포함) =====
@@ -109,6 +151,11 @@ export default function ScheduleListScreen() {
             )
           )
           setCurrentPopup("recommendation_ready")
+
+          // ✅ 추천 완료 시 오늘자 선택으로 기록(이전 선택은 덮어씀)
+          saveLastSelected(scheduleId)
+          setSelectedTodayId(scheduleId)
+
           return // OK → 폴링 종료
         }
 
@@ -168,6 +215,15 @@ export default function ScheduleListScreen() {
     router.push(`/schedule/edit?id=${schedule.id}`)
   }
 
+  const handleDelete = async (id: string) => {
+    await deleteSchedule(id)
+    // 삭제된 항목이 강조중이라면 해제
+    if (selectedTodayId === id) {
+      localStorage.removeItem(LS_SELECTED_KEY)
+      setSelectedTodayId(null)
+    }
+  }
+
   const closePopup = () => {
     setIsPopupOpen(false)
     setSelectedScheduleForPopup(null)
@@ -221,37 +277,46 @@ export default function ScheduleListScreen() {
               </div>
             ) : (
               <div className="space-y-3">
-                {schedules.map((schedule) => (
-                  <div key={schedule.id} className="bg-white rounded-lg p-4 shadow-sm">
-                    <h3 className="font-medium mb-3">{schedule.title}</h3>
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={() => deleteSchedule(schedule.id!)}
-                        size="sm"
-                        variant="outline"
-                        className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
-                      >
-                        삭제
-                      </Button>
-                      <Button
-                        onClick={() => handleScheduleEdit(schedule)}
-                        size="sm"
-                        variant="outline"
-                        className="flex-1 text-gray-700 border-gray-200 hover:bg-gray-50"
-                      >
-                        수정
-                      </Button>
-                      <Button
-                        onClick={() => handleScheduleSelect(schedule)}
-                        size="sm"
-                        className="flex-1 bg-blue-500 hover:bg-blue-600 text-white"
-                        disabled={isProcessing}
-                      >
-                        {isProcessing ? "처리 중..." : "선택"}
-                      </Button>
+                {schedules.map((schedule) => {
+                  const isSelectedToday = selectedTodayId === schedule.id
+                  return (
+                    <div
+                      key={schedule.id}
+                      className={
+                        `bg-white rounded-lg p-4 shadow-sm ` +
+                        (isSelectedToday ? "border-2 border-blue-500" : "border border-transparent")
+                      }
+                    >
+                      <h3 className="font-medium mb-3">{schedule.title}</h3>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => handleDelete(schedule.id!)}
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
+                        >
+                          삭제
+                        </Button>
+                        <Button
+                          onClick={() => handleScheduleEdit(schedule)}
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 text-gray-700 border-gray-200 hover:bg-gray-50"
+                        >
+                          수정
+                        </Button>
+                        <Button
+                          onClick={() => handleScheduleSelect(schedule)}
+                          size="sm"
+                          className="flex-1 bg-blue-500 hover:bg-blue-600 text-white"
+                          disabled={isProcessing}
+                        >
+                          {isProcessing ? "처리 중..." : (isSelectedToday ? "다시 선택" : "선택")}
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
