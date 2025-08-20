@@ -29,9 +29,10 @@ public final class TmapResultMapper {
                     .lon(asString(s.get("lon")))  
                     .scheduledTime(asString(s.get("scheduledTime")))
                     .radius(asInt(s.get("radius")));
+          
 
             Object mt = s.get("mealType");
-            sb.mealType(asInt(mt, 0)); // fallback 0
+            //sb.mealType(asInt(mt, 0)); // fallback 0
 
             slots.add(sb.build());
         }

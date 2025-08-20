@@ -78,7 +78,7 @@ public class TmapRequestMapper {
 		// 3) 매핑 결과도 필요하면 한 번 더 요약 로그
 		if (log.isDebugEnabled()) {
 			mealSlots.forEach(
-					ms -> log.debug("[MEAL-SLOTS/MAPPED] scheduleId={} slotId={} time={} mealType={} radius={}",
+					ms -> log.info("[MEAL-SLOTS/MAPPED] scheduleId={} slotId={} time={} mealType={} radius={}",
 							scheduleId, ms.getSlotId(), ms.getScheduledTime(), ms.getMealType(), ms.getRadius()));
 		}
 
