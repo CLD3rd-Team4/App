@@ -216,9 +216,14 @@ public class ReviewController {
             logger.info("=== USER REVIEWS REQUEST ===");
             logger.info("UserId: {}, Page: {}, Size: {}", userId, page, size);
             
-            // 실제 서비스 로직 호출
+            // 실제 서비스 로직 호출 (Repository에서 이미 예외 처리됨)
             List<ReviewEntity> reviews = reviewService.getUserReviews(userId, page, size);
             long totalCount = reviewService.getUserReviewsCount(userId);
+            
+            // 빈 결과도 정상적으로 처리
+            if (reviews == null) {
+                reviews = new ArrayList<>();
+            }
         
             logger.info("Retrieved {} reviews out of {} total for user: {}", reviews.size(), totalCount, userId);
         
@@ -375,9 +380,6 @@ public class ReviewController {
             "success", true,
             "message", "리뷰가 삭제되었습니다."
         ));
-    }
-    
-    }
     }
 
     /**
