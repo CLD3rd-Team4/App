@@ -162,12 +162,12 @@ public class ReviewController {
         if (result.isSuccess() && result.getReview() != null) {
             ReviewEntity review = result.getReview();
             Map<String, Object> reviewData = new HashMap<>();
-            String reviewId = review.getReviewId();
+            String formattedReviewId = review.getReviewId();
             // 기존 # 형식을 _ 형식으로 변환 (프론트엔드 호환성)
-            if (reviewId != null && reviewId.contains("#")) {
-                reviewId = reviewId.replace("#", "_");
+            if (formattedReviewId != null && formattedReviewId.contains("#")) {
+                formattedReviewId = formattedReviewId.replace("#", "_");
             }
-            reviewData.put("reviewId", reviewId);
+            reviewData.put("reviewId", formattedReviewId);
             reviewData.put("restaurantId", review.getRestaurantId());
             reviewData.put("restaurantName", review.getRestaurantName());
             reviewData.put("restaurantAddress", review.getRestaurantAddress());
@@ -424,12 +424,12 @@ public class ReviewController {
         ReviewEntity review = reviewOpt.get();
 
         Map<String, Object> reviewData = new HashMap<>();
-        String reviewId = review.getReviewId();
+        String formattedReviewId = review.getReviewId();
         // 기존 # 형식을 _ 형식으로 변환 (프론트엔드 호환성)
-        if (reviewId != null && reviewId.contains("#")) {
-            reviewId = reviewId.replace("#", "_");
+        if (formattedReviewId != null && formattedReviewId.contains("#")) {
+            formattedReviewId = formattedReviewId.replace("#", "_");
         }
-        reviewData.put("reviewId", reviewId);
+        reviewData.put("reviewId", formattedReviewId);
         reviewData.put("restaurantId", review.getRestaurantId());
         reviewData.put("restaurantName", review.getRestaurantName());
         reviewData.put("restaurantAddress", review.getRestaurantAddress());
@@ -470,12 +470,12 @@ public class ReviewController {
         
         // 작성자가 아닌 경우에도 리뷰는 조회 가능 (공개 정보)
         Map<String, Object> reviewData = new HashMap<>();
-        String reviewId = review.getReviewId();
+        String formattedReviewId = review.getReviewId();
         // 기존 # 형식을 _ 형식으로 변환 (프론트엔드 호환성)
-        if (reviewId != null && reviewId.contains("#")) {
-            reviewId = reviewId.replace("#", "_");
+        if (formattedReviewId != null && formattedReviewId.contains("#")) {
+            formattedReviewId = formattedReviewId.replace("#", "_");
         }
-        reviewData.put("reviewId", reviewId);
+        reviewData.put("reviewId", formattedReviewId);
         reviewData.put("restaurantId", review.getRestaurantId());
         reviewData.put("restaurantName", review.getRestaurantName());
         reviewData.put("restaurantAddress", review.getRestaurantAddress());
@@ -532,12 +532,12 @@ public class ReviewController {
         
         // 완전한 리뷰 데이터 반환
         Map<String, Object> reviewData = new HashMap<>();
-        String reviewId = updatedReview.getReviewId();
+        String formattedReviewId = updatedReview.getReviewId();
         // 기존 # 형식을 _ 형식으로 변환 (프론트엔드 호환성)
-        if (reviewId != null && reviewId.contains("#")) {
-            reviewId = reviewId.replace("#", "_");
+        if (formattedReviewId != null && formattedReviewId.contains("#")) {
+            formattedReviewId = formattedReviewId.replace("#", "_");
         }
-        reviewData.put("reviewId", reviewId);
+        reviewData.put("reviewId", formattedReviewId);
         reviewData.put("restaurantId", updatedReview.getRestaurantId());
         reviewData.put("restaurantName", updatedReview.getRestaurantName());
         reviewData.put("restaurantAddress", updatedReview.getRestaurantAddress());
