@@ -73,7 +73,7 @@ public class CustomRouteLocator {
                                 .filter(jwtAuthenticationFilter.apply(new JwtAuthenticationFilter.Config())))
                         .uri("http://review.service-review:8080"))
             
-                .route("review-http-detail", r -> r.path("/review/{restaurantId}/{reviewId}") // 상세조회 수정 삭제
+                .route("review-http-detail", r -> r.path("/http/review/{restaurantId}/{reviewId}") // 상세조회 수정 삭제
                        .and().method("GET", "PUT", "DELETE")
                        .filters(f -> f
                                 .filter(xssProtectionFilter.apply(new XssProtectionFilter.Config()))
