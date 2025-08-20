@@ -336,7 +336,13 @@ public class ReviewService {
         // 사용자 인증 검증
         validateUserAuthentication(userId);
         
-        Optional<ReviewEntity> existingReview = reviewRepository.findByRestaurantIdAndReviewId(restaurantId, reviewId);
+        // reviewId가 timestamp만 있는 경우 userId 추가
+        String fullReviewId = reviewId;
+        if (!reviewId.contains("_")) {
+            fullReviewId = reviewId + "_" + userId;
+        }
+        
+        Optional<ReviewEntity> existingReview = reviewRepository.findByRestaurantIdAndReviewId(restaurantId, fullReviewId);
         
         if (existingReview.isEmpty()) {
             throw new IllegalStateException("리뷰를 찾을 수 없습니다.");
@@ -369,30 +375,61 @@ public class ReviewService {
         // 사용자 인증 검증
         validateUserAuthentication(userId);
 
-        // 여러 방법으로 리뷰 찾기 시도
-        Optional<ReviewEntity> existingReview = reviewRepository.findByRestaurantIdAndReviewId(restaurantId, reviewId);
-
+        // 여러 형식으로 리뷰 찾기 시도
+        Optional<ReviewEntity> existingReview = Optional.empty();
+        
+        // 1. 원본 reviewId로 시도
+        if (reviewId.contains("_") || reviewId.contains("#")) {
+            logger.info("원본 reviewId로 시도: {}", reviewId);
+            existingReview = reviewRepository.findByRestaurantIdAndReviewId(restaurantId, reviewId);
+        }
+        
+        // 2. 원본 실패 시, timestamp + userId (새 형식) 시도
+        if (existingReview.isEmpty() && (!reviewId.contains("_") && !reviewId.contains("#"))) {
+            String newFormatReviewId = reviewId + "_" + userId;
+            logger.info("새 형식으로 시도: {}", newFormatReviewId);
+            existingReview = reviewRepository.findByRestaurantIdAndReviewId(restaurantId, newFormatReviewId);
+        }
+        
+        // 3. timestamp + userId (기존 형식) 시도
+        if (existingReview.isEmpty() && (!reviewId.contains("_") && !reviewId.contains("#"))) {
+            String oldFormatReviewId = reviewId + "#" + userId;
+            logger.info("기존 형식으로 시도: {}", oldFormatReviewId);
+            existingReview = reviewRepository.findByRestaurantIdAndReviewId(restaurantId, oldFormatReviewId);
+        }
+        
+        // 4. reviewId만으로 전체 스캔 시도
         if (existingReview.isEmpty()) {
-            logger.warn("기본 방식으로 리뷰를 찾을 수 없음, reviewId로 다시 시도: {}", reviewId);
-            // reviewId로도 찾아보기
-            existingReview = reviewRepository.findByReviewId(reviewId);
-
-            if (existingReview.isEmpty()) {
-                logger.error("리뷰를 찾을 수 없음 - restaurantId: {}, reviewId: {}, userId: {}", restaurantId, reviewId, userId);
-                throw new IllegalStateException("리뷰를 찾을 수 없습니다.");
+            logger.warn("모든 방식 실패, reviewId로 전체 스캔 시도");
+            if (reviewId.contains("_") || reviewId.contains("#")) {
+                existingReview = reviewRepository.findByReviewId(reviewId);
+            } else {
+                // timestamp만 있는 경우 두 형식 모두 시도
+                existingReview = reviewRepository.findByReviewId(reviewId + "_" + userId);
+                if (existingReview.isEmpty()) {
+                    existingReview = reviewRepository.findByReviewId(reviewId + "#" + userId);
+                }
             }
         }
 
+        if (existingReview.isEmpty()) {
+            logger.error("리뷰를 찾을 수 없음 - restaurantId: {}, reviewId: {}, userId: {}", 
+                       restaurantId, reviewId, userId);
+            throw new IllegalStateException("리뷰를 찾을 수 없습니다.");
+        }
+
         ReviewEntity review = existingReview.get();
-        logger.info("리뷰 발견 - 실제 restaurantId: {}, userId: {}", review.getRestaurantId(), review.getUserId());
+        logger.info("리뷰 발견 - 실제 restaurantId: {}, userId: {}, createdAtUserId: {}", 
+                   review.getRestaurantId(), review.getUserId(), review.getCreatedAtUserId());
 
         // 작성자 검증
         if (!review.getUserId().equals(userId)) {
             throw new SecurityException("리뷰 삭제 권한이 없습니다.");
         }
 
-        // reviewId로 찾았을 경우, 찾은 엔티티의 restaurantId를 사용
-        reviewRepository.deleteByRestaurantIdAndReviewId(review.getRestaurantId(), reviewId);
+        // 실제 저장된 키를 사용하여 삭제
+        reviewRepository.deleteByRestaurantIdAndReviewId(review.getRestaurantId(), review.getCreatedAtUserId());
+        logger.info("리뷰 삭제 완료 - restaurantId: {}, createdAtUserId: {}", review.getRestaurantId(), review.getCreatedAtUserId());
     }
     
     @Cacheable(value = "reviewStats", key = "'count_' + #restaurantId")
@@ -432,7 +469,13 @@ public class ReviewService {
         // 사용자 권한 검증
         validateUserAuthentication(userId);
         
-        Optional<ReviewEntity> existingReview = reviewRepository.findByRestaurantIdAndReviewId(restaurantId, reviewId);
+        // reviewId가 timestamp만 있는 경우 userId 추가
+        String fullReviewId = reviewId;
+        if (!reviewId.contains("_")) {
+            fullReviewId = reviewId + "_" + userId;
+        }
+        
+        Optional<ReviewEntity> existingReview = reviewRepository.findByRestaurantIdAndReviewId(restaurantId, fullReviewId);
         if (existingReview.isEmpty()) {
             throw new IllegalStateException("리뷰를 찾을 수 없습니다.");
         }

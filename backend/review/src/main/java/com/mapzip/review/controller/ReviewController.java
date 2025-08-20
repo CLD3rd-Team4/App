@@ -245,9 +245,9 @@ public class ReviewController {
                 Map<String, Object> reviewMap = new HashMap<>();
                 reviewMap.put("reviewId", review.getReviewId() != null ? review.getReviewId() : "");
                 String reviewId = review.getReviewId();
-                // reviewId에 #이 포함되어 있지 않다면, 잘못된 형식으로 간주하고 수정합니다.
-                if (reviewId != null && !reviewId.contains("#") && review.getCreatedAt() != null && review.getUserId() != null) {
-                    reviewId = review.getCreatedAt().toString() + "#" + review.getUserId();
+                // reviewId에 _이 포함되어 있지 않다면, 잘못된 형식으로 간주하고 수정합니다.
+                if (reviewId != null && !reviewId.contains("_") && review.getCreatedAt() != null && review.getUserId() != null) {
+                    reviewId = review.getCreatedAt().toString() + "_" + review.getUserId();
                 }
                 reviewMap.put("reviewId", reviewId != null ? reviewId : "");
                 reviewMap.put("restaurantId", review.getRestaurantId() != null ? review.getRestaurantId() : "");
@@ -371,7 +371,7 @@ public class ReviewController {
                 "userId", userId,
                 "restaurantId", restaurantId, 
                 "scheduledTime", scheduledTime,
-                "expectedCompositeKey", restaurantId + "#" + scheduledTime
+                "expectedCompositeKey", restaurantId + "_" + scheduledTime
             ));
             
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
