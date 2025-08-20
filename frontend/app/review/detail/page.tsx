@@ -10,7 +10,6 @@ import { Textarea } from "@/components/ui/textarea";
 
 // 상세 페이지의 실제 콘텐츠
 function ReviewDetailContent() {
-  console.log('Rendering ReviewDetailContent'); // Added log
   const router = useRouter();
   const searchParams = useSearchParams();
   const restaurantId = searchParams.get('restaurantId');
@@ -106,8 +105,6 @@ function ReviewDetailContent() {
       </div>
     );
   }
-
-  console.log('Review data:', review); // Added log
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
