@@ -305,7 +305,7 @@ export default function VisitedRestaurantsScreen() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDeleteReview(review.restaurantId || review.reviewId, review.reviewId);
+                            handleDeleteReview(review.restaurantId, review.reviewId);
                           }}
                           className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 transition-colors"
                         >
