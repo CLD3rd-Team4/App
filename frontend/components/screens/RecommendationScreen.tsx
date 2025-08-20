@@ -421,46 +421,56 @@ export default function RecommendationScreen() {
               </div>
 
               {(mealSections || []).map((section) => (
-                <div key={section.id} className="bg-white rounded-lg shadow-sm border">
-                  <button
-                    onClick={() => toggleSection(section.id)}
-                    className="w-full p-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                        <span className="text-sm font-medium text-blue-600">
-                          {section.type === "식사" ? "🍽️" : "🍪"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="font-medium text-lg">{section.title}</span>
-                        <span className="text-sm text-gray-500 ml-2">
-                          ({formatTime(section.time)})
-                          {section.lockedByPast && (
-                            <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700 align-middle">
-                              시간 지남
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                      {selectedRestaurants[section.id] && !section.lockedByPast && (
-                        <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full">선택완료</span>
-                      )}
-                      {section.lockedByPast && (
-                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">이전선택 고정</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {selectedRestaurants[section.id] && !section.lockedByPast && (
-                        <span className="text-sm text-gray-600">{selectedRestaurants[section.id].placeName}</span>
-                      )}
-                      {expandedSections.has(section.id) ? (
-                        <ChevronUp className="w-5 h-5 text-gray-400" />
-                      ) : (
-                        <ChevronDown className="w-5 h-5 text-gray-400" />
-                      )}
-                    </div>
-                  </button>
+  <div key={section.id} className="bg-white rounded-lg shadow-sm border">
+    <button
+      onClick={() => toggleSection(section.id)}
+      className="w-full p-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
+    >
+      {/* LEFT */}
+      <div className="flex items-center gap-3">
+        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+          <span className="text-sm font-medium text-blue-600">
+            {section.type === "식사" ? "🍽️" : "🍪"}
+          </span>
+        </div>
+
+        {/* ✅ 한 줄에 정렬 */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-medium text-lg leading-none">{section.title}</span>
+          <span className="text-sm text-gray-500 leading-none">({formatTime(section.time)})</span>
+
+          {/* ✅ 모두 같은 스타일의 inline-flex 칩으로 */}
+          {section.lockedByPast && (
+            <>
+              <span className="inline-flex items-center h-5 px-2 rounded-full bg-gray-200 text-gray-700 text-xs">
+                시간 지남
+              </span>
+              <span className="inline-flex items-center h-5 px-2 rounded-full bg-gray-100 text-gray-600 text-xs">
+                이전선택 고정
+              </span>
+            </>
+          )}
+
+          {!section.lockedByPast && selectedRestaurants[section.id] && (
+            <span className="inline-flex items-center h-5 px-2 rounded-full bg-green-100 text-green-600 text-xs">
+              선택완료
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* RIGHT */}
+      <div className="flex items-center gap-2">
+        {!section.lockedByPast && selectedRestaurants[section.id] && (
+          <span className="text-sm text-gray-600">{selectedRestaurants[section.id].placeName}</span>
+        )}
+        {expandedSections.has(section.id) ? (
+          <ChevronUp className="w-5 h-5 text-gray-400" />
+        ) : (
+          <ChevronDown className="w-5 h-5 text-gray-400" />
+        )}
+      </div>
+    </button>
 
                   {expandedSections.has(section.id) && (
                     <div className="px-4 pb-4 border-t bg-gray-50">
