@@ -141,8 +141,7 @@ export default function VisitedRestaurantsScreen() {
         
         setVisitedRestaurants(prev => 
           prev.filter(r => {
-            const rId = r.id;
-            return !(rId === restaurantId && r.scheduledTime === scheduledTime);
+            return !(r.restaurantId === restaurantId && r.scheduledTime === scheduledTime);
           })
         );
       } else {
@@ -306,7 +305,7 @@ export default function VisitedRestaurantsScreen() {
                         {restaurant.review && <p className="text-sm text-gray-700 mb-2">{restaurant.review}</p>}
                         <div className="flex gap-2">
                           <Button
-                            onClick={() => handleDeleteUnwritten(restaurant.id, restaurant.scheduledTime || '')}
+                            onClick={() => handleDeleteUnwritten(restaurant.restaurantId, restaurant.scheduledTime || '')}
                             size="sm"
                             variant="outline"
                             className="text-red-600 border-red-200"
