@@ -50,7 +50,8 @@ public class ReviewEntity implements java.io.Serializable {
     
     /**
      * 프론트엔드 호환성을 위한 reviewId 접근자
-     * 형식: "2024-01-01T12:00:00Z_userId"
+     * 실제로는 createdAtUserId(Sort Key)와 동일한 값
+     * 형식: "2024-01-01T12:00:00Z#userId"
      */
     public String getReviewId() {
         return this.createdAtUserId;
@@ -230,7 +231,7 @@ public class ReviewEntity implements java.io.Serializable {
             this.createdAt = Instant.now();
         }
         if (this.userId != null) {
-            this.createdAtUserId = this.createdAt.toString() + "_" + this.userId;
+            this.createdAtUserId = this.createdAt.toString() + "#" + this.userId;
         }
         
         // GSI 필드들도 명시적으로 설정하여 null 값 방지
@@ -251,27 +252,21 @@ public class ReviewEntity implements java.io.Serializable {
     
     // 사용자 ID와 생성 시간에서 복합키 생성
     public static String createCompositeKey(String userId, Instant createdAt) {
-        return createdAt.toString() + "_" + userId;
+        return createdAt.toString() + "#" + userId;
     }
     
     // 복합키에서 사용자 ID 추출
     public static String extractUserIdFromCompositeKey(String compositeKey) {
-        if (compositeKey != null && compositeKey.contains("_")) {
-            String[] parts = compositeKey.split("_");
-            return parts.length > 1 ? parts[parts.length - 1] : null;
+        if (compositeKey != null && compositeKey.contains("#")) {
+            return compositeKey.split("#")[1];
         }
         return null;
     }
     
     // 복합키에서 생성 시간 추출
     public static Instant extractCreatedAtFromCompositeKey(String compositeKey) {
-        if (compositeKey != null && compositeKey.contains("_")) {
-            String[] parts = compositeKey.split("_");
-            if (parts.length > 1) {
-                // timestamp 부분은 마지막 _ 앞까지
-                String timestampPart = compositeKey.substring(0, compositeKey.lastIndexOf("_"));
-                return Instant.parse(timestampPart);
-            }
+        if (compositeKey != null && compositeKey.contains("#")) {
+            return Instant.parse(compositeKey.split("#")[0]);
         }
         return null;
     }
