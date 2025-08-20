@@ -123,6 +123,7 @@ public class CacheConfig {
         cacheObjectMapper.registerModule(new JavaTimeModule());
         // 타입 정보를 포함하여 직렬화하여 ClassCastException 방지
         cacheObjectMapper.activateDefaultTyping(
+            cacheObjectMapper.getPolymorphicTypeValidator(),
             ObjectMapper.DefaultTyping.NON_FINAL, JsonTypeInfo.As.PROPERTY);
         cacheObjectMapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         cacheObjectMapper.configure(com.fasterxml.jackson.databind.SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
