@@ -27,7 +27,7 @@ type ApiPlace = {
 type ApiSlot = { slotId: string; places: ApiPlace[] }
 type GetResultsResponse = {
   slotRecommendations: ApiSlot[]
-  selectedSlotPlaces?: ApiSlot[]     // ✅ 이전선택(신규 필드, 서버가 추가)
+  selectedSlotPlaces?: ApiSlot[]     // 이전선택(서버가 추가)
   status: "OK" | "PENDING" | "ERROR"
   message?: string
 }
@@ -54,13 +54,14 @@ type SubmitRequest = {
 // ==== 화면용 타입 ====
 interface MealSection {
   id: string                 // 화면용 id
-  originSlotId?: string      // 서버 slotId (있으면 이걸 우선 사용)
+  originSlotId?: string      // 서버 slotId
   title: string
   type: "식사" | "간식"
   index: number
   time: string
-  restaurants: Restaurant[]          // 새 후보 (최대 2개)
-  previousSelection?: Restaurant     // 이전 선택 (있으면 1개)
+  restaurants: Restaurant[]          // 새 후보 (이전선택 있으면 2개, 없으면 3개)
+  previousSelection?: Restaurant     // 이전 선택
+  lockedByPast?: boolean             // ✅ 시간이 지났고 이전선택이 있으면 잠금
 }
 
 // ==== 헬퍼 ====
@@ -99,6 +100,45 @@ function writeLastSubmitSafely(entry: any) {
   } catch (e) {
     console.error("[recommendations] lastSubmit save failed:", e);
   }
+}
+
+// 표시용 포맷(백 문자열 존중)
+const formatTime = (time: string) => {
+  if (!time) return ""
+  return time
+}
+
+// 문자열 시간 → 오늘 날짜 Date (오전/오후 HH:mm | HH:mm | ISO)
+const parseDisplayTimeToDate = (time?: string): Date | null => {
+  if (!time || typeof time !== "string") return null
+  const ampm = time.match(/(오전|오후)\s*(\d{1,2}):(\d{2})/)
+  if (ampm) {
+    const [, period, hhStr, mmStr] = ampm
+    let h = parseInt(hhStr, 10)
+    const m = parseInt(mmStr, 10)
+    if (period === "오후" && h !== 12) h += 12
+    if (period === "오전" && h === 12) h = 0
+    const d = new Date()
+    d.setHours(h, m, 0, 0)
+    return d
+  }
+  const h24 = time.match(/^(\d{1,2}):(\d{2})$/)
+  if (h24) {
+    const h = parseInt(h24[1], 10)
+    const m = parseInt(h24[2], 10)
+    const d = new Date()
+    d.setHours(h, m, 0, 0)
+    return d
+  }
+  const maybe = new Date(time)
+  return isNaN(maybe.getTime()) ? null : maybe
+}
+
+// 지금 기준 이미 지났는지
+const isTimePastNow = (time?: string): boolean => {
+  const d = parseDisplayTimeToDate(time)
+  if (!d) return false
+  return Date.now() > d.getTime()
 }
 
 // API → 화면 모델
@@ -142,7 +182,7 @@ export default function RecommendationScreen() {
       activeScheduleIdRef.current = scheduleId
       const runId = localStorage.getItem(`recommend:lastRun:${scheduleId}`)
       const { data } = await api.get<GetResultsResponse>("/recommend/result", {
-        params: { scheduleId,runId },
+        params: { scheduleId, runId },
       })
 
       if (activeScheduleIdRef.current !== scheduleId) return
@@ -191,24 +231,24 @@ export default function RecommendationScreen() {
         const label: "식사" | "간식" = mealTypeToLabel(mealType)
         const idx = label === "식사" ? mealIdx++ : snackIdx++
 
-        // 섹션 생성 부분 중 일부 (slotIds.map 내부)
-
         // 이전선택 (있으면 1개만 사용)
-          const previousSelection: Restaurant | undefined = firstSel ? toRestaurant(firstSel) : undefined
+        const previousSelection: Restaurant | undefined = firstSel ? toRestaurant(firstSel) : undefined
 
-        // ✅ 후보 최대 개수: 이전선택 있으면 2개, 없으면 3개
-          const maxCandidates = previousSelection ? 2 : 3
+        // 후보 최대 개수: 이전선택 있으면 2개, 없으면 3개
+        const maxCandidates = previousSelection ? 2 : 3
 
         // 후보: 이전선택과 id 중복 제거 후 최대 maxCandidates개
         const prevId = previousSelection?.id
         const restaurants: Restaurant[] = (candSlot?.places ?? [])
-        .filter(p => !prevId || p.id !== prevId)
-        .slice(0, maxCandidates)   // ⬅️ 여기만 변경!
-        .map(toRestaurant)
+          .filter(p => !prevId || p.id !== prevId)
+          .slice(0, maxCandidates)
+          .map(toRestaurant)
 
-
-        // 섹션 시간 결정
+        // 섹션 시간
         const time = firstCand?.scheduledTime ?? firstSel?.scheduledTime ?? ""
+
+        // ✅ 잠금 여부: 시간이 지났고 이전선택이 있는 경우
+        const lockedByPast = !!previousSelection && isTimePastNow(time)
 
         return {
           id: `${label === "식사" ? "meal" : "snack"}-${idx}`,
@@ -219,11 +259,13 @@ export default function RecommendationScreen() {
           time,
           restaurants,
           previousSelection,
+          lockedByPast,
         }
       })
 
       setMealSections(sections)
       setExpandedSections(new Set())
+      // 잠긴 섹션은 선택 없이도 완료 가능하므로 별도 preselect는 하지 않음
     } catch (e) {
       console.error("추천 결과 로드 실패:", e)
       setMealSections([])
@@ -250,21 +292,11 @@ export default function RecommendationScreen() {
     setSelectedRestaurants((prev) => ({ ...prev, [sectionId]: restaurant }))
   }, [])
 
-  const formatTime = (time: string) => {
-    if (!time) return ""
-    if (/^(오전|오후)\s?\d{1,2}:\d{2}$/.test(time)) return time
-    if (/^\d{1,2}:\d{2}$/.test(time)) {
-      const [hour, minute] = time.split(":")
-      const h = Number.parseInt(hour, 10)
-      const period = h >= 12 ? "오후" : "오전"
-      const displayHour = h === 0 ? 12 : h > 12 ? h - 12 : h
-      return `${period} ${displayHour}:${minute}`
-    }
-    return time
-  }
-
+  // ✅ 모든 섹션이 충족됐는지: 잠긴 섹션은 자동 충족으로 간주
   const isAllSectionsSelected = useCallback(() => {
-    return (mealSections || []).every((section) => !!selectedRestaurants[section.id])
+    return (mealSections || []).every((section) =>
+      section.lockedByPast ? true : !!selectedRestaurants[section.id]
+    )
   }, [mealSections, selectedRestaurants])
 
   // 제출
@@ -280,24 +312,29 @@ export default function RecommendationScreen() {
       return
     }
 
+    // ✅ 잠긴 섹션은 이전선택을 자동 포함
     const selectedPlaces: SubmitPlace[] = (mealSections || []).map(sec => {
-      const r = selectedRestaurants[sec.id]
-      if (!r) {
-        console.error(`No restaurant selected for section ${sec.id}`)
+      const chosen = sec.lockedByPast
+        ? sec.previousSelection
+        : selectedRestaurants[sec.id]
+
+      if (!chosen) {
+        // 안전장치: 잠기지 않았는데 미선택이면 제외
         return null
       }
+
       return {
         slotId: sec.originSlotId || sec.id,
         mealType: sec.type === "식사" ? 0 : 1,
         scheduledTime: sec.time,
-        id: r.id,
-        placeName: r.placeName,
-        reason: r.aiReason || "",
+        id: chosen.id,
+        placeName: chosen.placeName,
+        reason: chosen.aiReason || "",
         distance: "",
-        addressName: (r as any).addressName || "",
-        placeUrl: (r as any).placeUrl || "",
-        averageRating: r.rating ?? 0,
-        representativeReview: r.description || "",
+        addressName: (chosen as any).addressName || "",
+        placeUrl: (chosen as any).placeUrl || "",
+        averageRating: chosen.rating ?? 0,
+        representativeReview: chosen.description || "",
       }
     }).filter(Boolean) as SubmitPlace[]
 
@@ -358,7 +395,7 @@ export default function RecommendationScreen() {
               : "bg-blue-500 hover:bg-blue-600 text-white shadow-md"
           }`}
         >
-          입력완료 ({Object.keys(selectedRestaurants).length}/{(mealSections || []).length})
+          입력완료 ({Object.keys(selectedRestaurants).length + (mealSections || []).filter(s => s.lockedByPast).length}/{(mealSections || []).length})
         </Button>
       </div>
 
@@ -397,14 +434,24 @@ export default function RecommendationScreen() {
                       </div>
                       <div>
                         <span className="font-medium text-lg">{section.title}</span>
-                        <span className="text-sm text-gray-500 ml-2">({formatTime(section.time)})</span>
+                        <span className="text-sm text-gray-500 ml-2">
+                          ({formatTime(section.time)})
+                          {section.lockedByPast && (
+                            <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700 align-middle">
+                              시간 지남
+                            </span>
+                          )}
+                        </span>
                       </div>
-                      {selectedRestaurants[section.id] && (
+                      {selectedRestaurants[section.id] && !section.lockedByPast && (
                         <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full">선택완료</span>
+                      )}
+                      {section.lockedByPast && (
+                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">이전선택 고정</span>
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      {selectedRestaurants[section.id] && (
+                      {selectedRestaurants[section.id] && !section.lockedByPast && (
                         <span className="text-sm text-gray-600">{selectedRestaurants[section.id].placeName}</span>
                       )}
                       {expandedSections.has(section.id) ? (
@@ -464,107 +511,119 @@ export default function RecommendationScreen() {
                                   </div>
                                 )}
 
-                                <Button
-                                  onClick={() => handleRestaurantSelect(section.id, section.previousSelection!)}
-                                  size="sm"
-                                  className={`w-full mt-3 ${
-                                    selectedRestaurants[section.id]?.id === section.previousSelection!.id
-                                      ? "bg-green-500 hover:bg-green-600 text-white"
-                                      : "bg-blue-500 hover:bg-blue-600 text-white"
-                                  }`}
-                                >
-                                  {selectedRestaurants[section.id]?.id === section.previousSelection!.id ? "✓ 선택됨" : "다시 선택"}
-                                </Button>
+                                {/* ✅ 시간이 지났으면 버튼 제거(읽기 전용) */}
+                                {!section.lockedByPast && (
+                                  <Button
+                                    onClick={() => handleRestaurantSelect(section.id, section.previousSelection!)}
+                                    size="sm"
+                                    className={`w-full mt-3 ${
+                                      selectedRestaurants[section.id]?.id === section.previousSelection!.id
+                                        ? "bg-green-500 hover:bg-green-600 text-white"
+                                        : "bg-blue-500 hover:bg-blue-600 text-white"
+                                    }`}
+                                  >
+                                    {selectedRestaurants[section.id]?.id === section.previousSelection!.id ? "✓ 선택됨" : "다시 선택"}
+                                  </Button>
+                                )}
                               </div>
                             </div>
                           </div>
                         )}
 
-                        {/* 새로운 추천 (최대 2개) */}
-                        <div className="space-y-3">
-                          <h4 className="font-medium text-gray-800">새로운 추천</h4>
-                          {(section.restaurants || []).map((restaurant) => {
-                            const hasRating = !!restaurant.rating && restaurant.rating > 0
-                            const hasReason = !!restaurant.aiReason
-                            const showMeta = hasRating || hasReason
+                        {/* ✅ 시간이 지났고 이전선택이 있으면 후보 숨김 */}
+                        {!section.lockedByPast && (
+                          <div className="space-y-3">
+                            <h4 className="font-medium text-gray-800">새로운 추천</h4>
+                            {(section.restaurants || []).map((restaurant) => {
+                              const hasRating = !!restaurant.rating && restaurant.rating > 0
+                              const hasReason = !!restaurant.aiReason
+                              const showMeta = hasRating || hasReason
 
-                            return (
-                              <div
-                                key={restaurant.id}
-                                className={`bg-white border rounded-lg p-4 hover:border-blue-200 transition-all ${
-                                  selectedRestaurants[section.id]?.id === restaurant.id ? "border-blue-500 bg-blue-50" : ""
-                                }`}
-                              >
-                                <div className="flex items-start gap-4">
-                                  <PinTile addressName={(restaurant as any).addressName} />
+                              return (
+                                <div
+                                  key={restaurant.id}
+                                  className={`bg-white border rounded-lg p-4 hover:border-blue-200 transition-all ${
+                                    selectedRestaurants[section.id]?.id === restaurant.id ? "border-blue-500 bg-blue-50" : ""
+                                  }`}
+                                >
+                                  <div className="flex items-start gap-4">
+                                    <PinTile addressName={(restaurant as any).addressName} />
 
-                                  <div className="flex-1 min-w-0">
-                                    <h3 className="font-semibold text-lg mb-1">{restaurant.placeName}</h3>
+                                    <div className="flex-1 min-w-0">
+                                      <h3 className="font-semibold text-lg mb-1">{restaurant.placeName}</h3>
 
-                                    {restaurant.description && (
-                                      <p className="text-sm text-gray-600 mb-2">{restaurant.description}</p>
-                                    )}
-                                    {restaurant.aiReason && (
-                                      <p className="text-sm text-blue-600 mb-3">{restaurant.aiReason}</p>
-                                    )}
+                                      {restaurant.description && (
+                                        <p className="text-sm text-gray-600 mb-2">{restaurant.description}</p>
+                                      )}
+                                      {restaurant.aiReason && (
+                                        <p className="text-sm text-blue-600 mb-3">{restaurant.aiReason}</p>
+                                      )}
 
-                                    {showMeta && (
-                                      <div className="flex items-center justify-between mb-3">
-                                        <div className="flex items-center gap-4">
-                                          {hasRating && (
-                                            <div className="flex items-center gap-2">
-                                              <span className="text-xs text-gray-500">카카오</span>
-                                              {renderStars(restaurant.rating as number)}
-                                            </div>
-                                          )}
+                                      {showMeta && (
+                                        <div className="flex items-center justify-between mb-3">
+                                          <div className="flex items-center gap-4">
+                                            {hasRating && (
+                                              <div className="flex items-center gap-2">
+                                                <span className="text-xs text-gray-500">카카오</span>
+                                                {renderStars(restaurant.rating as number)}
+                                              </div>
+                                            )}
 
-                                          {(restaurant as any).placeUrl && (
-                                            <a
-                                              href={(restaurant as any).placeUrl}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="text-sm text-blue-600 underline"
-                                            >
-                                              카카오 지도
-                                            </a>
-                                          )}
+                                            {(restaurant as any).placeUrl && (
+                                              <a
+                                                href={(restaurant as any).placeUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-sm text-blue-600 underline"
+                                              >
+                                                카카오 지도
+                                              </a>
+                                            )}
+                                          </div>
                                         </div>
-                                      </div>
-                                    )}
+                                      )}
 
-                                    <Button
-                                      onClick={() => handleRestaurantSelect(section.id, restaurant)}
-                                      size="sm"
-                                      className={`w-full ${
-                                        selectedRestaurants[section.id]?.id === restaurant.id
-                                          ? "bg-green-500 hover:bg-green-600 text-white"
-                                          : "bg-blue-500 hover:bg-blue-600 text-white"
-                                      }`}
-                                    >
-                                      {selectedRestaurants[section.id]?.id === restaurant.id ? "✓ 선택됨" : "선택하기"}
-                                    </Button>
+                                      <Button
+                                        onClick={() => handleRestaurantSelect(section.id, restaurant)}
+                                        size="sm"
+                                        className={`w-full ${
+                                          selectedRestaurants[section.id]?.id === restaurant.id
+                                            ? "bg-green-500 hover:bg-green-600 text-white"
+                                            : "bg-blue-500 hover:bg-blue-600 text-white"
+                                        }`}
+                                      >
+                                        {selectedRestaurants[section.id]?.id === restaurant.id ? "✓ 선택됨" : "선택하기"}
+                                      </Button>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            )
-                          })}
-                        </div>
+                              )
+                            })}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
                 </div>
               ))}
 
-              {Object.keys(selectedRestaurants).length > 0 && (
+              {((mealSections || []).some(s => s.lockedByPast) || Object.keys(selectedRestaurants).length > 0) && (
                 <div className="bg-blue-50 p-4 rounded-lg">
                   <h3 className="font-medium mb-2">선택된 식당</h3>
                   <div className="space-y-2">
-                    {Object.entries(selectedRestaurants).map(([sectionId, restaurant]) => {
-                      const section = (mealSections || []).find((s) => s.id === sectionId)
+                    {(mealSections || []).map((section) => {
+                      const chosen =
+                        section.lockedByPast ? section.previousSelection : selectedRestaurants[section.id]
+                      if (!chosen) return null
                       return (
-                        <div key={sectionId} className="flex items-center gap-2 text-sm">
-                          <span className="font-medium">{section?.title}:</span>
-                          <span>{restaurant.placeName}</span>
+                        <div key={section.id} className="flex items-center gap-2 text-sm">
+                          <span className="font-medium">{section.title}:</span>
+                          <span>{chosen.placeName}</span>
+                          {section.lockedByPast && (
+                            <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">
+                              시간 지남(고정)
+                            </span>
+                          )}
                         </div>
                       )
                     })}
