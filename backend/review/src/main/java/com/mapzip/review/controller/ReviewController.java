@@ -439,11 +439,11 @@ public class ReviewController {
     /**
      * 특정 리뷰 상세 조회
      */
-    @GetMapping("/{restaurantId}/{reviewId}")
+    @GetMapping("/{restaurantId}")
     public ResponseEntity<Map<String, Object>> getReview(
             @RequestHeader("x-user-id") String userId,
             @PathVariable String restaurantId,
-            @PathVariable String reviewId) throws Exception {
+            @RequestParam String reviewId) throws Exception {
         
         logger.info("Getting review detail for user: {}, restaurant: {}, review: {}", userId, restaurantId, reviewId);
         
