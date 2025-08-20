@@ -381,11 +381,11 @@ public class ReviewController {
     /**
      * 작성된 리뷰 삭제
      */
-    @DeleteMapping("/http/{restaurantId}/{reviewId}")
+    @DeleteMapping("/http/{restaurantId}")
     public ResponseEntity<Map<String, Object>> deleteReview(
             @RequestHeader("x-user-id") String userId,
             @PathVariable String restaurantId,
-            @PathVariable String reviewId) throws Exception {
+            @RequestParam String reviewId) throws Exception {
         
         logger.info("Deleting review for user: {}, restaurant: {}, review: {}", userId, restaurantId, reviewId);
         
@@ -439,7 +439,7 @@ public class ReviewController {
     /**
      * 특정 리뷰 상세 조회
      */
-    @GetMapping("/http/{restaurantId}/{reviewId}")
+    @GetMapping("/http/{restaurantId}")
     public ResponseEntity<Map<String, Object>> getReview(
             @RequestHeader("x-user-id") String userId,
             @PathVariable String restaurantId,
@@ -480,11 +480,11 @@ public class ReviewController {
     /**
      * 리뷰 수정
      */
-    @PutMapping("/http/{restaurantId}/{reviewId}")
+    @PutMapping("/http/{restaurantId}")
     public ResponseEntity<Map<String, Object>> updateReview(
             @RequestHeader("x-user-id") String userId,
             @PathVariable String restaurantId,
-            @PathVariable String reviewId,
+            @RequestParam String reviewId,
             @RequestParam("rating") int rating,
             @RequestParam("content") String content,
             @RequestParam(value = "reviewImages", required = false) List<MultipartFile> reviewImages) throws Exception {
