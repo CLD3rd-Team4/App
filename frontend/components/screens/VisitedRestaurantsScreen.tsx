@@ -193,7 +193,7 @@ export default function VisitedRestaurantsScreen() {
   const handleReviewClick = (review: any) => {
     // 쿼리 파라미터를 사용하여 상세 페이지로 이동하는 올바른 방식
     if (review.restaurantId && review.reviewId) {
-      router.push(`/review/detail?restaurantId=${review.restaurantId}&reviewId=${encodeURIComponent(review.reviewId)}`);
+      router.push(`/review/detail?restaurantId=${review.restaurantId}&reviewId=${review.reviewId}`);
     } else {
       console.error("리뷰 상세 정보에 필요한 ID가 없습니다:", review);
       alert("리뷰 정보를 여는 데 실패했습니다.");
