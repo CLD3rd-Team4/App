@@ -1,87 +1,114 @@
-// components/screens/ScheduleSummaryScreen.tsx
+// app/recommendations/page.tsx
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
-import BottomNavigation from "@/components/common/BottomNavigation"
-import { RefreshCw } from "lucide-react"
-import api from "@/lib/interceptor"
-import type { Restaurant } from "@/types"
-import { MealType } from "@/types"
+import { ArrowLeft, ChevronDown, ChevronUp, MapPin } from "lucide-react"
 import useSchedule from "@/hooks/useSchedule"
+import type { Restaurant } from "@/types"
+import api from "@/lib/interceptor"
 
-// 팝업
-import ScheduleProcessingPopup from "@/components/modals/ScheduleProcessingPopup"
-import RecommendationReadyPopup from "@/components/modals/RecommendationReadyPopup"
-
-// 파일 로컬 전용 runId 생성기
-const genRunId = () => {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID()
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-}
-const LS_RUN_PREFIX = "recommend:lastRun:"
-const setLastRunId = (scheduleId: string, runId: string) => {
-  try { localStorage.setItem(`${LS_RUN_PREFIX}${scheduleId}`, runId) } catch {}
-}
-
-type TimelineItem = {
-  type: "departure" | "waypoint" | "destination" | "restaurant" | "update"
-  time?: string
-  title: string
-  icon: string
-  color: "red" | "blue" | "orange" | "green" | "purple"
-  description?: string
-  url?: string
-  restaurant?: Restaurant
+// ==== 서버 proto에 맞춘 응답 타입 ====
+type ApiPlace = {
+  id: string
+  placeName: string
+  reason?: string
+  distance?: string
+  scheduledTime?: string
+  mealType?: number // 0=식사, 1=간식
+  placeUrl?: string
+  addressName?: string
+  averageRating?: number
+  representativeReview?: string
+  image?: string
 }
 
-type ScheduleDetailResp = {
-  status: "OK" | "NOT_FOUND" | "ERROR"
+type ApiSlot = { slotId: string; places: ApiPlace[] }
+type GetResultsResponse = {
+  slotRecommendations: ApiSlot[]
+  selectedSlotPlaces?: ApiSlot[]     // 이전선택(서버가 추가)
+  status: "OK" | "PENDING" | "ERROR"
   message?: string
-  scheduleDetail?: {
-    departureTime: string
-    departureName: string
-    destinationName: string
-    estimatedArrivalTime: string
-    waypointNames: string[]
-    waypointTimes: string[]
-    updates?: Array<{ time: string }>
+}
+
+type SubmitPlace = {
+  slotId: string
+  mealType: number
+  scheduledTime: string
+  id: string
+  placeName: string
+  reason?: string
+  distance?: string
+  addressName?: string
+  placeUrl?: string
+  averageRating?: number
+  representativeReview?: string
+}
+
+type SubmitRequest = {
+  scheduleId: string
+  selectedPlaces: SubmitPlace[]
+}
+
+// ==== 화면용 타입 ====
+interface MealSection {
+  id: string                 // 화면용 id
+  originSlotId?: string      // 서버 slotId
+  title: string
+  type: "식사" | "간식"
+  index: number
+  time: string
+  restaurants: Restaurant[]          // 새 후보 (이전선택 있으면 2개, 없으면 3개)
+  previousSelection?: Restaurant     // 이전 선택
+  lockedByPast?: boolean             // ✅ 시간이 지났고 이전선택이 있으면 잠금
+}
+
+// ==== 헬퍼 ====
+const mealTypeToLabel = (t: number): "식사" | "간식" => (t === 0 ? "식사" : "간식")
+const sectionTitle = (label: "식사" | "간식", idx: number) =>
+  label === "식사" ? `식사${idx}` : `간식${idx}`
+
+const extractDong = (addr?: string) => {
+  if (!addr) return ""
+  const tokens = addr.split(/\s+/)
+  const dongLike = [...tokens].reverse().find(t => /(동|가|읍|면|리)$/.test(t))
+  return dongLike || tokens[tokens.length - 2] || tokens[tokens.length - 1] || ""
+}
+
+const renderStars = (rating: number) => {
+  const v = Math.round(Math.max(0, Math.min(5, rating || 0)))
+  const full = "★".repeat(v)
+  const empty = "☆".repeat(5 - v)
+  return (
+    <span className="text-yellow-500 tracking-tight" aria-label={`카카오 평점 ${v}점/5점`}>
+      {full}{empty}
+    </span>
+  )
+}
+
+function endOfTodayTs(): number {
+  const d = new Date();
+  d.setHours(23, 59, 59, 999);
+  return d.getTime();
+}
+const LS_KEY_SELECTED = "recommend:lastSubmit";
+function writeLastSubmitSafely(entry: any) {
+  try {
+    localStorage.setItem(LS_KEY_SELECTED, JSON.stringify(entry));
+    console.log("[recommendations] lastSubmit saved:", entry);
+  } catch (e) {
+    console.error("[recommendations] lastSubmit save failed:", e);
   }
 }
 
-type ViewModel = {
-  scheduleId: string
-  departureTime?: string
-  departure?: { name: string }
-  destination?: { name: string }
-  calculatedArrivalTime?: string
-  waypoints?: Array<{ name: string; arrivalTime?: string }>
-  updates?: Array<{ time: string }>
-  mealSlots?: Array<{ slotId: string; mealType: number; scheduledTime?: string }>
-  selectedRestaurants?: Array<{
-    sectionId: string
-    restaurant: Restaurant
-  }>
+// 표시용 포맷(백 문자열 존중)
+const formatTime = (time: string) => {
+  if (!time) return ""
+  return time
 }
 
-const LAST_SUBMIT_KEY = "recommend:lastSubmit"
-const POLL_INTERVAL_MS = 1500
-const RECOMMEND_SEND_URL = "/recommend/request"
-const RECOMMEND_RESULT_URL = "/recommend/result"
-
-type GetResultsResponse = {
-  status: "PENDING" | "OK" | "ERROR" | string
-  message?: string
-  runId?: string
-  slotRecommendations?: Array<{
-    slotId: string
-    places: Array<{ id: string; placeName: string }>
-  }>
-}
-type PopupType = "processing" | "recommendation_ready"
-
-/** "오전/오후 HH:mm" | "HH:mm" | ISO → Date(오늘 날짜) */
+// 문자열 시간 → 오늘 날짜 Date (오전/오후 HH:mm | HH:mm | ISO)
 const parseDisplayTimeToDate = (time?: string): Date | null => {
   if (!time || typeof time !== "string") return null
   const ampm = time.match(/(오전|오후)\s*(\d{1,2}):(\d{2})/)
@@ -107,531 +134,516 @@ const parseDisplayTimeToDate = (time?: string): Date | null => {
   return isNaN(maybe.getTime()) ? null : maybe
 }
 
-/** 백 문자열 그대로 표시 */
-const toKoreanAmPmRaw = (time?: string): string => (!time ? "시간 미정" : time)
-
-/** 분 단위 비교값 */
-const minutesOfDay = (time?: string): number | null => {
+// 지금 기준 이미 지났는지
+const isTimePastNow = (time?: string): boolean => {
   const d = parseDisplayTimeToDate(time)
-  if (!d) return null
-  return d.getHours() * 60 + d.getMinutes()
+  if (!d) return false
+  return Date.now() > d.getTime()
 }
 
-/** 출발시간 기준, t가 출발보다 이르면 "익일 " 접두어를 붙여 표시 */
-const displayWithNextDayPrefix = (t?: string, departureTime?: string): string => {
-  if (!t) return "시간 미정"
-  if (!departureTime) return toKoreanAmPmRaw(t)
-  const tMin = minutesOfDay(t)
-  const depMin = minutesOfDay(departureTime)
-  if (tMin == null || depMin == null) return toKoreanAmPmRaw(t)
-  return (tMin < depMin ? "익일 " : "") + toKoreanAmPmRaw(t)
-}
+// API → 화면 모델
+const toRestaurant = (p: ApiPlace): Restaurant => ({
+  id: p.id,
+  placeName: p.placeName,
+  description: p.representativeReview || "",
+  aiReason: p.reason || "",
+  rating: (typeof p.averageRating === "number" && p.averageRating > 0) ? p.averageRating : undefined,
+  distance: "",
+  addressName: p.addressName,
+  image: "",
+  // @ts-ignore
+  placeUrl: p.placeUrl,
+})
 
-/** 출발시간을 기준으로 정렬 비교용 timestamp (익일 보정) */
-const anchorToScheduleDay = (time?: string, departureTime?: string): Date | null => {
-  const t = parseDisplayTimeToDate(time)
-  if (!t) return null
-  if (!departureTime) return t
-  const tMin = minutesOfDay(time)
-  const depMin = minutesOfDay(departureTime)
-  if (tMin == null || depMin == null) return t
-  if (tMin < depMin) {
-    const anchored = new Date(t)
-    anchored.setDate(anchored.getDate() + 1)
-    return anchored
-  }
-  return t
-}
-
-export default function ScheduleSummaryScreen() {
+export default function RecommendationScreen() {
   const router = useRouter()
-  const { isProcessing } = useSchedule()
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [vm, setVm] = useState<ViewModel | null>(null)
+  const { selectedSchedule, selectSchedule } = useSchedule()
 
-  const [isPopupOpen, setIsPopupOpen] = useState(false)
-  const [currentPopup, setCurrentPopup] = useState<PopupType>("processing")
-  const [updating, setUpdating] = useState(false)
+  const activeScheduleIdRef = useRef<string | null>(null)
 
-  // 팝업에서 좌표 보여주기용 ("현재 위치: 37.123456, 127.123456")
-  const [coordText, setCoordText] = useState<string>("")
+  const [mealSections, setMealSections] = useState<MealSection[]>([])
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
+  const [selectedRestaurants, setSelectedRestaurants] = useState<Record<string, Restaurant>>({})
+  const [isLoading, setIsLoading] = useState(true)
 
-  // 폴링 및 요청 식별자
-  const pollingStopRef = useRef<() => void>(() => {})
-  const currentRunIdRef = useRef<string | null>(null)
+  // 데이터 로드
+  const loadRecommendations = useCallback(async () => {
+    try {
+      setIsLoading(true)
 
-  useEffect(() => {
-    let mounted = true
-    ;(async () => {
-      try {
-        setLoading(true)
-        setError(null)
-
-        const raw = localStorage.getItem(LAST_SUBMIT_KEY)
-        if (!raw) {
-          setError("선택 내역이 없습니다. 스케줄을 먼저 선택해주세요.")
-          setVm(null)
-          return
-        }
-
-        const lastSubmit = JSON.parse(raw) as {
-          scheduleId: string
-          isSelected: boolean
-          selectedPlaces: Array<{
-            slotId: string
-            mealType: number
-            scheduledTime?: string
-            id: string
-            placeName: string
-            reason?: string
-            distance?: string
-            placeUrl?: string
-            addressName?: string
-            averageRating?: number
-            representativeReview?: string
-          }>
-          expiryAt?: number
-          submittedAt?: string
-        }
-
-        const scheduleId = lastSubmit.scheduleId
-        if (!scheduleId) {
-          setError("선택 내역이 없습니다. 스케줄을 먼저 선택해주세요.")
-          setVm(null)
-          return
-        }
-
-        // 스케줄 상세 조회
-        let d: ScheduleDetailResp["scheduleDetail"] | undefined
-        try {
-          const { data } = await api.get<ScheduleDetailResp>(
-            `/recommend/schedule/${encodeURIComponent(scheduleId)}`
-          )
-          if (data.status !== "OK" || !data.scheduleDetail) {
-            setError("선택 내역이 없습니다. 스케줄을 먼저 선택해주세요.")
-            setVm(null)
-            return
-          }
-          d = data.scheduleDetail
-        } catch {
-          setError("선택 내역이 없습니다. 스케줄을 먼저 선택해주세요.")
-          setVm(null)
-          return
-        }
-
-        const waypoints =
-          d?.waypointNames?.map((name, i) => ({
-            name,
-            arrivalTime: d?.waypointTimes?.[i] || "",
-          })) ?? []
-
-        const updates = d?.updates?.map(u => ({ time: u?.time })) ?? []
-
-        const mealSlots = lastSubmit.selectedPlaces.map((p) => ({
-          slotId: p.slotId,
-          mealType: p.mealType,
-          scheduledTime: p.scheduledTime,
-        }))
-
-        const selectedRestaurants = lastSubmit.selectedPlaces.map((p) => ({
-          sectionId: (p.mealType === MealType.MEAL ? "meal-" : "snack-") + p.slotId,
-          restaurant: {
-            id: p.id,
-            placeName: p.placeName,
-            aiReason: p.reason ?? "",
-            addressName: p.addressName,
-            // @ts-ignore
-            placeUrl: p.placeUrl,
-          } as Restaurant,
-        }))
-
-        const nextVm: ViewModel = {
-          scheduleId,
-          departureTime: d?.departureTime,
-          departure: d?.departureName ? { name: d.departureName } : undefined,
-          destination: d?.destinationName ? { name: d.destinationName } : undefined,
-          calculatedArrivalTime: d?.estimatedArrivalTime,
-          waypoints,
-          updates,
-          mealSlots,
-          selectedRestaurants,
-        }
-
-        if (mounted) setVm(nextVm)
-      } catch {
-        if (mounted) {
-          setError("선택 내역이 없습니다. 스케줄을 먼저 선택해주세요.")
-          setVm(null)
-        }
-      } finally {
-        if (mounted) setLoading(false)
-      }
-    })()
-    return () => {
-      mounted = false
-    }
-  }, [])
-
-  /** 출발 전 여부 (버튼 안내용) */
-  const isBeforeDeparture = useMemo(() => {
-    if (!vm?.departureTime) return false
-    const dep = parseDisplayTimeToDate(vm.departureTime)
-    return dep ? Date.now() < dep.getTime() : false
-  }, [vm?.departureTime])
-
-  /** 폴링 */
-  const startPollingResults = (scheduleId: string) => {
-    let active = true
-    let timer: any = null
-
-    const tick = async () => {
-      if (!active) return
-      try {
-        const runId = currentRunIdRef.current
-        const params: any = { scheduleId }
-        if (runId) params.runId = runId
-
-        const res = await api.get<GetResultsResponse>(RECOMMEND_RESULT_URL, { params })
-        if (res.data.status === "OK") {
-          if (runId && res.data.runId && res.data.runId !== runId) {
-            timer = setTimeout(tick, POLL_INTERVAL_MS)
-            return
-          }
-          setCurrentPopup("recommendation_ready")
-          setUpdating(false)
-          return
-        }
-        timer = setTimeout(tick, POLL_INTERVAL_MS)
-      } catch {
-        timer = setTimeout(tick, POLL_INTERVAL_MS * 2)
-      }
-    }
-
-    tick()
-    pollingStopRef.current = () => {
-      active = false
-      if (timer) clearTimeout(timer)
-    }
-  }
-  const stopPollingResults = () => pollingStopRef.current?.()
-
-  const getCurrentPositionAsync = (opts?: PositionOptions) =>
-    new Promise<GeolocationPosition>((resolve, reject) => {
-      if (!navigator.geolocation) return reject(new Error("Geolocation not supported"))
-      navigator.geolocation.getCurrentPosition(resolve, reject, opts)
-    })
-
-  /** 업데이트 트리거 */
-  const triggerRecommendUpdate = async (scheduleId: string, lat: number, lng: number) => {
-    const runId = currentRunIdRef.current || genRunId()
-    currentRunIdRef.current = runId
-    setLastRunId(scheduleId, runId)
-
-    const payload = {
-      scheduleId,
-      clientNowIso: new Date().toISOString(),
-      currentLat: lat,
-      currentLng: lng,
-      runId,
-    }
-    await api.post(RECOMMEND_SEND_URL, payload)
-  }
-
-  const handleUpdate = async () => {
-    if (!vm?.scheduleId) {
-      alert("스케줄을 먼저 선택해주세요.")
-      return
-    }
-
-    // 출발 전이면 즉시 차단
-    if (isBeforeDeparture) {
-      alert("아직 출발 전입니다. 출발 이후에 추천 업데이트를 요청할 수 있어요.")
-      return
-    }
-
-    // ETA 선검사 (출발보다 이르면 다음날로 보정하여 비교)
-    if (vm.calculatedArrivalTime) {
-      const anchoredEta = anchorToScheduleDay(vm.calculatedArrivalTime, vm.departureTime)
-      if (anchoredEta && Date.now() > anchoredEta.getTime()) {
-        alert("도착 예상 시간을 이미 지났습니다. 추천 업데이트 요청을 보낼 수 없어요.")
+      const scheduleId = selectedSchedule?.id
+      if (!scheduleId) {
+        setMealSections([])
+        setExpandedSections(new Set())
+        setIsLoading(false)
         return
       }
+
+      activeScheduleIdRef.current = scheduleId
+      const runId = localStorage.getItem(`recommend:lastRun:${scheduleId}`)
+      const { data } = await api.get<GetResultsResponse>("/recommend/result", {
+        params: { scheduleId, runId },
+      })
+
+      if (activeScheduleIdRef.current !== scheduleId) return
+
+      const candidates = data.slotRecommendations ?? []
+      const selected = data.selectedSlotPlaces ?? []
+
+      if ((candidates.length === 0 && selected.length === 0) || data.status === "PENDING") {
+        setMealSections([])
+        setExpandedSections(new Set())
+        return
+      }
+
+      // slotId → 슬롯 매핑
+      const candMap = new Map<string, ApiSlot>(candidates.map(s => [s.slotId, s]))
+      const selMap = new Map<string, ApiSlot>(selected.map(s => [s.slotId, s]))
+
+      // 슬롯 합집합
+      const slotIds = Array.from(new Set<string>([
+        ...candidates.map(s => s.slotId),
+        ...selected.map(s => s.slotId),
+      ]))
+
+      // 정렬 기준: 후보 첫 장소의 scheduledTime → 없으면 이전선택 첫 장소의 scheduledTime → 빈문자
+      slotIds.sort((a, b) => {
+        const at = candMap.get(a)?.places?.[0]?.scheduledTime ?? selMap.get(a)?.places?.[0]?.scheduledTime ?? ""
+        const bt = candMap.get(b)?.places?.[0]?.scheduledTime ?? selMap.get(b)?.places?.[0]?.scheduledTime ?? ""
+        const t = at.localeCompare(bt)
+        if (t !== 0) return t
+        // 동률이면 mealType(식사 먼저)
+        const am = candMap.get(a)?.places?.[0]?.mealType ?? selMap.get(a)?.places?.[0]?.mealType ?? 0
+        const bm = candMap.get(b)?.places?.[0]?.mealType ?? selMap.get(b)?.places?.[0]?.mealType ?? 0
+        return am - bm
+      })
+
+      let mealIdx = 1
+      let snackIdx = 1
+      const sections: MealSection[] = slotIds.map(slotId => {
+        const candSlot = candMap.get(slotId)
+        const selSlot = selMap.get(slotId)
+
+        const firstCand = candSlot?.places?.[0]
+        const firstSel  = selSlot?.places?.[0]
+
+        const mealType = firstCand?.mealType ?? firstSel?.mealType ?? 0
+        const label: "식사" | "간식" = mealTypeToLabel(mealType)
+        const idx = label === "식사" ? mealIdx++ : snackIdx++
+
+        // 이전선택 (있으면 1개만 사용)
+        const previousSelection: Restaurant | undefined = firstSel ? toRestaurant(firstSel) : undefined
+
+        // 후보 최대 개수: 이전선택 있으면 2개, 없으면 3개
+        const maxCandidates = previousSelection ? 2 : 3
+
+        // 후보: 이전선택과 id 중복 제거 후 최대 maxCandidates개
+        const prevId = previousSelection?.id
+        const restaurants: Restaurant[] = (candSlot?.places ?? [])
+          .filter(p => !prevId || p.id !== prevId)
+          .slice(0, maxCandidates)
+          .map(toRestaurant)
+
+        // 섹션 시간
+        const time = firstCand?.scheduledTime ?? firstSel?.scheduledTime ?? ""
+
+        // ✅ 잠금 여부: 시간이 지났고 이전선택이 있는 경우
+        const lockedByPast = !!previousSelection && isTimePastNow(time)
+
+        return {
+          id: `${label === "식사" ? "meal" : "snack"}-${idx}`,
+          originSlotId: slotId,
+          title: sectionTitle(label, idx),
+          type: label,
+          index: idx,
+          time,
+          restaurants,
+          previousSelection,
+          lockedByPast,
+        }
+      })
+
+      setMealSections(sections)
+      setExpandedSections(new Set())
+      // 잠긴 섹션은 선택 없이도 완료 가능하므로 별도 preselect는 하지 않음
+    } catch (e) {
+      console.error("추천 결과 로드 실패:", e)
+      setMealSections([])
+      setExpandedSections(new Set())
+    } finally {
+      setIsLoading(false)
+    }
+  }, [selectedSchedule])
+
+  useEffect(() => {
+    loadRecommendations()
+  }, [loadRecommendations])
+
+  // UI 핸들러
+  const toggleSection = useCallback((sectionId: string) => {
+    setExpandedSections((prev) => {
+      const next = new Set(prev)
+      next.has(sectionId) ? next.delete(sectionId) : next.add(sectionId)
+      return next
+    })
+  }, [])
+
+  const handleRestaurantSelect = useCallback((sectionId: string, restaurant: Restaurant) => {
+    setSelectedRestaurants((prev) => ({ ...prev, [sectionId]: restaurant }))
+  }, [])
+
+  // ✅ 모든 섹션이 충족됐는지: 잠긴 섹션은 자동 충족으로 간주
+  const isAllSectionsSelected = useCallback(() => {
+    return (mealSections || []).every((section) =>
+      section.lockedByPast ? true : !!selectedRestaurants[section.id]
+    )
+  }, [mealSections, selectedRestaurants])
+
+  // 제출
+  const handleComplete = async () => {
+    if (!isAllSectionsSelected()) {
+      alert("모든 식사/간식 시간에 대해 식당을 선택해주세요.")
+      return
     }
 
+    const scheduleId = selectedSchedule?.id
+    if (!scheduleId) {
+      alert("오류: 스케줄 ID가 없습니다.")
+      return
+    }
+
+    // ✅ 잠긴 섹션은 이전선택을 자동 포함
+    const selectedPlaces: SubmitPlace[] = (mealSections || []).map(sec => {
+      const chosen = sec.lockedByPast
+        ? sec.previousSelection
+        : selectedRestaurants[sec.id]
+
+      if (!chosen) {
+        // 안전장치: 잠기지 않았는데 미선택이면 제외
+        return null
+      }
+
+      return {
+        slotId: sec.originSlotId || sec.id,
+        mealType: sec.type === "식사" ? 0 : 1,
+        scheduledTime: sec.time,
+        id: chosen.id,
+        placeName: chosen.placeName,
+        reason: chosen.aiReason || "",
+        distance: "",
+        addressName: (chosen as any).addressName || "",
+        placeUrl: (chosen as any).placeUrl || "",
+        averageRating: chosen.rating ?? 0,
+        representativeReview: chosen.description || "",
+      }
+    }).filter(Boolean) as SubmitPlace[]
+
+    const payload: SubmitRequest = { scheduleId, selectedPlaces }
+
     try {
-      // 위치 먼저 받아서 팝업에 표시
-      const pos = await getCurrentPositionAsync({
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
-      })
-      const lat = +pos.coords.latitude.toFixed(6)
-      const lng = +pos.coords.longitude.toFixed(6)
-      setCoordText(`현재 위치: ${lat}, ${lng}`)
+      await api.post<{ status: "OK" | "ERROR"; message?: string }>("/recommend/submit", payload)
+      await selectSchedule(scheduleId)
 
-      setUpdating(true)
-      setIsPopupOpen(true)
-      setCurrentPopup("processing")
+      const entry = {
+        scheduleId,
+        submittedAt: new Date().toISOString(),
+        selectedPlaces,
+        isSelected: true,
+        expiryAt: endOfTodayTs(),
+      }
+      writeLastSubmitSafely(entry)
 
-      stopPollingResults()
-      currentRunIdRef.current = genRunId()
-      setLastRunId(vm.scheduleId, currentRunIdRef.current)
-
-      startPollingResults(vm.scheduleId)
-      await triggerRecommendUpdate(vm.scheduleId, lat, lng)
+      alert("선택을 저장했습니다.")
+      router.push("/")
     } catch (e: any) {
-      const code = typeof e?.code === "number" ? e.code : 0
-      const msg =
-        code === 1
-          ? "위치 정보 접근 권한이 거부되었습니다. 설정에서 권한을 허용해주세요."
-          : code === 2
-          ? "현재 위치를 파악할 수 없습니다."
-          : code === 3
-          ? "위치 정보를 가져오는 데 시간이 초과되었습니다."
-          : e?.message || "업데이트 요청 중 오류가 발생했습니다."
-      console.error("[RecommendUpdate] failed:", e)
-      alert(msg)
-      setUpdating(false)
-      stopPollingResults()
-      setIsPopupOpen(false)
+      console.error("submit 실패:", e?.response?.data || e)
+      alert("저장 중 오류가 발생했습니다.")
     }
   }
 
-  const timelineItems: TimelineItem[] = useMemo(() => {
-    if (!vm) return []
-    const items: TimelineItem[] = []
-
-    if (vm.departureTime && vm.departure) {
-      items.push({
-        type: "departure",
-        time: vm.departureTime,
-        title: vm.departure.name,
-        icon: "출발",
-        color: "red",
-      })
-    }
-
-    vm.updates?.forEach((u) => {
-      items.push({
-        type: "update",
-        time: u.time,
-        title: "위치 갱신",
-        icon: "업뎃",
-        color: "purple",
-      })
-    })
-
-    vm.waypoints?.forEach((wp) => {
-      items.push({
-        type: "waypoint",
-        time: wp.arrivalTime || "",
-        title: wp.name,
-        icon: "경유",
-        color: "blue",
-      })
-    })
-
-    vm.selectedRestaurants?.forEach((item) => {
-      const slotId = item.sectionId.replace(/^(meal|snack)-/, "")
-      const mt = vm.mealSlots?.find(ms => ms.slotId === slotId)
-      items.push({
-        type: "restaurant",
-        time: mt?.scheduledTime || "",
-        title: item.restaurant.placeName || "선택된 식당",
-        description: item.restaurant.aiReason || "",
-        // @ts-ignore
-        url: (item.restaurant as any).placeUrl || "",
-        icon: item.sectionId.startsWith("meal-") ? "식사" : "간식",
-        color: "orange",
-        restaurant: item.restaurant,
-      })
-    })
-
-    if (vm.destination) {
-      items.push({
-        type: "destination",
-        time: vm.calculatedArrivalTime,
-        title: vm.destination.name,
-        icon: "도착",
-        color: "green",
-      })
-    }
-
-    const sortKey = (t?: string) => {
-      const d = anchorToScheduleDay(t, vm.departureTime)
-      return d ? d.getTime() : Number.MAX_SAFE_INTEGER
-    }
-    return items.sort((a, b) => sortKey(a.time) - sortKey(b.time))
-  }, [vm])
-
-  if (loading) {
+  const PinTile = ({ addressName }: { addressName?: string }) => {
+    const dong = extractDong(addressName)
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">선택한 스케줄을 불러오는 중...</p>
-        </div>
+      <div className="w-20 h-20 rounded-lg bg-blue-100 flex flex-col items-center justify-center relative overflow-hidden">
+        <MapPin className="w-7 h-7 text-blue-600" />
+        {dong ? (
+          <span className="absolute bottom-1 text-[11px] px-1.5 py-0.5 rounded-full bg-white/90 text-gray-700">
+            {dong}
+          </span>
+        ) : null}
       </div>
     )
   }
 
+  // 렌더
   return (
-    <>
-      <div className="min-h-screen bg-gray-100 flex flex-col">
-        <div className="bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <h1 className="text-lg font-medium">나의 스케줄 요약</h1>
-            <div className="flex flex-col items-end">
-              <Button
-                onClick={handleUpdate}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2 border-blue-200 text-blue-600 hover:bg-blue-50"
-                disabled={isProcessing || updating} // 출발 전에도 클릭 → alert로 차단
-                title={isBeforeDeparture ? "아직 출발 전이에요. 클릭하면 안내를 드려요." : undefined}
-              >
-                <RefreshCw className={`w-4 h-4 ${isProcessing || updating ? "animate-spin" : ""}`} />
-                {isProcessing || updating ? "업데이트 중..." : "추천 업데이트"}
-              </Button>
-              {isBeforeDeparture && (
-                <span className="mt-1 text-xs text-red-500">
-                  아직 출발 전입니다. 출발 후 요청해 주세요.
-                </span>
-              )}
+    <div className="min-h-screen bg-gray-100 flex flex-col">
+      <div className="bg-white p-4 shadow-sm flex items-center justify-between sticky top-0 z-10">
+        <div className="flex items-center">
+          <Button onClick={() => router.push("/")} variant="ghost" size="sm" className="mr-3">
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <h1 className="text-lg font-medium">추천 결과</h1>
+        </div>
+        <Button
+          onClick={handleComplete}
+          disabled={!isAllSectionsSelected()}
+          size="sm"
+          className={`px-4 py-2 font-medium ${
+            !isAllSectionsSelected()
+              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+              : "bg-blue-500 hover:bg-blue-600 text-white shadow-md"
+          }`}
+        >
+          입력완료 ({Object.keys(selectedRestaurants).length + (mealSections || []).filter(s => s.lockedByPast).length}/{(mealSections || []).length})
+        </Button>
+      </div>
+
+      <div className="flex-1 content-with-bottom-nav">
+        <div className="p-4">
+          {isLoading ? (
+            <div className="text-center py-8">
+              <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-gray-600">추천 결과를 불러오는 중...</p>
             </div>
-          </div>
+          ) : (mealSections || []).length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-600 mb-4">식사 시간이 설정되지 않았거나 결과가 아직 준비되지 않았습니다.</p>
+              <Button onClick={() => router.push("/schedule")} className="bg-blue-500 hover:bg-blue-600 text-white">
+                스케줄 수정하기
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="bg-blue-500 text-white p-4 rounded-lg">
+                <h2 className="font-medium mb-2">추천 결과</h2>
+                <p className="text-sm opacity-90">사용자의 이동경로와 선호도에 따라 추천된 장소입니다</p>
+              </div>
+
+              {(mealSections || []).map((section) => (
+  <div key={section.id} className="bg-white rounded-lg shadow-sm border">
+    <button
+      onClick={() => toggleSection(section.id)}
+      className="w-full p-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
+    >
+      {/* LEFT */}
+      <div className="flex items-center gap-3">
+        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+          <span className="text-sm font-medium text-blue-600">
+            {section.type === "식사" ? "🍽️" : "🍪"}
+          </span>
         </div>
 
-        <div className="flex-1 content-with-bottom-nav">
-          <div className="p-4 pb-24">
-            <div className="bg-white rounded-lg p-4 shadow-sm">
-              {error || timelineItems.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-600 mb-4">{error ?? "스케줄 정보가 없습니다. 다시 선택해주세요."}</p>
-                  <Button
-                    onClick={() => router.push("/schedule/")}
-                    className="bg-blue-500 hover:bg-blue-600 text-white"
-                  >
-                    스케줄 선택하기
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {timelineItems.map((item, index) => (
-                    <div
-                      key={index}
-                      className={`flex items-center gap-3 ${
-                        item.type === "restaurant"
-                          ? "bg-orange-50 rounded-lg p-3 -mx-3"
-                          : item.type === "update"
-                          ? "bg-purple-50 rounded-lg p-3 -mx-3"
-                          : ""
-                      }`}
-                    >
-                      <div
-                        className={`w-8 h-8 ${
-                          item.color === "red"
-                            ? "bg-red-100"
-                            : item.color === "blue"
-                            ? "bg-blue-100"
-                            : item.color === "orange"
-                            ? "bg-orange-500"
-                            : item.color === "purple"
-                            ? "bg-purple-500"
-                            : "bg-green-100"
-                        } rounded-full flex items-center justify-center`}
-                      >
-                        <span
-                          className={`text-sm font-medium ${
-                            item.color === "orange" || item.color === "purple"
-                              ? "text-white"
-                              : item.color === "red"
-                              ? "text-red-600"
-                              : item.color === "blue"
-                              ? "text-blue-600"
-                              : "text-green-600"
-                          }`}
-                        >
-                          {item.icon}
-                        </span>
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm text-gray-500">
-                          {displayWithNextDayPrefix(item.time, vm!.departureTime)}
-                        </p>
-                        <p className="font-medium">
-                          {item.title}
-                          {item.type === "update" && (
-                            <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-purple-600 text-white align-middle">
-                              업데이트
-                            </span>
-                          )}
-                        </p>
+        {/* ✅ 한 줄에 정렬 */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-medium text-lg leading-none">{section.title}</span>
+          <span className="text-sm text-gray-500 leading-none">({formatTime(section.time)})</span>
 
-                        {item.type === "restaurant" && (
-                          <>
-                            {item.description && (
-                              <p className="text-sm text-gray-600">{item.description}</p>
-                            )}
-                            {item.url && (
-                              <div className="mt-1">
-                                <a
-                                  href={item.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-sm text-blue-600 underline"
-                                >
-                                  카카오 지도
-                                </a>
+          {/* ✅ 모두 같은 스타일의 inline-flex 칩으로 */}
+          {section.lockedByPast && (
+            <>
+              <span className="inline-flex items-center h-5 px-2 rounded-full bg-gray-200 text-gray-700 text-xs">
+                시간 지남
+              </span>
+              <span className="inline-flex items-center h-5 px-2 rounded-full bg-gray-100 text-gray-600 text-xs">
+                이전선택 고정
+              </span>
+            </>
+          )}
+
+          {!section.lockedByPast && selectedRestaurants[section.id] && (
+            <span className="inline-flex items-center h-5 px-2 rounded-full bg-green-100 text-green-600 text-xs">
+              선택완료
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* RIGHT */}
+      <div className="flex items-center gap-2">
+        {!section.lockedByPast && selectedRestaurants[section.id] && (
+          <span className="text-sm text-gray-600">{selectedRestaurants[section.id].placeName}</span>
+        )}
+        {expandedSections.has(section.id) ? (
+          <ChevronUp className="w-5 h-5 text-gray-400" />
+        ) : (
+          <ChevronDown className="w-5 h-5 text-gray-400" />
+        )}
+      </div>
+    </button>
+
+                  {expandedSections.has(section.id) && (
+                    <div className="px-4 pb-4 border-t bg-gray-50">
+                      <div className="space-y-3 pt-4">
+                        {/* 이전 선택 (있을 때만) */}
+                        {section.previousSelection && (
+                          <div className="bg-green-50 p-4 rounded-lg border-2 border-green-200">
+                            <div className="flex items-start gap-4">
+                              <PinTile addressName={section.previousSelection.addressName as any} />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className="text-xs bg-green-500 text-white px-2 py-1 rounded-full font-medium">
+                                    이전 선택
+                                  </span>
+                                  <h3 className="font-medium">{section.previousSelection.placeName}</h3>
+                                </div>
+
+                                {section.previousSelection.description && (
+                                  <p className="text-sm text-gray-600 mb-2">{section.previousSelection.description}</p>
+                                )}
+                                {section.previousSelection.aiReason && (
+                                  <p className="text-sm text-blue-600 mb-2">{section.previousSelection.aiReason}</p>
+                                )}
+
+                                {(
+                                  (!!section.previousSelection.rating && section.previousSelection.rating > 0) ||
+                                  !!section.previousSelection.aiReason
+                                ) && (
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                      {section.previousSelection.rating && section.previousSelection.rating > 0 && (
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-xs text-gray-500">카카오</span>
+                                          {renderStars(section.previousSelection.rating)}
+                                        </div>
+                                      )}
+                                      {(section.previousSelection as any).placeUrl && (
+                                        <a
+                                          href={(section.previousSelection as any).placeUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-sm text-blue-600 underline"
+                                        >
+                                          카카오 지도
+                                        </a>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* ✅ 시간이 지났으면 버튼 제거(읽기 전용) */}
+                                {!section.lockedByPast && (
+                                  <Button
+                                    onClick={() => handleRestaurantSelect(section.id, section.previousSelection!)}
+                                    size="sm"
+                                    className={`w-full mt-3 ${
+                                      selectedRestaurants[section.id]?.id === section.previousSelection!.id
+                                        ? "bg-green-500 hover:bg-green-600 text-white"
+                                        : "bg-blue-500 hover:bg-blue-600 text-white"
+                                    }`}
+                                  >
+                                    {selectedRestaurants[section.id]?.id === section.previousSelection!.id ? "✓ 선택됨" : "다시 선택"}
+                                  </Button>
+                                )}
                               </div>
-                            )}
-                          </>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* ✅ 시간이 지났고 이전선택이 있으면 후보 숨김 */}
+                        {!section.lockedByPast && (
+                          <div className="space-y-3">
+                            <h4 className="font-medium text-gray-800">새로운 추천</h4>
+                            {(section.restaurants || []).map((restaurant) => {
+                              const hasRating = !!restaurant.rating && restaurant.rating > 0
+                              const hasReason = !!restaurant.aiReason
+                              const showMeta = hasRating || hasReason
+
+                              return (
+                                <div
+                                  key={restaurant.id}
+                                  className={`bg-white border rounded-lg p-4 hover:border-blue-200 transition-all ${
+                                    selectedRestaurants[section.id]?.id === restaurant.id ? "border-blue-500 bg-blue-50" : ""
+                                  }`}
+                                >
+                                  <div className="flex items-start gap-4">
+                                    <PinTile addressName={(restaurant as any).addressName} />
+
+                                    <div className="flex-1 min-w-0">
+                                      <h3 className="font-semibold text-lg mb-1">{restaurant.placeName}</h3>
+
+                                      {restaurant.description && (
+                                        <p className="text-sm text-gray-600 mb-2">{restaurant.description}</p>
+                                      )}
+                                      {restaurant.aiReason && (
+                                        <p className="text-sm text-blue-600 mb-3">{restaurant.aiReason}</p>
+                                      )}
+
+                                      {showMeta && (
+                                        <div className="flex items-center justify-between mb-3">
+                                          <div className="flex items-center gap-4">
+                                            {hasRating && (
+                                              <div className="flex items-center gap-2">
+                                                <span className="text-xs text-gray-500">카카오</span>
+                                                {renderStars(restaurant.rating as number)}
+                                              </div>
+                                            )}
+
+                                            {(restaurant as any).placeUrl && (
+                                              <a
+                                                href={(restaurant as any).placeUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-sm text-blue-600 underline"
+                                              >
+                                                카카오 지도
+                                              </a>
+                                            )}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      <Button
+                                        onClick={() => handleRestaurantSelect(section.id, restaurant)}
+                                        size="sm"
+                                        className={`w-full ${
+                                          selectedRestaurants[section.id]?.id === restaurant.id
+                                            ? "bg-green-500 hover:bg-green-600 text-white"
+                                            : "bg-blue-500 hover:bg-blue-600 text-white"
+                                        }`}
+                                      >
+                                        {selectedRestaurants[section.id]?.id === restaurant.id ? "✓ 선택됨" : "선택하기"}
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
                         )}
                       </div>
                     </div>
-                  ))}
+                  )}
+                </div>
+              ))}
+
+              {((mealSections || []).some(s => s.lockedByPast) || Object.keys(selectedRestaurants).length > 0) && (
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <h3 className="font-medium mb-2">선택된 식당</h3>
+                  <div className="space-y-2">
+                    {(mealSections || []).map((section) => {
+                      const chosen =
+                        section.lockedByPast ? section.previousSelection : selectedRestaurants[section.id]
+                      if (!chosen) return null
+                      return (
+                        <div key={section.id} className="flex items-center gap-2 text-sm">
+                          <span className="font-medium">{section.title}:</span>
+                          <span>{chosen.placeName}</span>
+                          {section.lockedByPast && (
+                            <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">
+                              시간 지남(고정)
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
             </div>
-          </div>
+          )}
         </div>
-
-        <BottomNavigation currentTab="home" />
       </div>
-
-      {isPopupOpen && (
-        <>
-          <ScheduleProcessingPopup
-            isOpen={currentPopup === "processing"}
-            onClose={() => {
-              setIsPopupOpen(false)
-              setUpdating(false)
-              stopPollingResults()
-            }}
-            scheduleTitle="위치 업데이트 중"
-            variant="location"            // 중앙 정렬
-            coordText={coordText}         // "현재 위치: 37.xxx, 127.xxx"
-            statusText="맞춤 식당 추천 검색 중..."
-            isProcessing={currentPopup === "processing"}
-          />
-
-          <RecommendationReadyPopup
-            isOpen={currentPopup === "recommendation_ready"}
-            onViewResults={async () => {
-              stopPollingResults()
-              setIsPopupOpen(false)
-              setUpdating(false)
-              router.push("/recommendations/")
-            }}
-            onGoBack={() => {
-              stopPollingResults()
-              setIsPopupOpen(false)
-              setUpdating(false)
-            }}
-          />
-        </>
-      )}
-    </>
+    </div>
   )
 }
