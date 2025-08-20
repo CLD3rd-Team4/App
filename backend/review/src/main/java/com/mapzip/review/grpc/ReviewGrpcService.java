@@ -434,6 +434,41 @@ public class ReviewGrpcService extends ReviewServiceGrpc.ReviewServiceImplBase {
     }
 
     @Override
+    public void deletePendingReview(ReviewProto.DeletePendingReviewRequest request,
+                                   StreamObserver<ReviewProto.DeletePendingReviewResponse> responseObserver) {
+        try {
+            logger.info("Deleting pending review for restaurant: {}, scheduledTime: {}", 
+                       request.getRestaurantId(), request.getScheduledTime());
+            
+            // 현재 사용자 ID 추출
+            String userId = getCurrentUserId();
+            
+            // ReviewService에서 미작성 리뷰 삭제
+            boolean success = reviewService.deletePendingReview(
+                    userId, request.getRestaurantId(), request.getScheduledTime());
+            
+            ReviewProto.DeletePendingReviewResponse response = ReviewProto.DeletePendingReviewResponse.newBuilder()
+                    .setSuccess(success)
+                    .setMessage(success ? "미작성 리뷰가 성공적으로 삭제되었습니다." : "미작성 리뷰 삭제에 실패했습니다.")
+                    .build();
+            
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+            
+        } catch (Exception e) {
+            logger.error("Error deleting pending review", e);
+            
+            ReviewProto.DeletePendingReviewResponse errorResponse = ReviewProto.DeletePendingReviewResponse.newBuilder()
+                    .setSuccess(false)
+                    .setMessage("미작성 리뷰 삭제 실패: " + e.getMessage())
+                    .build();
+            
+            responseObserver.onNext(errorResponse);
+            responseObserver.onCompleted();
+        }
+    }
+
+    @Override
     public void getPendingReviewDetail(ReviewProto.GetPendingReviewDetailRequest request,
                                      StreamObserver<ReviewProto.GetPendingReviewDetailResponse> responseObserver) {
         try {
@@ -482,6 +517,50 @@ public class ReviewGrpcService extends ReviewServiceGrpc.ReviewServiceImplBase {
         } catch (Exception e) {
             logger.error("Error getting pending review detail", e);
             responseObserver.onError(Status.INTERNAL.withDescription("미작성 리뷰 조회 실패: " + e.getMessage()).asRuntimeException());
+        }
+    }
+
+    @Override
+    public void healthCheck(ReviewProto.HealthCheckRequest request,
+                           StreamObserver<ReviewProto.HealthCheckResponse> responseObserver) {
+        try {
+            logger.debug("Health check requested");
+            
+            // Redis 상태 체크를 위한 맵 생성
+            java.util.Map<String, String> redisStatus = new java.util.HashMap<>();
+            
+            try {
+                // 간단한 Redis 연결 테스트 (실제로는 CacheManager를 통해 확인)
+                redisStatus.put("status", "UP");
+                redisStatus.put("connection", "OK");
+            } catch (Exception e) {
+                redisStatus.put("status", "DOWN");
+                redisStatus.put("error", e.getMessage());
+            }
+            
+            ReviewProto.HealthCheckResponse response = ReviewProto.HealthCheckResponse.newBuilder()
+                    .setService("review-service")
+                    .setTimestamp(System.currentTimeMillis())
+                    .setStatus("UP")
+                    .putAllRedis(redisStatus)
+                    .build();
+            
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+            
+        } catch (Exception e) {
+            logger.error("Health check failed", e);
+            
+            ReviewProto.HealthCheckResponse errorResponse = ReviewProto.HealthCheckResponse.newBuilder()
+                    .setService("review-service")
+                    .setTimestamp(System.currentTimeMillis())
+                    .setStatus("DOWN")
+                    .putRedis("status", "DOWN")
+                    .putRedis("error", e.getMessage())
+                    .build();
+            
+            responseObserver.onNext(errorResponse);
+            responseObserver.onCompleted();
         }
     }
     

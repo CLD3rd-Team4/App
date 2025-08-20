@@ -101,32 +101,70 @@ public class ReviewRepository {
             System.out.println("=== 테이블 스캔으로 사용자 리뷰 조회 시작 ===");
             System.out.println("UserId: " + userId + ", Page: " + page + ", Size: " + size);
             
-            ScanEnhancedRequest scanRequest = ScanEnhancedRequest.builder()
-                    .filterExpression(Expression.builder()
-                            .expression("user_id = :userId")
-                            .putExpressionValue(":userId", AttributeValue.builder().s(userId).build())
-                            .build())
-                    .build();
+            // 더 안전한 스캔 방식 - 필터 없이 전체 스캔 후 필터링
+            ScanEnhancedRequest scanRequest = ScanEnhancedRequest.builder().build();
             
-            List<ReviewEntity> results = reviewTable.scan(scanRequest)
-                    .stream()
-                    .flatMap(scanPage -> {
-                        List<ReviewEntity> pageItems = scanPage.items();
-                        System.out.println("테이블 스캔 페이지 결과: " + pageItems.size() + "개 항목");
-                        return pageItems.stream();
-                    })
-                    .sorted((r1, r2) -> r2.getCreatedAt().compareTo(r1.getCreatedAt())) // 최신순 정렬
-                    .skip((long) page * size)
-                    .limit(size)
-                    .collect(Collectors.toList());
+            List<ReviewEntity> results = new ArrayList<>();
             
-            System.out.println("=== 테이블 스캔 완료 ===");
-            System.out.println("최종 결과: " + results.size() + "개 리뷰");
-            
-            return results;
+            try {
+                // 전체 테이블 스캔 후 userId로 필터링
+                reviewTable.scan(scanRequest).forEach(scanPage -> {
+                    List<ReviewEntity> pageItems = scanPage.items();
+                    System.out.println("스캔 페이지: " + pageItems.size() + "개 항목");
+                    
+                    // 안전한 userId 필터링
+                    for (ReviewEntity item : pageItems) {
+                        try {
+                            if (item != null && item.getUserId() != null && 
+                                userId.equals(item.getUserId())) {
+                                results.add(item);
+                            }
+                        } catch (Exception itemError) {
+                            System.err.println("개별 아이템 처리 중 오류: " + itemError.getMessage());
+                            // 개별 아이템 오류는 무시하고 계속 진행
+                        }
+                    }
+                });
+                
+                System.out.println("필터링된 결과: " + results.size() + "개 리뷰");
+                
+                // 안전한 정렬
+                results.sort((r1, r2) -> {
+                    try {
+                        if (r1.getCreatedAt() == null && r2.getCreatedAt() == null) return 0;
+                        if (r1.getCreatedAt() == null) return 1;
+                        if (r2.getCreatedAt() == null) return -1;
+                        return r2.getCreatedAt().compareTo(r1.getCreatedAt());
+                    } catch (Exception sortError) {
+                        System.err.println("정렬 중 오류: " + sortError.getMessage());
+                        return 0;
+                    }
+                });
+                
+                // 페이징 적용
+                int startIndex = page * size;
+                int endIndex = Math.min(startIndex + size, results.size());
+                
+                if (startIndex >= results.size()) {
+                    System.out.println("페이지 범위를 벗어남 - 빈 결과 반환");
+                    return new ArrayList<>();
+                }
+                
+                List<ReviewEntity> paginatedResults = results.subList(startIndex, endIndex);
+                
+                System.out.println("=== 테이블 스캔 완료 ===");
+                System.out.println("페이징 적용 결과: " + paginatedResults.size() + "개 리뷰");
+                
+                return paginatedResults;
+                
+            } catch (Exception scanLoopError) {
+                System.err.println("스캔 루프 중 오류: " + scanLoopError.getMessage());
+                scanLoopError.printStackTrace();
+                return new ArrayList<>();
+            }
             
         } catch (Exception scanError) {
-            System.err.println("=== 테이블 스캔도 실패 ===");
+            System.err.println("=== 테이블 스캔 전체 실패 ===");
             System.err.println("Scan Error: " + scanError.getMessage());
             scanError.printStackTrace();
             return new ArrayList<>();
@@ -171,29 +209,44 @@ public class ReviewRepository {
             System.out.println("=== 테이블 스캔으로 사용자 리뷰 카운트 시작 ===");
             System.out.println("UserId: " + userId);
             
-            ScanEnhancedRequest scanRequest = ScanEnhancedRequest.builder()
-                    .filterExpression(Expression.builder()
-                            .expression("user_id = :userId")
-                            .putExpressionValue(":userId", AttributeValue.builder().s(userId).build())
-                            .build())
-                    .build();
+            // 더 안전한 스캔 방식 - 필터 없이 전체 스캔 후 카운트
+            ScanEnhancedRequest scanRequest = ScanEnhancedRequest.builder().build();
             
-            long count = reviewTable.scan(scanRequest)
-                    .stream()
-                    .mapToLong(scanPage -> {
-                        long pageCount = scanPage.items().size();
-                        System.out.println("테이블 스캔 카운트 페이지: " + pageCount + "개 항목");
-                        return pageCount;
-                    })
-                    .sum();
+            long count = 0;
             
-            System.out.println("=== 테이블 스캔 카운트 완료 ===");
-            System.out.println("총 개수: " + count);
-            
-            return count;
+            try {
+                // 전체 테이블 스캔 후 userId로 필터링하여 카운트
+                for (Page<ReviewEntity> scanPage : reviewTable.scan(scanRequest)) {
+                    List<ReviewEntity> pageItems = scanPage.items();
+                    System.out.println("스캔 페이지: " + pageItems.size() + "개 항목");
+                    
+                    // 안전한 userId 필터링 및 카운트
+                    for (ReviewEntity item : pageItems) {
+                        try {
+                            if (item != null && item.getUserId() != null && 
+                                userId.equals(item.getUserId())) {
+                                count++;
+                            }
+                        } catch (Exception itemError) {
+                            System.err.println("개별 아이템 카운트 중 오류: " + itemError.getMessage());
+                            // 개별 아이템 오류는 무시하고 계속 진행
+                        }
+                    }
+                }
+                
+                System.out.println("=== 테이블 스캔 카운트 완료 ===");
+                System.out.println("총 개수: " + count);
+                
+                return count;
+                
+            } catch (Exception scanLoopError) {
+                System.err.println("스캔 루프 중 오류: " + scanLoopError.getMessage());
+                scanLoopError.printStackTrace();
+                return 0;
+            }
             
         } catch (Exception scanError) {
-            System.err.println("=== 테이블 스캔 카운트도 실패 ===");
+            System.err.println("=== 테이블 스캔 카운트 전체 실패 ===");
             System.err.println("Scan Error: " + scanError.getMessage());
             scanError.printStackTrace();
             return 0;
