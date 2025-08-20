@@ -233,8 +233,8 @@ public class ReviewController {
                 reviewMap.put("imageUrls", review.getImageUrls() != null ? review.getImageUrls() : List.of());
                 reviewMap.put("visitDate", review.getVisitDate() != null ? review.getVisitDate() : "");
                 reviewMap.put("isVerified", review.getIsVerified() != null ? review.getIsVerified() : false);
-                reviewMap.put("createdAt", review.getCreatedAt().toString());
-                reviewMap.put("updatedAt", review.getUpdatedAt().toString());
+                reviewMap.put("createdAt", review.getCreatedAt() != null ? review.getCreatedAt().toString() : "");
+                reviewMap.put("updatedAt", review.getUpdatedAt() != null ? review.getUpdatedAt().toString() : "");
                 return reviewMap;
             })
             .collect(Collectors.toList());

@@ -96,11 +96,18 @@ export default function VisitedRestaurantsScreen() {
       await visitedRestaurantApi.deletePendingReview(restaurantId, scheduledTime)
       console.log('미작성 리뷰가 삭제되었습니다.')
       
-      // 삭제 후 전체 목록을 다시 로드하여 최신 상태 반영
-      await loadVisitedRestaurants()
+      // 삭제 후 UI를 낙관적으로 업데이트
+      setVisitedRestaurants(prev => 
+        prev.filter(r => {
+          const rId = r.restaurantId || r.id;
+          return !(rId === restaurantId && r.scheduledTime === scheduledTime);
+        })
+      );
     } catch (error) {
       console.error('미작성 리뷰 삭제 실패:', error)
       alert('삭제에 실패했습니다. 다시 시도해주세요.')
+      // 에러 발생 시 목록을 다시 로드하여 원래 상태로 복구
+      loadVisitedRestaurants()
     }
   }
 
