@@ -99,17 +99,30 @@ export default function VisitedRestaurantsScreen() {
     try {
       console.log('작성된 리뷰 데이터 로드 시작')
       const response = await reviewApi.getUserReviews(0, 10) // page=0부터 시작
-      console.log('작성된 리뷰 데이터:', response)
+      console.log('작성된 리뷰 API 응답:', response)
       
       // 응답 데이터 유효성 검증
       if (response && Array.isArray(response.data)) {
         setCompletedReviews(response.data)
+        console.log('작성된 리뷰 로드 성공:', response.data.length, '개')
       } else {
         console.warn('작성된 리뷰 응답 데이터가 예상 형식이 아님:', response)
         setCompletedReviews([])
       }
     } catch (error: any) {
       console.error("작성된 리뷰 목록 로드 실패:", error)
+      console.error("에러 상세:", {
+        status: error.status,
+        code: error.code,
+        message: error.message,
+        response: error.response
+      })
+      
+      // 500 에러인 경우 특별한 처리
+      if (error.status === 500) {
+        console.error('서버 내부 오류 - 백엔드 수정이 아직 배포되지 않음')
+      }
+      
       // 에러가 있어도 미작성 리뷰는 표시하도록 함
       setCompletedReviews([])
     }
@@ -124,19 +137,28 @@ export default function VisitedRestaurantsScreen() {
 
     try {
       console.log('삭제 요청:', { restaurantId, scheduledTime })
-      await visitedRestaurantApi.deletePendingReview(restaurantId, scheduledTime)
-      console.log('미작성 리뷰가 삭제되었습니다.')
+      const response = await visitedRestaurantApi.deletePendingReview(restaurantId, scheduledTime)
+      console.log('삭제 API 응답:', response)
       
-      // 삭제 후 UI를 낙관적으로 업데이트
-      setVisitedRestaurants(prev => 
-        prev.filter(r => {
-          const rId = r.restaurantId || r.id;
-          return !(rId === restaurantId && r.scheduledTime === scheduledTime);
-        })
-      );
-    } catch (error) {
+      if (response && response.success) {
+        console.log('미작성 리뷰가 삭제되었습니다.')
+        
+        // 실제 삭제가 성공한 경우에만 UI 업데이트
+        setVisitedRestaurants(prev => 
+          prev.filter(r => {
+            const rId = r.restaurantId || r.id;
+            return !(rId === restaurantId && r.scheduledTime === scheduledTime);
+          })
+        );
+      } else {
+        console.error('삭제 실패 - 서버 응답:', response)
+        alert('삭제에 실패했습니다: ' + (response?.message || '알 수 없는 오류'))
+        // 실패 시 목록 새로고침
+        loadVisitedRestaurants()
+      }
+    } catch (error: any) {
       console.error('미작성 리뷰 삭제 실패:', error)
-      alert('삭제에 실패했습니다. 다시 시도해주세요.')
+      alert('삭제에 실패했습니다: ' + (error.message || '네트워크 오류'))
       // 에러 발생 시 목록을 다시 로드하여 원래 상태로 복구
       loadVisitedRestaurants()
     }
