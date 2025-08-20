@@ -185,6 +185,12 @@ public class ReviewService {
     public Optional<ReviewEntity> getReview(String restaurantId, String reviewId) {
         return reviewRepository.findByRestaurantIdAndReviewId(restaurantId, reviewId);
     }
+
+    @Cacheable(value = "singleReviewById", key = "#reviewId", unless = "#result == null || !#result.isPresent()")
+    public Optional<ReviewEntity> getByReviewId(String reviewId) {
+        logger.info("Fetching review from database for reviewId: {}", reviewId);
+        return reviewRepository.findByReviewId(reviewId);
+    }
     
     @Caching(evict = {
         @CacheEvict(value = "userReviews", allEntries = true),

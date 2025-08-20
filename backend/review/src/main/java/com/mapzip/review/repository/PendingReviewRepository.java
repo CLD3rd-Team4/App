@@ -102,6 +102,7 @@ public class PendingReviewRepository {
      * 미작성 리뷰 삭제 (사용자가 안간 경우)
      */
     public boolean delete(String userId, String compositeKey) {
+        logger.info("=== STARTING PENDING REVIEW DELETION ===");
         logger.info("Deleting pending review for user: {}, compositeKey: {}", userId, compositeKey);
         
         try {
@@ -109,27 +110,49 @@ public class PendingReviewRepository {
             Optional<PendingReviewEntity> existing = findByUserIdAndCompositeKey(userId, compositeKey);
             if (existing.isEmpty()) {
                 logger.warn("Pending review not found for deletion - user: {}, compositeKey: {}", userId, compositeKey);
+                
+                // 디버깅을 위해 사용자의 모든 미작성 리뷰 조회
+                List<PendingReviewEntity> allPendingReviews = findByUserId(userId);
+                logger.info("User {} has {} pending reviews:", userId, allPendingReviews.size());
+                for (PendingReviewEntity review : allPendingReviews) {
+                    logger.info("  - compositeKey: {}, restaurantId: {}, scheduledTime: {}", 
+                               review.getRestaurantIdScheduledTime(), 
+                               review.getRestaurantId(), 
+                               review.getScheduledTime());
+                }
+                
                 return false;
             }
             
-            logger.info("Found pending review to delete: {}", existing.get().getRestaurantId());
+            PendingReviewEntity reviewToDelete = existing.get();
+            logger.info("Found pending review to delete: restaurantId={}, scheduledTime={}, compositeKey={}", 
+                       reviewToDelete.getRestaurantId(), reviewToDelete.getScheduledTime(), 
+                       reviewToDelete.getRestaurantIdScheduledTime());
             
             Key key = Key.builder()
                     .partitionValue(userId)
                     .sortValue(compositeKey)
                     .build();
-                    
+            
+            logger.info("Using deletion key: partitionValue={}, sortValue={}", userId, compositeKey);
+            
             PendingReviewEntity deletedItem = pendingReviewTable.deleteItem(key);
             
-            if (deletedItem != null) {
+            // 삭제 후 재확인
+            Optional<PendingReviewEntity> afterDeletion = findByUserIdAndCompositeKey(userId, compositeKey);
+            
+            if (afterDeletion.isEmpty()) {
+                logger.info("=== DELETION SUCCESSFUL ===");
                 logger.info("Successfully deleted pending review for user: {}, compositeKey: {}", userId, compositeKey);
                 return true;
             } else {
-                logger.warn("DeleteItem returned null. Deletion may have failed silently. user: {}, compositeKey: {}", userId, compositeKey);
+                logger.error("=== DELETION FAILED ===");
+                logger.error("Item still exists after deletion attempt. user: {}, compositeKey: {}", userId, compositeKey);
                 return false;
             }
             
         } catch (Exception e) {
+            logger.error("=== DELETION EXCEPTION ===");
             logger.error("Error deleting pending review for user: {}, compositeKey: {}", userId, compositeKey, e);
             return false;
         }

@@ -697,11 +697,11 @@ export const reviewApi = {
     }
   },
 
-  // 특정 리뷰 상세 조회
-  getReview: async (restaurantId: string, reviewId: string): Promise<GetReviewResponse> => {
+  // 특정 리뷰 상세 조회 (reviewId만 사용)
+  getReview: async (reviewId: string): Promise<GetReviewResponse> => {
     try {
-      // GET /review/{restaurantId}/{reviewId}
-      const response = await api.get(`/review/${restaurantId}/${reviewId}`);
+      // GET /review/detail/{reviewId}
+      const response = await api.get(`/review/detail/${reviewId}`);
       
       // 응답 구조: { success: true, data: {...} }
       return response.data;

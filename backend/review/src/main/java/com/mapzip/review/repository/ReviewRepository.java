@@ -81,8 +81,16 @@ public class ReviewRepository {
                     .limit(size)
                     .collect(Collectors.toList());
         } catch (Exception e) {
-            // GSI 문제 시 빈 리스트 반환하여 500 에러 방지
-            System.err.println("UserIdIndex GSI 쿼리 실패, 빈 목록 반환: " + e.getMessage());
+            // GSI 문제에 대한 상세 로깅
+            System.err.println("=== USERIDINDEX GSI 쿼리 실패 ===");
+            System.err.println("UserId: " + userId + ", Page: " + page + ", Size: " + size);
+            System.err.println("Exception type: " + e.getClass().getSimpleName());
+            System.err.println("Exception message: " + e.getMessage());
+            if (e.getCause() != null) {
+                System.err.println("Cause: " + e.getCause().getClass().getSimpleName() + " - " + e.getCause().getMessage());
+            }
+            e.printStackTrace();
+            System.err.println("UserIdIndex GSI 쿼리 실패로 빈 목록 반환");
             return new ArrayList<>();
         }
     }
@@ -100,8 +108,16 @@ public class ReviewRepository {
                     .mapToLong(queryPage -> queryPage.items().size())
                     .sum();
         } catch (Exception e) {
-            // GSI 문제 시 0 반환하여 500 에러 방지
-            System.err.println("UserIdIndex GSI count 쿼리 실패, 0 반환: " + e.getMessage());
+            // GSI 문제에 대한 상세 로깅
+            System.err.println("=== USERIDINDEX GSI COUNT 쿼리 실패 ===");
+            System.err.println("UserId: " + userId);
+            System.err.println("Exception type: " + e.getClass().getSimpleName());
+            System.err.println("Exception message: " + e.getMessage());
+            if (e.getCause() != null) {
+                System.err.println("Cause: " + e.getCause().getClass().getSimpleName() + " - " + e.getCause().getMessage());
+            }
+            e.printStackTrace();
+            System.err.println("UserIdIndex GSI count 쿼리 실패로 0 반환");
             return 0;
         }
     }
@@ -125,6 +141,37 @@ public class ReviewRepository {
                 .build();
                 
         reviewTable.deleteItem(key);
+    }
+
+    public Optional<ReviewEntity> findByReviewId(String reviewId) {
+        try {
+            String userId = ReviewEntity.extractUserIdFromCompositeKey(reviewId);
+            Instant createdAt = ReviewEntity.extractCreatedAtFromCompositeKey(reviewId);
+
+            if (userId == null || createdAt == null) {
+                return Optional.empty();
+            }
+
+            DynamoDbIndex<ReviewEntity> index = reviewTable.index("UserIdIndex");
+            Key key = Key.builder().partitionValue(userId).sortValue(createdAt.toString()).build();
+            QueryConditional queryConditional = QueryConditional.keyEqualTo(key);
+
+            QueryEnhancedRequest queryRequest = QueryEnhancedRequest.builder()
+                    .queryConditional(queryConditional)
+                    .build();
+
+            List<ReviewEntity> items = index.query(queryRequest)
+                    .stream()
+                    .flatMap(page -> page.items().stream())
+                    .collect(Collectors.toList());
+
+            return items.stream()
+                        .filter(item -> reviewId.equals(item.getCreatedAtUserId()))
+                        .findFirst();
+        } catch (Exception e) {
+            System.err.println("UserIdIndex GSI query by reviewId failed: " + e.getMessage());
+            return Optional.empty();
+        }
     }
 
     public double getAverageRatingByRestaurantId(String restaurantId) {

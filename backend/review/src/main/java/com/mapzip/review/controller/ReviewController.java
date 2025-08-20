@@ -213,12 +213,17 @@ public class ReviewController {
         }
         
         try {
+            logger.info("=== USER REVIEWS REQUEST ===");
+            logger.info("UserId: {}, Page: {}, Size: {}", userId, page, size);
+            
             // 실제 서비스 로직 호출
             List<ReviewEntity> reviews = reviewService.getUserReviews(userId, page, size);
             long totalCount = reviewService.getUserReviewsCount(userId);
         
-        // 다음 페이지 존재 여부 계산
-        boolean hasNext = (page + 1) * size < totalCount;
+            logger.info("Retrieved {} reviews out of {} total for user: {}", reviews.size(), totalCount, userId);
+        
+            // 다음 페이지 존재 여부 계산
+            boolean hasNext = (page + 1) * size < totalCount;
         
         // 리뷰 데이터를 Map으로 변환
         List<Map<String, Object>> reviewData = reviews.stream()
@@ -248,8 +253,38 @@ public class ReviewController {
                 "hasNext", hasNext
             ));
         } catch (Exception e) {
-            logger.error("Failed to get user reviews for user: {}", userId, e);
-            throw new RuntimeException("사용자 리뷰 조회 중 오류가 발생했습니다", e);
+            logger.error("=== USER REVIEWS REQUEST FAILED ===");
+            logger.error("UserId: {}, Page: {}, Size: {}", userId, page, size);
+            logger.error("Exception type: {}", e.getClass().getSimpleName());
+            logger.error("Exception message: {}", e.getMessage());
+            if (e.getCause() != null) {
+                logger.error("Cause: {} - {}", e.getCause().getClass().getSimpleName(), e.getCause().getMessage());
+            }
+            e.printStackTrace();
+            
+            // GSI 관련 에러인지 확인하여 더 구체적인 응답 제공
+            String errorType = "UNKNOWN_ERROR";
+            String errorMessage = "사용자 리뷰 조회 중 오류가 발생했습니다";
+            
+            if (e.getMessage() != null && e.getMessage().contains("UserIdIndex")) {
+                errorType = "GSI_ERROR";
+                errorMessage = "DynamoDB UserIdIndex GSI 오류로 리뷰를 조회할 수 없습니다";
+            } else if (e.getMessage() != null && e.getMessage().contains("AccessDenied")) {
+                errorType = "ACCESS_DENIED";
+                errorMessage = "DynamoDB 접근 권한이 없습니다";
+            }
+            
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", errorMessage);
+            errorResponse.put("errorCode", errorType);
+            errorResponse.put("data", List.of());
+            errorResponse.put("totalCount", 0);
+            errorResponse.put("currentPage", page);
+            errorResponse.put("totalPages", 0);
+            errorResponse.put("hasNext", false);
+            
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
     
@@ -281,11 +316,25 @@ public class ReviewController {
             @PathVariable String restaurantId,
             @RequestParam String scheduledTime) throws Exception {
         
-        logger.info("Deleting pending review for user: {}, restaurant: {}, scheduledTime: {}", userId, restaurantId, scheduledTime);
+        logger.info("=== PENDING REVIEW DELETION REQUEST ===");
+        logger.info("User: {}, Restaurant: {}, ScheduledTime: {}", userId, restaurantId, scheduledTime);
+        
+        // 삭제 전 사용자의 모든 미작성 리뷰 목록 확인 (디버깅용)
+        try {
+            List<PendingReviewEntity> allPendingReviews = reviewService.getPendingReviewsByUserId(userId);
+            logger.info("User {} has {} pending reviews before deletion:", userId, allPendingReviews.size());
+            for (PendingReviewEntity review : allPendingReviews) {
+                logger.info("  - RestaurantId: {}, ScheduledTime: {}, CompositeKey: {}", 
+                           review.getRestaurantId(), review.getScheduledTime(), 
+                           review.getRestaurantIdScheduledTime());
+            }
+        } catch (Exception e) {
+            logger.warn("Failed to fetch user's pending reviews for debugging", e);
+        }
         
         boolean success = reviewService.deletePendingReview(userId, restaurantId, scheduledTime);
         
-        logger.info("Pending review deletion result: {}", success);
+        logger.info("=== PENDING REVIEW DELETION RESULT: {} ===", success);
         
         if (success) {
             return ResponseEntity.ok(Map.of(
@@ -293,7 +342,19 @@ public class ReviewController {
                 "message", "미작성 리뷰가 삭제되었습니다."
             ));
         } else {
-            throw new IllegalStateException("삭제할 미작성 리뷰를 찾을 수 없습니다.");
+            // 실패 시 더 자세한 정보 제공
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", "미작성 리뷰 삭제에 실패했습니다.");
+            errorResponse.put("errorCode", "DELETION_FAILED");
+            errorResponse.put("details", Map.of(
+                "userId", userId,
+                "restaurantId", restaurantId, 
+                "scheduledTime", scheduledTime,
+                "expectedCompositeKey", restaurantId + "#" + scheduledTime
+            ));
+            
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
         }
     }
     
@@ -316,6 +377,48 @@ public class ReviewController {
         ));
     }
     
+    }
+    }
+
+    /**
+     * 특정 리뷰 상세 조회 (reviewId만 사용)
+     */
+    @GetMapping("/detail/{reviewId}")
+    public ResponseEntity<Map<String, Object>> getReviewByReviewId(
+            @RequestHeader("x-user-id") String userId,
+            @PathVariable String reviewId) throws Exception {
+
+        logger.info("Getting review detail for review: {}", reviewId);
+
+        Optional<ReviewEntity> reviewOpt = reviewService.getByReviewId(reviewId);
+
+        if (reviewOpt.isEmpty()) {
+            throw new IllegalStateException("리뷰를 찾을 수 없습니다.");
+        }
+
+        ReviewEntity review = reviewOpt.get();
+
+        Map<String, Object> reviewData = new HashMap<>();
+        reviewData.put("reviewId", review.getReviewId());
+        reviewData.put("restaurantId", review.getRestaurantId());
+        reviewData.put("restaurantName", review.getRestaurantName());
+        reviewData.put("restaurantAddress", review.getRestaurantAddress());
+        reviewData.put("userId", review.getUserId());
+        reviewData.put("rating", review.getRating());
+        reviewData.put("content", review.getContent());
+        reviewData.put("imageUrls", review.getImageUrls());
+        reviewData.put("visitDate", review.getVisitDate());
+        reviewData.put("isVerified", review.getIsVerified());
+        reviewData.put("createdAt", review.getCreatedAt());
+        reviewData.put("updatedAt", review.getUpdatedAt());
+        reviewData.put("isOwner", review.getUserId().equals(userId));
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "data", reviewData
+        ));
+    }
+
     /**
      * 특정 리뷰 상세 조회
      */
