@@ -6,6 +6,7 @@ import com.mapzip.recommend.cache.ScheduleDetailCache;
 import com.mapzip.recommend.dto.MultiSlotRecommendRequestDto;
 import com.mapzip.recommend.dto.RecommendRequestDto;
 import com.mapzip.recommend.dto.RecommendResultDto;
+import com.mapzip.recommend.dto.SlotContext;
 import com.mapzip.recommend.dto.kakao.Document;
 import com.mapzip.recommend.dto.kakao.KakaoSearchResponse;
 import com.mapzip.recommend.dto.tmap.MealSlotData;
@@ -96,16 +97,22 @@ public class RecommendRequestConsumer {
             
             
             // 추천 식당 redis에 저장 
-            Map<String, Integer> slotMealTypeMap = tmapScheduleRequest.getMealSlots().stream()
-            	    .collect(Collectors.toMap(MealSlotData::getSlotId, MealSlotData::getMealType));
-            recommendRedisStoreService.storeRecommendations(recommendResultDto.getUserId(),
-					recommendResultDto.getScheduleId(), recommendResultDto.getRecommendPlaceListJson(),
-					recommendResultDto.getRecommendationRequestIds(), 
-					recommendResultDto.getScheduledTimes(),
-					slotMealTypeMap,
-					IsUpdate,
-					runId
-			);
+            Map<String, SlotContext> slotContextMap = tmapScheduleRequest.getMealSlots().stream()
+            	    .collect(Collectors.toMap(
+            	        MealSlotData::getSlotId,
+            	        m -> new SlotContext(m.getScheduledTime(), m.getMealType()),
+            	        (a, b) -> a,                     
+            	        java.util.LinkedHashMap::new     
+            	    ));
+            recommendRedisStoreService.storeRecommendations(
+            	    recommendResultDto.getUserId(),
+            	    recommendResultDto.getScheduleId(),
+            	    recommendResultDto.getRecommendPlaceListJson(),
+            	    recommendResultDto.getRecommendationRequestIds(),
+            	    slotContextMap,                                   
+            	    IsUpdate,
+            	    runId
+            	);
             // 다른 스케줄 valkey에서 정리 
             cleanupDbService.cleanupUserKeysExceptSchedule(recommendResultDto.getUserId(),recommendResultDto.getScheduleId());
             // scheduleId를 key, userId를 value로 다음 토픽으로 전송
