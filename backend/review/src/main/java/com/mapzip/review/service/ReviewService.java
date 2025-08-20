@@ -28,6 +28,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.web.multipart.MultipartFile;
+import java.util.LinkedHashMap;
 
 @Service
 public class ReviewService {
@@ -54,6 +55,44 @@ public class ReviewService {
         this.s3Service = s3Service;
         this.valkeyTemplate = redisTemplate;
         this.objectMapper = objectMapper;
+    }
+    
+    /**
+     * 캐시에서 받은 데이터를 안전하게 ReviewEntity 리스트로 변환
+     * LinkedHashMap으로 역직렬화된 경우를 처리
+     */
+    private List<ReviewEntity> safeCastToReviewEntityList(Object cachedData) {
+        if (cachedData == null) {
+            return new ArrayList<>();
+        }
+        
+        if (cachedData instanceof List<?>) {
+            List<?> rawList = (List<?>) cachedData;
+            List<ReviewEntity> result = new ArrayList<>();
+            
+            for (Object item : rawList) {
+                try {
+                    if (item instanceof ReviewEntity) {
+                        result.add((ReviewEntity) item);
+                    } else if (item instanceof LinkedHashMap) {
+                        // LinkedHashMap을 ReviewEntity로 변환
+                        @SuppressWarnings("unchecked")
+                        LinkedHashMap<String, Object> map = (LinkedHashMap<String, Object>) item;
+                        ReviewEntity entity = objectMapper.convertValue(map, ReviewEntity.class);
+                        result.add(entity);
+                    } else {
+                        logger.warn("캐시에서 예상치 못한 타입 발견: {}", item.getClass().getSimpleName());
+                    }
+                } catch (Exception e) {
+                    logger.error("캐시 데이터 변환 실패: {}", e.getMessage());
+                }
+            }
+            
+            return result;
+        }
+        
+        logger.warn("캐시에서 List가 아닌 타입 반환: {}", cachedData.getClass().getSimpleName());
+        return new ArrayList<>();
     }
     
     @Caching(evict = {
@@ -147,13 +186,37 @@ public class ReviewService {
         }
     }
     
-    @Cacheable(value = "userReviews", key = "#userId + '_' + #page + '_' + #size", unless = "#result == null or #result.isEmpty()")
     public List<ReviewEntity> getUserReviews(String userId, int page, int size) {
-        logger.info("Fetching user reviews from database for userId: {}, page: {}, size: {}", userId, page, size);
+        logger.info("Fetching user reviews for userId: {}, page: {}, size: {}", userId, page, size);
         
+        // 캐시에서 먼저 시도
+        String cacheKey = "userReviews::" + userId + "_" + page + "_" + size;
+        try {
+            Object cachedData = valkeyTemplate.opsForValue().get(cacheKey);
+            if (cachedData != null) {
+                logger.info("Cache hit for user reviews: {}", cacheKey);
+                return safeCastToReviewEntityList(cachedData);
+            }
+        } catch (Exception e) {
+            logger.warn("캐시 조회 실패, DB에서 조회: {}", e.getMessage());
+        }
+        
+        // 캐시 미스 시 DB에서 조회
+        logger.info("Cache miss, fetching user reviews from database for userId: {}", userId);
         try {
             List<ReviewEntity> reviews = reviewRepository.findByUserId(userId, page, size);
             logger.info("Successfully fetched {} reviews for user: {}", reviews.size(), userId);
+            
+            // 결과를 캐시에 저장
+            if (!reviews.isEmpty()) {
+                try {
+                    valkeyTemplate.opsForValue().set(cacheKey, reviews, java.time.Duration.ofHours(1));
+                    logger.debug("Cached user reviews: {}", cacheKey);
+                } catch (Exception cacheError) {
+                    logger.warn("캐시 저장 실패: {}", cacheError.getMessage());
+                }
+            }
+            
             return reviews;
         } catch (Exception e) {
             logger.error("Error fetching user reviews for userId: {}, page: {}, size: {}", userId, page, size, e);
@@ -176,10 +239,41 @@ public class ReviewService {
         }
     }
     
-    @Cacheable(value = "restaurantReviews", key = "#restaurantId + '_' + #page + '_' + #size", unless = "#result == null or #result.isEmpty()")
     public List<ReviewEntity> getRestaurantReviews(String restaurantId, int page, int size) {
-        logger.info("Fetching restaurant reviews from database for restaurantId: {}, page: {}, size: {}", restaurantId, page, size);
-        return reviewRepository.findByRestaurantId(restaurantId, page, size);
+        logger.info("Fetching restaurant reviews for restaurantId: {}, page: {}, size: {}", restaurantId, page, size);
+        
+        // 캐시에서 먼저 시도
+        String cacheKey = "restaurantReviews::" + restaurantId + "_" + page + "_" + size;
+        try {
+            Object cachedData = valkeyTemplate.opsForValue().get(cacheKey);
+            if (cachedData != null) {
+                logger.info("Cache hit for restaurant reviews: {}", cacheKey);
+                return safeCastToReviewEntityList(cachedData);
+            }
+        } catch (Exception e) {
+            logger.warn("캐시 조회 실패, DB에서 조회: {}", e.getMessage());
+        }
+        
+        // 캐시 미스 시 DB에서 조회
+        logger.info("Cache miss, fetching restaurant reviews from database for restaurantId: {}", restaurantId);
+        try {
+            List<ReviewEntity> reviews = reviewRepository.findByRestaurantId(restaurantId, page, size);
+            
+            // 결과를 캐시에 저장
+            if (!reviews.isEmpty()) {
+                try {
+                    valkeyTemplate.opsForValue().set(cacheKey, reviews, java.time.Duration.ofHours(2));
+                    logger.debug("Cached restaurant reviews: {}", cacheKey);
+                } catch (Exception cacheError) {
+                    logger.warn("캐시 저장 실패: {}", cacheError.getMessage());
+                }
+            }
+            
+            return reviews;
+        } catch (Exception e) {
+            logger.error("Error fetching restaurant reviews: {}", e.getMessage());
+            return new ArrayList<>();
+        }
     }
     
     public Optional<ReviewEntity> getReview(String restaurantId, String reviewId) {
