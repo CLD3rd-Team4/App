@@ -58,6 +58,8 @@ public class ReviewRepository {
         return reviewTable.query(querySpec)
                 .stream()
                 .flatMap(page1 -> page1.items().stream())
+                .filter(item -> item instanceof ReviewEntity) // 타입 체크 추가
+                .map(item -> (ReviewEntity) item)
                 .skip((long) page * size)
                 .limit(size)
                 .collect(Collectors.toList());
@@ -108,6 +110,8 @@ public class ReviewRepository {
         return index.query(queryRequest)
                 .stream()
                 .flatMap(queryPage -> queryPage.items().stream())
+                .filter(item -> item instanceof ReviewEntity) // 타입 체크 추가
+                .map(item -> (ReviewEntity) item)
                 .skip((long) page * size)
                 .limit(size)
                 .collect(Collectors.toList());
@@ -320,6 +324,8 @@ public class ReviewRepository {
         List<ReviewEntity> items = index.query(queryRequest)
                 .stream()
                 .flatMap(page -> page.items().stream())
+                .filter(item -> item instanceof ReviewEntity) // 타입 체크 추가
+                .map(item -> (ReviewEntity) item)
                 .collect(Collectors.toList());
 
         return items.stream()
@@ -376,6 +382,8 @@ public class ReviewRepository {
                 .build())
                 .stream()
                 .flatMap(page -> page.items().stream())
+                .filter(item -> item instanceof ReviewEntity) // 타입 체크 추가
+                .map(item -> (ReviewEntity) item)
                 .filter(review -> review.getRating() != null && review.getRating() > 0)
                 .mapToInt(ReviewEntity::getRating)
                 .average()
@@ -405,6 +413,8 @@ public class ReviewRepository {
         List<ReviewEntity> verifiedHighRatingReviews = index.query(queryRequest)
                 .stream()
                 .flatMap(queryPage -> queryPage.items().stream())
+                .filter(item -> item instanceof ReviewEntity) // 타입 체크 추가
+                .map(item -> (ReviewEntity) item)
                 .skip((long) page * size)
                 .limit(size)
                 .collect(Collectors.toList());
@@ -423,6 +433,8 @@ public class ReviewRepository {
                             .build())
                     .stream()
                     .flatMap(queryPage -> queryPage.items().stream())
+                    .filter(item -> item instanceof ReviewEntity) // 타입 체크 추가
+                    .map(item -> (ReviewEntity) item)
                     .limit(size - verifiedHighRatingReviews.size())
                     .collect(Collectors.toList());
 
@@ -485,6 +497,8 @@ public class ReviewRepository {
         return index.query(queryRequest)
                 .stream()
                 .flatMap(queryPage -> queryPage.items().stream())
+                .filter(item -> item instanceof ReviewEntity) // 타입 체크 추가
+                .map(item -> (ReviewEntity) item)
                 .skip((long) page * size)
                 .limit(size)
                 .collect(Collectors.toList());
@@ -557,6 +571,8 @@ public class ReviewRepository {
             List<ReviewEntity> ratingResults = index.query(queryRequest)
                     .stream()
                     .flatMap(queryPage -> queryPage.items().stream())
+                    .filter(item -> item instanceof ReviewEntity) // 타입 체크 추가
+                    .map(item -> (ReviewEntity) item)
                     .collect(Collectors.toList());
             
             allResults.addAll(ratingResults);
@@ -601,6 +617,8 @@ public class ReviewRepository {
                 .build())
                 .stream()
                 .flatMap(queryPage -> queryPage.items().stream())
+                .filter(item -> item instanceof ReviewEntity) // 타입 체크 추가
+                .map(item -> (ReviewEntity) item)
                 .skip((long) page * size)
                 .limit(size)
                 .collect(Collectors.toList());
