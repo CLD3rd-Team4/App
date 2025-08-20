@@ -64,34 +64,46 @@ public class ReviewRepository {
     }
 
     public List<ReviewEntity> findByUserId(String userId, int page, int size) {
-        DynamoDbIndex<ReviewEntity> index = reviewTable.index("UserIdIndex");
-        QueryConditional queryConditional = QueryConditional
-                .keyEqualTo(Key.builder().partitionValue(userId).build());
+        try {
+            DynamoDbIndex<ReviewEntity> index = reviewTable.index("UserIdIndex");
+            QueryConditional queryConditional = QueryConditional
+                    .keyEqualTo(Key.builder().partitionValue(userId).build());
 
-        QueryEnhancedRequest queryRequest = QueryEnhancedRequest.builder()
-                .queryConditional(queryConditional)
-                .scanIndexForward(false) // 최신순 정렬 (created_at 역순)
-                .build();
+            QueryEnhancedRequest queryRequest = QueryEnhancedRequest.builder()
+                    .queryConditional(queryConditional)
+                    .scanIndexForward(false) // 최신순 정렬 (created_at 역순)
+                    .build();
 
-        return index.query(queryRequest)
-                .stream()
-                .flatMap(queryPage -> queryPage.items().stream())
-                .skip((long) page * size)
-                .limit(size)
-                .collect(Collectors.toList());
+            return index.query(queryRequest)
+                    .stream()
+                    .flatMap(queryPage -> queryPage.items().stream())
+                    .skip((long) page * size)
+                    .limit(size)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            // GSI 문제 시 빈 리스트 반환하여 500 에러 방지
+            System.err.println("UserIdIndex GSI 쿼리 실패, 빈 목록 반환: " + e.getMessage());
+            return new ArrayList<>();
+        }
     }
 
     public long countByUserId(String userId) {
-        DynamoDbIndex<ReviewEntity> index = reviewTable.index("UserIdIndex");
-        QueryConditional queryConditional = QueryConditional
-                .keyEqualTo(Key.builder().partitionValue(userId).build());
+        try {
+            DynamoDbIndex<ReviewEntity> index = reviewTable.index("UserIdIndex");
+            QueryConditional queryConditional = QueryConditional
+                    .keyEqualTo(Key.builder().partitionValue(userId).build());
 
-        return index.query(QueryEnhancedRequest.builder()
-                .queryConditional(queryConditional)
-                .build())
-                .stream()
-                .mapToLong(queryPage -> queryPage.items().size())
-                .sum();
+            return index.query(QueryEnhancedRequest.builder()
+                    .queryConditional(queryConditional)
+                    .build())
+                    .stream()
+                    .mapToLong(queryPage -> queryPage.items().size())
+                    .sum();
+        } catch (Exception e) {
+            // GSI 문제 시 0 반환하여 500 에러 방지
+            System.err.println("UserIdIndex GSI count 쿼리 실패, 0 반환: " + e.getMessage());
+            return 0;
+        }
     }
 
     public long countByRestaurantId(String restaurantId) {
