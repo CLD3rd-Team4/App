@@ -320,7 +320,7 @@ public class ReviewService {
         return reviewRepository.findByRestaurantIdAndReviewId(restaurantId, reviewId);
     }
 
-    @Cacheable(value = "singleReviewById", key = "#reviewId", unless = "#result == null || #result.isEmpty()")
+    @Cacheable(value = "singleReviewById", key = "#reviewId", unless = "#result == null || (#result.class.simpleName == 'Optional' && !#result.isPresent())")
     public Optional<ReviewEntity> getByReviewId(String reviewId) {
         logger.info("Fetching review from database for reviewId: {}", reviewId);
         return reviewRepository.findByReviewId(reviewId);
@@ -410,7 +410,7 @@ public class ReviewService {
     /**
      * 특정 리뷰 조회 (ID 기반)
      */
-    @Cacheable(value = "singleReview", key = "#restaurantId + '_' + #reviewId", unless = "#result == null || #result.isEmpty()")
+    @Cacheable(value = "singleReview", key = "#restaurantId + '_' + #reviewId", unless = "#result == null || (#result.class.simpleName == 'Optional' && !#result.isPresent())")
     public Optional<ReviewEntity> getReviewById(String restaurantId, String reviewId) {
         logger.info("Fetching review from database for restaurantId: {}, reviewId: {}", restaurantId, reviewId);
         return reviewRepository.findByRestaurantIdAndReviewId(restaurantId, reviewId);
