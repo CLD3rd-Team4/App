@@ -656,35 +656,35 @@ export const reviewApi = {
   },
 
   // 특정 미작성 리뷰 상세 조회
-  getPendingReviewDetail: async (restaurantId: string, scheduledTime: string): Promise<GetPendingReviewDetailResponse> => {
-    try {
-      // GET /review/pending/{restaurantId}/detail?scheduledTime={scheduledTime}
-      const response = await api.get(`/review/pending/${restaurantId}/detail`, {
-        params: { scheduledTime },
-      });
+  // getPendingReviewDetail: async (restaurantId: string, scheduledTime: string): Promise<GetPendingReviewDetailResponse> => {
+  //   try {
+  //     // GET /review/pending/{restaurantId}/detail?scheduledTime={scheduledTime}
+  //     const response = await api.get(`/review/pending/${restaurantId}/detail`, {
+  //       params: { scheduledTime },
+  //     });
 
-      // 응답 구조: { success: true, data: {...} }
-      return response.data;
-    } catch (error: any) {
-      if (error instanceof APIError) {
-        throw error;
-      }
-      if (error.response?.data) {
-        throw new APIError(
-          error.response.data.message || '미작성 리뷰 조회 실패',
-          error.response.status,
-          error.response.data
-        );
-      }
-      throw new APIError('알 수 없는 오류가 발생했습니다', 0, { originalError: error });
-    }
-  },
+  //     // 응답 구조: { success: true, data: {...} }
+  //     return response.data;
+  //   } catch (error: any) {
+  //     if (error instanceof APIError) {
+  //       throw error;
+  //     }
+  //     if (error.response?.data) {
+  //       throw new APIError(
+  //         error.response.data.message || '미작성 리뷰 조회 실패',
+  //         error.response.status,
+  //         error.response.data
+  //       );
+  //     }
+  //     throw new APIError('알 수 없는 오류가 발생했습니다', 0, { originalError: error });
+  //   }
+  // },
 
   // 작성된 리뷰 삭제
   deleteReview: async (restaurantId: string, reviewId: string): Promise<DeleteReviewResponse> => {
     try {
       // DELETE /review/{restaurantId}/{reviewId}
-      const response = await api.delete(`/review/${restaurantId}/${reviewId}`);
+      const response = await api.delete(`/review/http/${restaurantId}`, { params: { reviewId: reviewId } });
       return response.data;
     } catch (error: any) {
       if (error instanceof APIError) {
@@ -704,8 +704,8 @@ export const reviewApi = {
   // 특정 리뷰 상세 조회
   getReview: async (restaurantId: string, reviewId: string): Promise<GetReviewResponse> => {
     try {
-      // GET /review/{restaurantId}/{reviewId}
-      const response = await api.get(`/review/${restaurantId}`,{ params: { reviewId }});
+      // GET /review/http/{restaurantId}?reviewId={reviewId}
+      const response = await api.get(`/review/http/${restaurantId}`,{ params: { reviewId }});
       
       // 응답 구조: { success: true, data: {...} }
       return response.data;
@@ -759,10 +759,11 @@ export const reviewApi = {
       }
 
       // PUT /review/{restaurantId}/{reviewId}
-      const response = await api.put(`/review/${restaurantId}/${reviewId}`, formData, {
+      const response = await api.put(`/review/http/${restaurantId}`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        params: { reviewId: reviewId },
       });
       
       return response.data;
