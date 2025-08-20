@@ -159,6 +159,7 @@ export interface GetUserReviewsResponse {
 export interface GetReviewResponse {
   success: boolean
   data: Review
+  message?: string
 }
 
 export interface UpdateReviewRequest {
