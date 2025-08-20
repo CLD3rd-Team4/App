@@ -80,14 +80,6 @@ export default function VisitedRestaurantsScreen() {
       console.log('미작성 리뷰 데이터:', data)
       
       if (Array.isArray(data)) {
-        // 미작성 리뷰 데이터 구조 디버깅
-        console.log('미작성 리뷰 데이터 상세:', data.map(item => ({
-          id: item.id,
-          restaurantId: item.restaurantId,
-          placeName: item.placeName,
-          scheduledTime: item.scheduledTime,
-          allKeys: Object.keys(item)
-        })))
         setVisitedRestaurants(data)
       } else {
         console.warn('미작성 리뷰 데이터가 배열이 아님:', data)
@@ -319,12 +311,7 @@ export default function VisitedRestaurantsScreen() {
                         {restaurant.review && <p className="text-sm text-gray-700 mb-2">{restaurant.review}</p>}
                         <div className="flex gap-2">
                           <Button
-                            onClick={() => {
-                              console.log('삭제 버튼 클릭 - restaurant 데이터:', restaurant);
-                              const restaurantId = restaurant.restaurantId || restaurant.id;
-                              console.log('사용할 restaurantId:', restaurantId);
-                              handleDeleteUnwritten(restaurantId, restaurant.scheduledTime || '');
-                            }}
+                            onClick={() => handleDeleteUnwritten(restaurant.id, restaurant.scheduledTime || '')}
                             size="sm"
                             variant="outline"
                             className="text-red-600 border-red-200"

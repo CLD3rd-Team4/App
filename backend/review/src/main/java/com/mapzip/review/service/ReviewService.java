@@ -336,31 +336,13 @@ public class ReviewService {
         // 사용자 인증 검증
         validateUserAuthentication(userId);
         
-        // 여러 형식으로 리뷰 찾기 시도
-        Optional<ReviewEntity> existingReview = Optional.empty();
-        
-        // 1. 원본 reviewId로 시도
-        if (reviewId.contains("_") || reviewId.contains("#")) {
-            existingReview = reviewRepository.findByRestaurantIdAndReviewId(restaurantId, reviewId);
+        // reviewId가 timestamp만 있는 경우 userId 추가
+        String fullReviewId = reviewId;
+        if (!reviewId.contains("_")) {
+            fullReviewId = reviewId + "_" + userId;
         }
         
-        // 2. _ 형식을 # 형식으로 변환하여 시도 (기존 데이터 호환성)
-        if (existingReview.isEmpty() && reviewId.contains("_")) {
-            String oldFormatReviewId = reviewId.replace("_", "#");
-            existingReview = reviewRepository.findByRestaurantIdAndReviewId(restaurantId, oldFormatReviewId);
-        }
-        
-        // 3. timestamp만 있는 경우 userId 추가
-        if (existingReview.isEmpty() && !reviewId.contains("_") && !reviewId.contains("#")) {
-            String fullReviewId = reviewId + "_" + userId;
-            existingReview = reviewRepository.findByRestaurantIdAndReviewId(restaurantId, fullReviewId);
-            
-            // 기존 형식도 시도
-            if (existingReview.isEmpty()) {
-                String oldFormatReviewId = reviewId + "#" + userId;
-                existingReview = reviewRepository.findByRestaurantIdAndReviewId(restaurantId, oldFormatReviewId);
-            }
-        }
+        Optional<ReviewEntity> existingReview = reviewRepository.findByRestaurantIdAndReviewId(restaurantId, fullReviewId);
         
         if (existingReview.isEmpty()) {
             throw new IllegalStateException("리뷰를 찾을 수 없습니다.");
@@ -481,42 +463,7 @@ public class ReviewService {
     @Cacheable(value = "singleReview", key = "#restaurantId + '_' + #reviewId", unless = "#result == null || !#result.isPresent()")
     public Optional<ReviewEntity> getReviewById(String restaurantId, String reviewId) {
         logger.info("Fetching review from database for restaurantId: {}, reviewId: {}", restaurantId, reviewId);
-        
-        // 여러 형식으로 리뷰 찾기 시도 (삭제 로직과 동일)
-        Optional<ReviewEntity> existingReview = Optional.empty();
-        
-        // 1. 원본 reviewId로 시도
-        if (reviewId.contains("_") || reviewId.contains("#")) {
-            logger.info("원본 reviewId로 조회 시도: {}", reviewId);
-            existingReview = reviewRepository.findByRestaurantIdAndReviewId(restaurantId, reviewId);
-        }
-        
-        // 2. _ 형식을 # 형식으로 변환하여 시도 (기존 데이터 호환성)
-        if (existingReview.isEmpty() && reviewId.contains("_")) {
-            String oldFormatReviewId = reviewId.replace("_", "#");
-            logger.info("# 형식으로 조회 시도: {}", oldFormatReviewId);
-            existingReview = reviewRepository.findByRestaurantIdAndReviewId(restaurantId, oldFormatReviewId);
-        }
-        
-        // 3. reviewId만으로 전체 스캔 시도
-        if (existingReview.isEmpty()) {
-            logger.warn("restaurantId 매칭 실패, reviewId로 전체 스캔 시도: {}", reviewId);
-            existingReview = reviewRepository.findByReviewId(reviewId);
-            
-            // _ 형식을 # 형식으로 변환해서도 시도
-            if (existingReview.isEmpty() && reviewId.contains("_")) {
-                String oldFormatReviewId = reviewId.replace("_", "#");
-                existingReview = reviewRepository.findByReviewId(oldFormatReviewId);
-            }
-        }
-        
-        if (existingReview.isPresent()) {
-            logger.info("리뷰 조회 성공 - restaurantId: {}, reviewId: {}", restaurantId, reviewId);
-        } else {
-            logger.warn("리뷰 조회 실패 - restaurantId: {}, reviewId: {}", restaurantId, reviewId);
-        }
-        
-        return existingReview;
+        return reviewRepository.findByRestaurantIdAndReviewId(restaurantId, reviewId);
     }
     
     /**

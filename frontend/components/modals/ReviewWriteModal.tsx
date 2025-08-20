@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useRef, useMemo } from "react"
+import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -32,16 +32,6 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
   const [restaurantAddress, setRestaurantAddress] = useState(restaurant.addressName || restaurant.address || '')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
-
-  // OCR 날짜 변환 결과를 메모화하여 무한 루프 방지
-  const formattedOcrDate = useMemo(() => {
-    return ocrResult?.visitDate ? formatDateForInput(ocrResult.visitDate) : null;
-  }, [ocrResult?.visitDate]);
-
-  // 날짜 일치 여부를 메모화
-  const isDateMatch = useMemo(() => {
-    return formattedOcrDate === visitDate;
-  }, [formattedOcrDate, visitDate]);
 
   // OCR 날짜를 HTML date input 형식(yyyy-MM-dd)으로 변환
   const formatDateForInput = (ocrDate: string): string | null => {
@@ -436,27 +426,27 @@ export function ReviewWriteModal({ restaurant, onComplete, onCancel }: ReviewWri
               {/* OCR 결과 날짜 검증 메시지 */}
               {ocrResult && ocrResult.visitDate && (
                 <div className={`mb-4 p-3 border rounded-lg ${
-                  isDateMatch 
+                  formatDateForInput(ocrResult.visitDate) === visitDate 
                     ? 'bg-green-50 border-green-200' 
                     : 'bg-yellow-50 border-yellow-200'
                 }`}>
                   <p className={`text-sm ${
-                    isDateMatch 
+                    formatDateForInput(ocrResult.visitDate) === visitDate 
                       ? 'text-green-800' 
                       : 'text-yellow-800'
                   }`}>
                     <strong>OCR 추출 날짜:</strong> {ocrResult.visitDate}
-                    {isDateMatch 
+                    {formatDateForInput(ocrResult.visitDate) === visitDate 
                       ? ' ✓ 일치' 
                       : ' ⚠️ 불일치'
                     }
                   </p>
                   <p className={`text-xs mt-1 ${
-                    isDateMatch 
+                    formatDateForInput(ocrResult.visitDate) === visitDate 
                       ? 'text-green-600' 
                       : 'text-yellow-600'
                   }`}>
-                    {isDateMatch 
+                    {formatDateForInput(ocrResult.visitDate) === visitDate 
                       ? '영수증 날짜와 방문 날짜가 일치합니다.' 
                       : '영수증 날짜와 방문 날짜가 다릅니다. 정확한 날짜인지 확인해주세요.'
                     }
