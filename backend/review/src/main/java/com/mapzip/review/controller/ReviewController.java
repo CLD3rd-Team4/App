@@ -243,7 +243,6 @@ public class ReviewController {
             .map(review -> (ReviewEntity) review) // 명시적 캐스팅 추가
             .map(review -> {
                 Map<String, Object> reviewMap = new HashMap<>();
-                reviewMap.put("reviewId", review.getReviewId() != null ? review.getReviewId() : "");
                 String reviewId = review.getReviewId();
                 // reviewId에 _이 포함되어 있지 않다면, 잘못된 형식으로 간주하고 수정합니다.
                 if (reviewId != null && !reviewId.contains("_") && review.getCreatedAt() != null && review.getUserId() != null) {
