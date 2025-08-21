@@ -225,7 +225,7 @@ export default function VisitedRestaurantsScreen() {
       </div>
 
       <div className="flex-1 content-with-bottom-nav">
-        <div className="p-4">
+        <div className="p-4 pb-24">
           {isLoading ? (
             <div className="text-center py-8">
               <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
