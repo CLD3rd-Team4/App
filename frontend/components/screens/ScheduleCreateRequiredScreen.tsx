@@ -221,7 +221,7 @@ export default function ScheduleCreateRequiredScreen({
         <h1 className="text-lg font-medium text-blue-600">필수 정보 입력</h1>
       </div>
 
-      <div className="flex-1 pb-20 bg-gray-100 overflow-y-auto">
+      <div className="flex-1 pb-32 bg-gray-100 overflow-y-auto">
         <div className="p-4 space-y-6">
           <p className="text-sm text-gray-600">스케줄명을 입력해주세요.</p>
 
