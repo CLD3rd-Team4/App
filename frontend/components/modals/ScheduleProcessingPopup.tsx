@@ -88,7 +88,7 @@ export default function ScheduleProcessingPopup({
           // location 모드: 중앙 정렬 + 현재 위치
           <div className="px-6 py-8 text-center">
             {coordText && (
-              <div className="text-gray-700 mb-3">현재 위치: {coordText}</div>
+              <div className="text-gray-700 mb-3">{coordText}</div>
             )}
             <div className="inline-flex items-center gap-2">
               {Spinner}
