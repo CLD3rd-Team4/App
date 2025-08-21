@@ -355,13 +355,16 @@ export default function VisitedRestaurantsScreen() {
                             <PinTile addressName={review.restaurantAddress} />
                           </div>
                         )}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center">
+                        <div>
+                          <div className="flex items-center mb-1">
                             {'★'.repeat(review.rating || 0)}<span className="text-gray-300">{'★'.repeat(5 - (review.rating || 0))}</span>
                           </div>
-                          <span className="text-xs text-gray-500 truncate ml-2">
+                          <div className="text-xs text-gray-700 font-medium truncate mb-1">
                             {review.restaurantName || '식당'}
-                          </span>
+                          </div>
+                          <div className="text-xs text-gray-500 truncate">
+                            {review.restaurantAddress || '주소 정보 없음'}
+                          </div>
                         </div>
                         </div>
                         {/* 삭제 버튼 */}
