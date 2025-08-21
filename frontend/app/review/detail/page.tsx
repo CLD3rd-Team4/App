@@ -31,6 +31,8 @@ function ReviewDetailContent() {
           setIsLoading(true);
           const response = await reviewApi.getReview(restaurantId, reviewId);
           if (response.success && response.data) {
+            console.log('리뷰 데이터:', response.data);
+            console.log('이미지 URLs:', response.data.imageUrls);
             setReview(response.data);
             setEditedRating(response.data.rating);
             setEditedContent(response.data.content);
@@ -140,6 +142,28 @@ function ReviewDetailContent() {
             ))}
           </div>
         </div>
+
+        {/* 리뷰 이미지 섹션 */}
+        {review.imageUrls && review.imageUrls.length > 0 && (
+          <div className="bg-white rounded-lg p-4 shadow-sm">
+            <h3 className="font-medium mb-3">리뷰 사진</h3>
+            <div className="grid grid-cols-2 gap-3">
+              {review.imageUrls.map((imageUrl: string, index: number) => (
+                <div key={index} className="relative">
+                  <img
+                    src={imageUrl}
+                    alt={`리뷰 이미지 ${index + 1}`}
+                    className="w-full h-32 object-cover rounded-lg"
+                    onError={(e) => {
+                      console.error('이미지 로드 실패:', imageUrl);
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="bg-white rounded-lg p-4 shadow-sm">
           <h3 className="font-medium mb-3">리뷰 내용</h3>
