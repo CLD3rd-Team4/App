@@ -1,0 +1,218 @@
+syntax = "proto3";
+
+package schedule;
+
+import "google/api/annotations.proto";
+
+option java_multiple_files = true;
+option java_package = "com.mapzip.schedule.grpc";
+option java_outer_classname = "ScheduleProto";
+
+// ===================================================================
+// 1. 서비스 정의 (Service Definition)
+// ===================================================================
+
+service ScheduleService {
+  
+  // 스케줄 생성
+  rpc CreateSchedule(CreateScheduleRequest) returns (CreateScheduleResponse) {
+    option (google.api.http) = {
+      post: "/schedule"
+      body: "*"
+    };
+  }
+  
+  // 스케줄 목록 조회
+  rpc GetScheduleList(GetScheduleListRequest) returns (GetScheduleListResponse) {
+    option (google.api.http) = {
+      get: "/schedule"
+    };
+  }
+
+  // 특정 스케줄 상세 조회 (순수 조회용)
+  rpc GetScheduleDetail(GetScheduleDetailRequest) returns (GetScheduleDetailResponse) {
+    option (google.api.http) = {
+      get: "/schedule/{scheduleId}"
+    };
+  }
+  
+  // 스케줄 선택 (Valkey에 선택 상태 저장 및 상세 조회)
+  rpc SelectSchedule(SelectScheduleRequest) returns (GetScheduleDetailResponse) {
+    option (google.api.http) = {
+      get: "/schedule/{scheduleId}:select"
+    };
+  }
+
+  // 사용자의 스케줄 선택 상태 플래그 조회
+  rpc IsScheduleSelected(IsScheduleSelectedRequest) returns (IsScheduleSelectedResponse) {
+    option (google.api.http) = {
+      get: "/schedule/selectedStatus"
+    };
+  }
+
+  // 스케줄 수정
+  rpc UpdateSchedule(UpdateScheduleRequest) returns (GetScheduleDetailResponse) {
+    option (google.api.http) = {
+      put: "/schedule/{scheduleId}"
+      body: "*"
+    };
+  }
+
+  // 스케줄 삭제
+  rpc DeleteSchedule(DeleteScheduleRequest) returns (DeleteScheduleResponse) {
+    option (google.api.http) = {
+      delete: "/schedule/{scheduleId}"
+    };
+  }
+
+  // 스케줄 선택 해제
+  rpc DeselectSchedule(DeselectScheduleRequest) returns (DeselectScheduleResponse) {
+    option (google.api.http) = {
+      delete: "/schedule/selection"
+    };
+  }
+
+  
+}
+
+// ===================================================================
+// 2. 공통 메시지 타입 (Common Message Types)
+// ===================================================================
+
+message Location {
+  double lat = 1;
+  double lng = 2;
+  string name = 3;
+  string address = 4;
+}
+
+message Waypoint {
+  double lat = 1;
+  double lng = 2;
+  string name = 3;
+  string arrivalTime = 4; // recommend-service가 계산 후 채워줄 필드
+}
+
+message MealTimeSlot {
+  string slotId = 1;          // 고유 슬롯 ID (DB PK)
+  MealType mealType = 2;      // 식사/간식 구분
+  string scheduledTime = 3;   // 예정 시간 (예: "오후 12:30")
+  int32 radius = 4;           // 검색 반경 (미터)
+}
+
+enum MealType {
+  MEAL = 0;    // 식사
+  SNACK = 1;   // 간식
+}
+
+// ===================================================================
+// 3. API별 요청/응답 메시지 (API-specific Messages)
+// ===================================================================
+
+// 3.1 스케줄 생성
+message CreateScheduleRequest {
+  string title = 1;
+  string departureTime = 2;
+  repeated MealTimeSlot mealSlots = 3;
+  Location departure = 4;
+  repeated Waypoint waypoints = 5;
+  Location destination = 6;
+  string purpose = 7;
+  repeated string companions = 8;
+  int32 arrivalBufferMinutes = 9; // 도착 여유 시간 (분)
+  string userNote = 10; // 사용자 요구사항
+}
+
+message CreateScheduleResponse {
+  string scheduleId = 1;
+  string message = 2;
+  bool success = 3;
+}
+
+// 3.2 스케줄 목록 조회
+message GetScheduleListRequest {
+  // No fields needed, userId comes from header
+}
+
+message GetScheduleListResponse {
+  message ScheduleSummary {
+    string scheduleId = 1;
+    string title = 2;
+    string departureTime = 3;
+    string destinationName = 4;
+    int32 totalMealSlots = 5;
+  }
+  repeated ScheduleSummary schedules = 1;
+}
+
+// 3.3 특정 스케줄 상세 조회
+message GetScheduleDetailRequest {
+  string scheduleId = 1;
+}
+
+message GetScheduleDetailResponse {
+  message ScheduleDetail {
+    string title = 1;
+    string departureTime = 2;
+    repeated MealTimeSlot mealSlots = 3;
+    Location departure = 4;
+    repeated Waypoint waypoints = 5;
+    Location destination = 6;
+    string purpose = 7;
+    repeated string companions = 8;
+    int32 arrivalBufferMinutes = 9; // 도착 여유 시간 (분)
+    string userNote = 10; // 사용자 요구사항
+    string scheduleId = 11; // 스케줄 ID 필드 추가
+  }
+  ScheduleDetail schedule = 1;
+}
+
+// 3.3.1 스케줄 선택 요청
+message SelectScheduleRequest {
+  string scheduleId = 1;
+}
+
+// 3.4 스케줄 수정
+message UpdateScheduleRequest {
+  string scheduleId = 1;
+  string title = 2;
+  string departureTime = 3;
+  repeated MealTimeSlot mealSlots = 4;
+  Location departure = 5;
+  repeated Waypoint waypoints = 6;
+  Location destination = 7;
+  string purpose = 8;
+  repeated string companions = 9;
+  int32 arrivalBufferMinutes = 10; // 도착 여유 시간 (분)
+  string userNote = 11; // 사용자 요구사항
+}
+
+// 3.5 스케줄 삭제
+message DeleteScheduleRequest {
+  string scheduleId = 1;
+}
+
+message DeleteScheduleResponse {
+  string message = 1;
+  bool success = 2;
+}
+
+// 3.7 스케줄 선택 해제
+message DeselectScheduleRequest {
+  // No fields needed, userId comes from header
+}
+
+message DeselectScheduleResponse {
+  string message = 1;
+  bool success = 2;
+}
+
+// 3.6 스케줄 선택 상태 조회
+message IsScheduleSelectedRequest {
+  // No fields needed, userId comes from header
+}
+
+message IsScheduleSelectedResponse {
+  bool isSelected = 1;
+  string schedule_id = 2;
+}

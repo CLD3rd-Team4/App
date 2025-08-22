@@ -1,0 +1,1020 @@
+package com.mapzip.review.service;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mapzip.review.dto.OcrResultDto;
+import com.mapzip.review.entity.ReviewEntity;
+import com.mapzip.review.entity.PendingReviewEntity;
+import com.mapzip.review.grpc.GrpcHeaderInterceptor;
+import com.mapzip.review.grpc.ReviewProto;
+import com.mapzip.review.repository.ReviewRepository;
+import com.mapzip.review.repository.PendingReviewRepository;
+import io.grpc.Context;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import org.springframework.web.multipart.MultipartFile;
+import java.util.LinkedHashMap;
+
+@Service
+public class ReviewService {
+    
+    private static final Logger logger = LoggerFactory.getLogger(ReviewService.class);
+    
+    private final ReviewRepository reviewRepository;
+    private final PendingReviewRepository pendingReviewRepository;
+    private final OcrService ocrService;
+    private final S3Service s3Service;
+    private final RedisTemplate<String, Object> valkeyTemplate;
+    private final ObjectMapper objectMapper;
+    
+    @Autowired
+    public ReviewService(ReviewRepository reviewRepository, 
+                        PendingReviewRepository pendingReviewRepository,
+                        OcrService ocrService, 
+                        S3Service s3Service,
+                        RedisTemplate<String, Object> redisTemplate,
+                        ObjectMapper objectMapper) {
+        this.reviewRepository = reviewRepository;
+        this.pendingReviewRepository = pendingReviewRepository;
+        this.ocrService = ocrService;
+        this.s3Service = s3Service;
+        this.valkeyTemplate = redisTemplate;
+        this.objectMapper = objectMapper;
+    }
+    
+    /**
+     * 캐시에서 받은 데이터를 안전하게 ReviewEntity 리스트로 변환
+     * LinkedHashMap으로 역직렬화된 경우를 처리
+     */
+    private List<ReviewEntity> safeCastToReviewEntityList(Object cachedData) {
+        if (cachedData == null) {
+            logger.debug("캐시 데이터가 null입니다");
+            return new ArrayList<>();
+        }
+        
+        logger.debug("캐시에서 받은 데이터 타입: {}", cachedData.getClass().getSimpleName());
+        
+        if (cachedData instanceof List<?>) {
+            List<?> rawList = (List<?>) cachedData;
+            List<ReviewEntity> result = new ArrayList<>();
+            
+            logger.debug("캐시에서 {} 개의 아이템 처리 중", rawList.size());
+            
+            for (int i = 0; i < rawList.size(); i++) {
+                Object item = rawList.get(i);
+                try {
+                    if (item instanceof ReviewEntity) {
+                        result.add((ReviewEntity) item);
+                        logger.debug("아이템 {}: ReviewEntity로 직접 캐스팅 성공", i);
+                    } else if (item instanceof LinkedHashMap) {
+                        // LinkedHashMap을 ReviewEntity로 변환
+                        @SuppressWarnings("unchecked")
+                        LinkedHashMap<String, Object> map = (LinkedHashMap<String, Object>) item;
+                        ReviewEntity entity = objectMapper.convertValue(map, ReviewEntity.class);
+                        result.add(entity);
+                        logger.debug("아이템 {}: LinkedHashMap에서 ReviewEntity로 변환 성공", i);
+                    } else if (item instanceof java.util.Map) {
+                        // 일반 Map도 처리
+                        @SuppressWarnings("unchecked")
+                        java.util.Map<String, Object> map = (java.util.Map<String, Object>) item;
+                        ReviewEntity entity = objectMapper.convertValue(map, ReviewEntity.class);
+                        result.add(entity);
+                        logger.debug("아이템 {}: Map에서 ReviewEntity로 변환 성공", i);
+                    } else {
+                        logger.warn("아이템 {}: 예상치 못한 타입 발견: {}, toString: {}", 
+                                i, item.getClass().getSimpleName(), item.toString().substring(0, Math.min(100, item.toString().length())));
+                        // JSON 문자열일 가능성도 체크
+                        if (item instanceof String) {
+                            try {
+                                ReviewEntity entity = objectMapper.readValue((String) item, ReviewEntity.class);
+                                result.add(entity);
+                                logger.debug("아이템 {}: JSON 문자열에서 ReviewEntity로 변환 성공", i);
+                            } catch (Exception jsonError) {
+                                logger.error("아이템 {}: JSON 변환 실패: {}", i, jsonError.getMessage());
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    logger.error("아이템 {} 캐시 데이터 변환 실패: {}, 원본 타입: {}", 
+                            i, e.getMessage(), item != null ? item.getClass().getSimpleName() : "null", e);
+                }
+            }
+            
+            logger.info("캐시에서 {} 개의 ReviewEntity 변환 완료", result.size());
+            return result;
+        }
+        
+        logger.warn("캐시에서 List가 아닌 타입 반환: {}", cachedData.getClass().getSimpleName());
+        return new ArrayList<>();
+    }
+    
+    @Caching(evict = {
+        @CacheEvict(value = "userReviews", allEntries = true),
+        @CacheEvict(value = "restaurantReviews", allEntries = true),
+        @CacheEvict(value = "reviewStats", allEntries = true)
+    })
+    public ReviewCreateResult createReview(String userId, String restaurantId, String restaurantName, 
+                                         String restaurantAddress, int rating, String content,
+                                         List<byte[]> receiptImages, List<byte[]> reviewImages, String visitDate) {
+        try {
+            // 사용자 인증 검증
+            validateUserAuthentication(userId);
+            
+            // OCR 검증 수행
+            OcrResultDto ocrResult = null;
+            boolean isVerified = false;
+            
+            if (receiptImages != null && !receiptImages.isEmpty()) {
+                // 첫 번째 영수증 이미지로 OCR 수행
+                ocrResult = ocrService.processReceiptImage(
+                    receiptImages.get(0), restaurantName, restaurantAddress);
+                isVerified = ocrResult.isValid();
+                logger.info("OCR verification result for user {}: {}", userId, isVerified);
+
+                if (!isVerified) {
+                    logger.warn("OCR verification failed for user {}, but allowing review creation", userId);
+                    // OCR 검증 실패해도 리뷰 작성은 허용하되, 검증 상태만 표시
+                }
+                
+                // OCR 날짜와 실제 방문 날짜 비교 검증 (경고만 로그)
+                if (visitDate != null && ocrResult.getVisitDate() != null) {
+                    boolean isDateValid = ocrService.validateVisitDate(ocrResult.getVisitDate(), visitDate);
+                    if (!isDateValid) {
+                        logger.warn("Date validation failed for user {}: OCR date {} vs visit date {}, but allowing review creation", 
+                                   userId, ocrResult.getVisitDate(), visitDate);
+                        // 날짜 불일치도 리뷰 작성 차단하지 않고 경고만 로그
+                        isVerified = false; // 검증 상태를 false로 설정
+                    }
+                }
+            }
+            
+            // 리뷰 이미지 S3 업로드
+            List<String> imageUrls = new ArrayList<>();
+            if (reviewImages != null) {
+                for (byte[] imageData : reviewImages) {
+                    try {
+                        String imageUrl = s3Service.uploadImage(imageData, "image/jpeg", userId);
+                        imageUrls.add(imageUrl);
+                    } catch (Exception e) {
+                        logger.error("Failed to upload review image for user {}", userId, e);
+                    }
+                }
+            }
+            
+            // 리뷰 엔티티 생성
+            ReviewEntity review = new ReviewEntity();
+            review.setRestaurantId(restaurantId);
+            review.setUserId(userId);
+            review.setRestaurantName(restaurantName);
+            review.setRestaurantAddress(restaurantAddress);
+            review.setRating(rating);
+            review.setContent(content);
+            review.setImageUrls(imageUrls);
+            review.setIsVerified(isVerified);
+            review.setReviewStatus("PUBLISHED");  // 기본 상태 설정
+            review.setCreatedAt(Instant.now());
+            review.setUpdatedAt(Instant.now());
+            
+            // DynamoDB 복합키 생성
+            review.generateCompositeKey();
+            
+            // 방문 날짜 설정 (우선순위: OCR 추출 > 사용자 입력 > 현재 날짜)
+            if (ocrResult != null && ocrResult.getVisitDate() != null && !ocrResult.getVisitDate().isEmpty()) {
+                review.setVisitDate(ocrResult.getVisitDate()); // OCR 추출 날짜 우선
+            } else if (visitDate != null && !visitDate.isEmpty()) {
+                review.setVisitDate(visitDate); // 사용자가 입력한 날짜
+            } else {
+                review.setVisitDate(Instant.now().toString().split("T")[0]); // 현재 날짜 fallback
+            }
+            
+            // 리뷰 저장
+            ReviewEntity savedReview = reviewRepository.save(review);
+            
+            
+            return new ReviewCreateResult(savedReview, ocrResult, true, "리뷰가 성공적으로 작성되었습니다.");
+            
+        } catch (Exception e) {
+            logger.error("Failed to create review for user {}", userId, e);
+            return new ReviewCreateResult(null, null, false, "리뷰 작성 실패: " + e.getMessage());
+        }
+    }
+    
+    public List<ReviewEntity> getUserReviews(String userId, int page, int size) {
+        logger.info("Fetching user reviews for userId: {}, page: {}, size: {}", userId, page, size);
+        
+        // 캐시에서 먼저 시도
+        String cacheKey = "userReviews::" + userId + "_" + page + "_" + size;
+        try {
+            Object cachedData = valkeyTemplate.opsForValue().get(cacheKey);
+            if (cachedData != null) {
+                logger.info("Cache hit for user reviews: {}", cacheKey);
+                List<ReviewEntity> cachedResult = safeCastToReviewEntityList(cachedData);
+                if (!cachedResult.isEmpty()) {
+                    return cachedResult;
+                } else {
+                    logger.warn("캐시 데이터 변환 결과가 비어있음, 캐시 삭제 후 DB에서 조회");
+                    valkeyTemplate.delete(cacheKey);
+                }
+            }
+        } catch (Exception e) {
+            logger.warn("캐시 조회 실패, DB에서 조회: {}", e.getMessage());
+            // 캐시에 문제가 있으면 삭제
+            try {
+                valkeyTemplate.delete(cacheKey);
+            } catch (Exception deleteError) {
+                logger.warn("캐시 삭제 실패: {}", deleteError.getMessage());
+            }
+        }
+        
+        // 캐시 미스 시 DB에서 조회
+        logger.info("Cache miss, fetching user reviews from database for userId: {}", userId);
+        try {
+            List<ReviewEntity> reviews = reviewRepository.findByUserId(userId, page, size);
+            logger.info("Successfully fetched {} reviews for user: {}", reviews.size(), userId);
+            
+            // 결과를 캐시에 저장 (TTL을 30분으로 단축)
+            if (!reviews.isEmpty()) {
+                try {
+                    valkeyTemplate.opsForValue().set(cacheKey, reviews, java.time.Duration.ofMinutes(30));
+                    logger.debug("Cached user reviews: {}", cacheKey);
+                } catch (Exception cacheError) {
+                    logger.warn("캐시 저장 실패: {}", cacheError.getMessage());
+                }
+            }
+            
+            return reviews;
+        } catch (Exception e) {
+            logger.error("Error fetching user reviews for userId: {}, page: {}, size: {}", userId, page, size, e);
+            // 에러 발생 시 빈 리스트 반환하여 500 에러 방지
+            return new ArrayList<>();
+        }
+    }
+    
+    public long getUserReviewsCount(String userId) {
+        logger.info("Fetching user review count from database for userId: {}", userId);
+        
+        try {
+            long count = reviewRepository.countByUserId(userId);
+            logger.info("Successfully fetched review count {} for user: {}", count, userId);
+            return count;
+        } catch (Exception e) {
+            logger.error("Error fetching user review count for userId: {}", userId, e);
+            // 에러 발생 시 0 반환하여 500 에러 방지
+            return 0;
+        }
+    }
+    
+    public List<ReviewEntity> getRestaurantReviews(String restaurantId, int page, int size) {
+        logger.info("Fetching restaurant reviews for restaurantId: {}, page: {}, size: {}", restaurantId, page, size);
+        
+        // 캐시에서 먼저 시도
+        String cacheKey = "restaurantReviews::" + restaurantId + "_" + page + "_" + size;
+        try {
+            Object cachedData = valkeyTemplate.opsForValue().get(cacheKey);
+            if (cachedData != null) {
+                logger.info("Cache hit for restaurant reviews: {}", cacheKey);
+                return safeCastToReviewEntityList(cachedData);
+            }
+        } catch (Exception e) {
+            logger.warn("캐시 조회 실패, DB에서 조회: {}", e.getMessage());
+        }
+        
+        // 캐시 미스 시 DB에서 조회
+        logger.info("Cache miss, fetching restaurant reviews from database for restaurantId: {}", restaurantId);
+        try {
+            List<ReviewEntity> reviews = reviewRepository.findByRestaurantId(restaurantId, page, size);
+            
+            // 결과를 캐시에 저장 (TTL을 30분으로 단축)
+            if (!reviews.isEmpty()) {
+                try {
+                    valkeyTemplate.opsForValue().set(cacheKey, reviews, java.time.Duration.ofMinutes(30));
+                    logger.debug("Cached restaurant reviews: {}", cacheKey);
+                } catch (Exception cacheError) {
+                    logger.warn("캐시 저장 실패: {}", cacheError.getMessage());
+                }
+            }
+            
+            return reviews;
+        } catch (Exception e) {
+            logger.error("Error fetching restaurant reviews: {}", e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+    
+    public Optional<ReviewEntity> getReview(String restaurantId, String reviewId) {
+        return reviewRepository.findByRestaurantIdAndReviewId(restaurantId, reviewId);
+    }
+
+    @Cacheable(value = "singleReviewById", key = "#reviewId", unless = "#result == null || (#result.class.simpleName == 'Optional' && !#result.isPresent())")
+    public Optional<ReviewEntity> getByReviewId(String reviewId) {
+        logger.info("Fetching review from database for reviewId: {}", reviewId);
+        return reviewRepository.findByReviewId(reviewId);
+    }
+    
+    @Caching(evict = {
+        @CacheEvict(value = "userReviews", allEntries = true),
+        @CacheEvict(value = "restaurantReviews", allEntries = true),
+        @CacheEvict(value = "reviewStats", allEntries = true)
+    })
+    public ReviewEntity updateReview(String restaurantId, String reviewId, String userId, 
+                                   int rating, String content, List<String> imageUrls) {
+        // 사용자 인증 검증
+        validateUserAuthentication(userId);
+        
+        Optional<ReviewEntity> existingReview = reviewRepository.findByRestaurantIdAndReviewId(restaurantId, reviewId);
+        
+        if (existingReview.isEmpty()) {
+            throw new IllegalStateException("리뷰를 찾을 수 없습니다.");
+        }
+        
+        ReviewEntity review = existingReview.get();
+        
+        // 작성자 검증
+        if (!review.getUserId().equals(userId)) {
+            throw new SecurityException("리뷰 수정 권한이 없습니다.");
+        }
+        
+        // 리뷰 업데이트
+        review.setRating(rating);
+        review.setContent(content);
+        review.setImageUrls(imageUrls);
+        review.setUpdatedAt(Instant.now());
+        
+        return reviewRepository.save(review);
+    }
+    
+    @Caching(evict = {
+        @CacheEvict(value = "userReviews", allEntries = true),
+        @CacheEvict(value = "restaurantReviews", allEntries = true),
+        @CacheEvict(value = "reviewStats", allEntries = true)
+    })
+    public void deleteReview(String restaurantId, String reviewId, String userId) {
+        logger.info("리뷰 삭제 시작 - restaurantId: {}, reviewId: {}, userId: {}", restaurantId, reviewId, userId);
+
+        // 사용자 인증 검증
+        validateUserAuthentication(userId);
+
+        // 여러 방법으로 리뷰 찾기 시도
+        Optional<ReviewEntity> existingReview = reviewRepository.findByRestaurantIdAndReviewId(restaurantId, reviewId);
+
+        if (existingReview.isEmpty()) {
+            logger.warn("기본 방식으로 리뷰를 찾을 수 없음, reviewId로 다시 시도: {}", reviewId);
+            // reviewId로도 찾아보기
+            existingReview = reviewRepository.findByReviewId(reviewId);
+
+            if (existingReview.isEmpty()) {
+                logger.error("리뷰를 찾을 수 없음 - restaurantId: {}, reviewId: {}, userId: {}", restaurantId, reviewId, userId);
+                throw new IllegalStateException("리뷰를 찾을 수 없습니다.");
+            }
+        }
+
+        ReviewEntity review = existingReview.get();
+        logger.info("리뷰 발견 - 실제 restaurantId: {}, userId: {}", review.getRestaurantId(), review.getUserId());
+
+        // 작성자 검증
+        if (!review.getUserId().equals(userId)) {
+            throw new SecurityException("리뷰 삭제 권한이 없습니다.");
+        }
+
+        // reviewId로 찾았을 경우, 찾은 엔티티의 restaurantId를 사용
+        reviewRepository.deleteByRestaurantIdAndReviewId(review.getRestaurantId(), reviewId);
+    }
+    
+    @Cacheable(value = "reviewStats", key = "'count_' + #restaurantId")
+    public long getRestaurantReviewCount(String restaurantId) {
+        logger.info("Fetching review count from database for restaurantId: {}", restaurantId);
+        return reviewRepository.countByRestaurantId(restaurantId);
+    }
+    
+    @Cacheable(value = "reviewStats", key = "'avg_rating_' + #restaurantId")
+    public double getRestaurantAverageRating(String restaurantId) {
+        logger.info("Fetching average rating from database for restaurantId: {}", restaurantId);
+        return reviewRepository.getAverageRatingByRestaurantId(restaurantId);
+    }
+    
+    /**
+     * 특정 리뷰 조회 (ID 기반)
+     */
+    @Cacheable(value = "singleReview", key = "#restaurantId + '_' + #reviewId", unless = "#result == null || (#result.class.simpleName == 'Optional' && !#result.isPresent())")
+    public Optional<ReviewEntity> getReviewById(String restaurantId, String reviewId) {
+        logger.info("Fetching review from database for restaurantId: {}, reviewId: {}", restaurantId, reviewId);
+        return reviewRepository.findByRestaurantIdAndReviewId(restaurantId, reviewId);
+    }
+    
+    /**
+     * 리뷰 수정 (MultipartFile 버전 - 새 이미지 업로드 포함)
+     */
+    @Caching(evict = {
+        @CacheEvict(value = "userReviews", allEntries = true),
+        @CacheEvict(value = "restaurantReviews", allEntries = true),
+        @CacheEvict(value = "reviewStats", allEntries = true),
+        @CacheEvict(value = "singleReview", key = "#restaurantId + '_' + #reviewId")
+    })
+    public ReviewEntity updateReviewWithImages(String restaurantId, String reviewId, String userId, 
+                                             int rating, String content, List<MultipartFile> reviewImages) {
+        logger.info("Updating review with images: {}/{} by user: {}", restaurantId, reviewId, userId);
+        
+        // 사용자 권한 검증
+        validateUserAuthentication(userId);
+        
+        Optional<ReviewEntity> existingReview = reviewRepository.findByRestaurantIdAndReviewId(restaurantId, reviewId);
+        if (existingReview.isEmpty()) {
+            throw new IllegalStateException("리뷰를 찾을 수 없습니다.");
+        }
+        
+        ReviewEntity review = existingReview.get();
+        
+        // 작성자 검증
+        if (!review.getUserId().equals(userId)) {
+            throw new SecurityException("리뷰 수정 권한이 없습니다.");
+        }
+        
+        // 리뷰 내용 업데이트
+        review.setRating(rating);
+        review.setContent(content);
+        review.setUpdatedAt(Instant.now()); // 올바른 Instant 타입 사용
+        
+        // 새로운 이미지가 있으면 S3에 업로드하고 URL 업데이트
+        if (reviewImages != null && !reviewImages.isEmpty()) {
+            List<String> newImageUrls = new ArrayList<>();
+            
+            for (MultipartFile image : reviewImages) {
+                if (!image.isEmpty()) {
+                    try {
+                        // S3Service의 올바른 메소드 시그니처 사용
+                        byte[] imageData = image.getBytes();
+                        String imageUrl = s3Service.uploadImage(imageData, image.getContentType(), userId);
+                        newImageUrls.add(imageUrl);
+                    } catch (Exception e) {
+                        logger.warn("Failed to upload review image for user: {}", userId, e);
+                    }
+                }
+            }
+            
+            if (!newImageUrls.isEmpty()) {
+                review.setImageUrls(newImageUrls);
+            }
+        }
+        
+        return reviewRepository.save(review);
+    }
+    
+    public OcrResultDto verifyReceipt(byte[] receiptImage, String expectedRestaurantName, String expectedAddress) {
+        logger.info("Processing OCR for restaurant: {}", expectedRestaurantName);
+        
+        try {
+            return ocrService.processReceiptImage(receiptImage, expectedRestaurantName, expectedAddress);
+        } catch (IllegalStateException e) {
+            logger.error("OCR service configuration error: {}", e.getMessage());
+            throw new RuntimeException("OCR 서비스 설정 오류: " + e.getMessage(), e);
+        } catch (Exception e) {
+            logger.error("OCR processing failed for restaurant: {}", expectedRestaurantName, e);
+            throw new RuntimeException("영수증 처리 중 오류가 발생했습니다: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * 추천 서버용 리뷰 데이터 조회
+     * @param area 지역 필터 (예: "강남구", "서초구", "전체" 등)
+     * @param category 카테고리 필터 (예: "한식", "중식", "전체" 등)
+     * @param page 페이지 번호 (0부터 시작)
+     * @param size 페이지 크기
+     * @return 추천용 고품질 리뷰 목록
+     */
+    @Cacheable(value = "recommendationReviews", key = "#area + '_' + #category + '_' + #page + '_' + #size", unless = "#result == null or #result.isEmpty()")
+    public List<ReviewEntity> getReviewsForRecommendation(String area, String category, int page, int size) {
+        logger.info("Fetching reviews for recommendation - area: {}, category: {}, page: {}, size: {}", 
+                   area, category, page, size);
+        
+        try {
+            List<ReviewEntity> reviews;
+            
+            // 지역 필터링 로직
+            if (area != null && !area.isEmpty() && !area.equals("전체")) {
+                // 주소 패턴으로 검색 (예: "강남구" 포함된 주소)
+                reviews = reviewRepository.findReviewsByAddressPattern(area, page, size);
+                logger.debug("Found {} reviews for area: {}", reviews.size(), area);
+            } else {
+                // 전체 지역: 고품질 리뷰만 조회 (OCR 검증 + 평점 3점 이상)
+                reviews = reviewRepository.findHighQualityReviewsForRecommendation(page, size);
+                logger.debug("Found {} high-quality reviews", reviews.size());
+            }
+            
+            // 카테고리 필터링 (식당명이나 주소에서 카테고리 키워드 매칭)
+            if (category != null && !category.isEmpty() && !category.equals("전체")) {
+                reviews = filterReviewsByCategory(reviews, category);
+                logger.debug("After category filtering ({}): {} reviews", category, reviews.size());
+            }
+            
+            // 추천용 데이터만 추출 (AI가 분석하기 좋은 형태로 가공)
+            reviews = prepareReviewsForAI(reviews);
+            
+            logger.info("Successfully fetched {} reviews for recommendation", reviews.size());
+            return reviews;
+            
+        } catch (Exception e) {
+            logger.error("Error fetching reviews for recommendation", e);
+            // 에러 발생 시 빈 리스트 반환하여 추천 서비스 중단 방지
+            return List.of();
+        }
+    }
+    
+    /**
+     * 특정 식당 ID들의 리뷰를 조회 (추천 서버에서 Kakao API 결과와 매칭할 때 사용)
+     */
+    public List<ReviewEntity> getReviewsByRestaurantIds(List<String> restaurantIds) {
+        logger.info("Fetching reviews for {} restaurants", restaurantIds.size());
+        
+        try {
+            // 각 식당별로 최대 5개의 최신 리뷰 조회
+            List<ReviewEntity> reviews = reviewRepository.findRecentReviewsByRestaurantIds(restaurantIds, 5);
+            
+            // AI 분석용으로 데이터 가공
+            reviews = prepareReviewsForAI(reviews);
+            
+            logger.info("Found {} reviews for {} restaurants", reviews.size(), restaurantIds.size());
+            return reviews;
+            
+        } catch (Exception e) {
+            logger.error("Error fetching reviews by restaurant IDs", e);
+            return List.of();
+        }
+    }
+    
+    /**
+     * 카테고리별 리뷰 필터링
+     * 실제 운영에서는 식당 카테고리 정보가 별도 테이블에 있어야 하지만,
+     * 현재는 식당명/주소에서 키워드 매칭으로 처리
+     */
+    private List<ReviewEntity> filterReviewsByCategory(List<ReviewEntity> reviews, String category) {
+        // 카테고리별 키워드 매핑
+        List<String> keywords = getCategoryKeywords(category);
+        
+        return reviews.stream()
+                .filter(review -> {
+                    String restaurantInfo = (review.getRestaurantName() + " " + review.getRestaurantAddress()).toLowerCase();
+                    return keywords.stream().anyMatch(keyword -> restaurantInfo.contains(keyword.toLowerCase()));
+                })
+                .collect(Collectors.toList());
+    }
+    
+    /**
+     * 카테고리별 검색 키워드 반환
+     */
+    private List<String> getCategoryKeywords(String category) {
+        return switch (category.toLowerCase()) {
+            case "한식", "korean" -> List.of("한식", "김치", "갈비", "불고기", "비빔밥", "한정식");
+            case "중식", "chinese" -> List.of("중식", "중국", "짜장면", "짬뽕", "탕수육", "마라");
+            case "일식", "japanese" -> List.of("일식", "일본", "초밥", "라멘", "우동", "사시미");
+            case "양식", "western" -> List.of("양식", "파스타", "피자", "스테이크", "샐러드");
+            case "카페", "cafe" -> List.of("카페", "커피", "디저트", "브런치", "베이커리");
+            case "치킨", "chicken" -> List.of("치킨", "닭", "프라이드", "양념");
+            case "피자", "pizza" -> List.of("피자", "pizza");
+            case "햄버거", "burger" -> List.of("햄버거", "버거", "burger");
+            default -> List.of(category); // 기본적으로 카테고리명 자체를 키워드로 사용
+        };
+    }
+    
+    /**
+     * AI 분석용 리뷰 데이터 가공
+     * - 너무 짧은 리뷰 제외
+     * - 의미있는 내용만 선별
+     * - 최신 리뷰 우선
+     */
+    private List<ReviewEntity> prepareReviewsForAI(List<ReviewEntity> reviews) {
+        return reviews.stream()
+                .filter(review -> review.getContent() != null && review.getContent().length() >= 10) // 최소 10자 이상
+                .filter(review -> review.getRating() != null && review.getRating() >= 2) // 1점 리뷰 제외
+                .filter(review -> !isSpamReview(review.getContent())) // 스팸 리뷰 제외
+                .sorted((r1, r2) -> {
+                    // 정렬 우선순위: 1) 검증된 리뷰 2) 최신순 3) 높은 평점순
+                    // NPE 방지를 위한 안전한 null 체크
+                    boolean r1Verified = Boolean.TRUE.equals(r1.getIsVerified());
+                    boolean r2Verified = Boolean.TRUE.equals(r2.getIsVerified());
+                    int verifiedCompare = Boolean.compare(r2Verified, r1Verified);
+                    if (verifiedCompare != 0) return verifiedCompare;
+                    
+                    int timeCompare = r2.getCreatedAt().compareTo(r1.getCreatedAt());
+                    if (timeCompare != 0) return timeCompare;
+                    
+                    int r1Rating = r1.getRating() != null ? r1.getRating() : 0;
+                    int r2Rating = r2.getRating() != null ? r2.getRating() : 0;
+                    return Integer.compare(r2Rating, r1Rating);
+                })
+                .collect(Collectors.toList());
+    }
+    
+    /**
+     * 간단한 스팸 리뷰 필터링
+     * 실제 운영에서는 ML 모델이나 더 정교한 필터링 필요
+     */
+    private boolean isSpamReview(String content) {
+        if (content == null || content.trim().isEmpty()) return true;
+        
+        String lowerContent = content.toLowerCase();
+        
+        // 스팸 패턴 체크
+        List<String> spamPatterns = List.of(
+            "광고", "홍보", "이벤트", "쿠폰", "할인", "http", "www", "링크",
+            "맛없", "별로", "최악", "돈아까", "비추"  // 극단적 부정 리뷰도 제외
+        );
+        
+        long spamCount = spamPatterns.stream()
+                .mapToLong(pattern -> content.toLowerCase().split(pattern).length - 1)
+                .sum();
+                
+        return spamCount > 2; // 스팸 키워드가 3개 이상이면 스팸으로 판단
+    }
+    
+    /**
+     * 사용자 인증 검증 메서드
+     * HTTP 요청과 gRPC 요청을 모두 지원
+     */
+    private void validateUserAuthentication(String requestedUserId) {
+        // gRPC Context에서 사용자 ID 확인 (gRPC 요청인 경우)
+        String authenticatedUserId = GrpcHeaderInterceptor.USER_ID_CONTEXT_KEY.get();
+        
+        if (authenticatedUserId != null && !authenticatedUserId.isEmpty()) {
+            // gRPC 요청인 경우: Context의 사용자 ID와 요청 사용자 ID 비교
+            if (!authenticatedUserId.equals(requestedUserId)) {
+                throw new SecurityException("다른 사용자의 리뷰에 접근할 수 없습니다.");
+            }
+            logger.debug("gRPC request - User authentication validated for userId: {}", authenticatedUserId);
+        } else {
+            // HTTP 요청인 경우: 기본적인 사용자 ID 유효성만 검증
+            if (requestedUserId == null || requestedUserId.trim().isEmpty()) {
+                throw new SecurityException("사용자 ID가 필요합니다.");
+            }
+            
+            // 기본적인 사용자 ID 형식 검증
+            if (!isValidUserId(requestedUserId)) {
+                throw new SecurityException("유효하지 않은 사용자 ID 형식입니다.");
+            }
+            
+            logger.debug("HTTP request - User authentication validated for userId: {}", requestedUserId);
+        }
+    }
+    
+    /**
+     * 사용자 ID 유효성 검증
+     * 안전한 문자만 허용하고 길이 제한
+     */
+    private boolean isValidUserId(String userId) {
+        if (userId == null || userId.trim().isEmpty()) {
+            return false;
+        }
+        
+        // 영문, 숫자, 하이픈, 언더스코어만 허용하고 길이 제한
+        return userId.matches("^[a-zA-Z0-9_-]{1,50}$") && 
+               !userId.startsWith("dev-test") && // 테스트 계정 패턴 차단
+               !userId.contains("..") && // 경로 순회 방지
+               !userId.equalsIgnoreCase("admin") && // 관리자 계정명 차단
+               !userId.equalsIgnoreCase("root"); // 루트 계정명 차단
+    }
+    
+    /**
+     * 추천 서버에서 보낸 식당 정보를 Valkey에 저장
+     * @param userId 사용자 ID
+     * @param places 식당 정보 목록
+     */
+    public void storePlacesForReview(String userId, List<ReviewProto.ReviewPlaceInfo> places) {
+        logger.info("Storing {} places for user: {}", places.size(), userId);
+        
+        try {
+            String key = "places_for_review:" + userId;
+            
+            // 기존 데이터 삭제 후 새로운 데이터 저장
+            valkeyTemplate.delete(key);
+            
+            // 각 식당 정보를 JSON으로 변환하여 저장
+            for (int i = 0; i < places.size(); i++) {
+                ReviewProto.ReviewPlaceInfo place = places.get(i);
+                
+                // ObjectMapper를 사용한 안전한 JSON 생성
+                PlaceData placeData = new PlaceData(
+                    place.getId(),
+                    place.getPlaceName(),
+                    place.getAddressName(),
+                    place.getPlaceUrl(),
+                    place.getScheduledTime()
+                );
+                
+                String placeJson = objectMapper.writeValueAsString(placeData);
+                valkeyTemplate.opsForList().rightPush(key, placeJson);
+            }
+            
+            // TTL 설정 (7일)
+            valkeyTemplate.expire(key, java.time.Duration.ofDays(7));
+            
+            logger.info("Successfully stored {} places for user: {}", places.size(), userId);
+            
+        } catch (Exception e) {
+            logger.error("Failed to store places for user: {}", userId, e);
+            throw new RuntimeException("식당 정보 저장 실패: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 사용자가 리뷰 작성 가능한 식당 목록 조회
+     * @param userId 사용자 ID
+     * @return 식당 정보 목록
+     */
+    public List<ReviewProto.ReviewPlaceInfo> getPlacesForReview(String userId) {
+        logger.info("Getting places for review for user: {}", userId);
+        
+        try {
+            String key = "places_for_review:" + userId;
+            List<Object> placesData = valkeyTemplate.opsForList().range(key, 0, -1);
+            
+            if (placesData == null || placesData.isEmpty()) {
+                logger.info("No places found for user: {}", userId);
+                return List.of();
+            }
+            
+            List<ReviewProto.ReviewPlaceInfo> places = new ArrayList<>();
+            for (Object placeData : placesData) {
+                try {
+                    String placeJson = placeData.toString();
+                    // ObjectMapper를 사용한 안전한 JSON 파싱
+                    PlaceData parsedPlace = objectMapper.readValue(placeJson, PlaceData.class);
+                    
+                    ReviewProto.ReviewPlaceInfo place = ReviewProto.ReviewPlaceInfo.newBuilder()
+                            .setId(parsedPlace.getId() != null ? parsedPlace.getId() : "")
+                            .setPlaceName(parsedPlace.getPlaceName() != null ? parsedPlace.getPlaceName() : "")
+                            .setAddressName(parsedPlace.getAddressName() != null ? parsedPlace.getAddressName() : "")
+                            .setPlaceUrl(parsedPlace.getPlaceUrl() != null ? parsedPlace.getPlaceUrl() : "")
+                            .setScheduledTime(parsedPlace.getScheduledTime() != null ? parsedPlace.getScheduledTime() : "")
+                            .build();
+                    
+                    places.add(place);
+                } catch (Exception e) {
+                    logger.warn("Failed to parse place data: {}", placeData, e);
+                }
+            }
+            
+            logger.info("Retrieved {} places for user: {}", places.size(), userId);
+            return places;
+            
+        } catch (Exception e) {
+            logger.error("Failed to get places for user: {}", userId, e);
+            return List.of();
+        }
+    }
+    
+    /**
+     * 추천 서버용 리뷰 요약 정보 제공
+     * @param restaurantIds 식당 ID 목록
+     * @return 식당별 리뷰 요약
+     */
+    public List<ReviewProto.RestaurantReviewSummary> getReviewSummaryForRecommendation(List<String> restaurantIds) {
+        logger.info("Getting review summary for {} restaurants", restaurantIds.size());
+        
+        List<ReviewProto.RestaurantReviewSummary> summaries = new ArrayList<>();
+        
+        for (String restaurantId : restaurantIds) {
+            try {
+                // 평균 평점과 총 리뷰 수 조회
+                double averageRating = getRestaurantAverageRating(restaurantId);
+                long totalReviews = getRestaurantReviewCount(restaurantId);
+                
+                // 대표 리뷰 조회 (더 정교한 기준 적용)
+                List<ReviewEntity> topReviews = reviewRepository.findByRestaurantId(restaurantId, 0, 20)
+                        .stream()
+                        .filter(review -> review.getRating() != null && review.getRating() >= 4)
+                        .filter(review -> review.getContent() != null && review.getContent().length() >= 10)
+                        .filter(review -> !isSpamReview(review.getContent())) // 스팸 필터링
+                        .sorted((r1, r2) -> {
+                            // 정렬 우선순위: 1) 검증된 리뷰 2) 높은 평점 3) 최신순
+                            boolean r1Verified = Boolean.TRUE.equals(r1.getIsVerified());
+                            boolean r2Verified = Boolean.TRUE.equals(r2.getIsVerified());
+                            int verifiedCompare = Boolean.compare(r2Verified, r1Verified);
+                            if (verifiedCompare != 0) return verifiedCompare;
+                            
+                            int ratingCompare = Integer.compare(r2.getRating(), r1.getRating());
+                            if (ratingCompare != 0) return ratingCompare;
+                            
+                            return r2.getCreatedAt().compareTo(r1.getCreatedAt());
+                        })
+                        .limit(3)
+                        .collect(Collectors.toList());
+                
+                List<String> topReviewContents = topReviews.stream()
+                        .map(ReviewEntity::getContent)
+                        .collect(Collectors.toList());
+                
+                ReviewProto.RestaurantReviewSummary summary = ReviewProto.RestaurantReviewSummary.newBuilder()
+                        .setRestaurantId(restaurantId)
+                        .setAverageRating(averageRating)
+                        .setTotalReviews((int) totalReviews)
+                        .addAllTopReviews(topReviewContents)
+                        .build();
+                
+                summaries.add(summary);
+                
+            } catch (Exception e) {
+                logger.warn("Failed to get review summary for restaurant: {}", restaurantId, e);
+                // 에러가 발생한 경우 기본값으로 추가
+                ReviewProto.RestaurantReviewSummary defaultSummary = ReviewProto.RestaurantReviewSummary.newBuilder()
+                        .setRestaurantId(restaurantId)
+                        .setAverageRating(0.0)
+                        .setTotalReviews(0)
+                        .build();
+                
+                summaries.add(defaultSummary);
+            }
+        }
+        
+        logger.info("Generated review summaries for {} restaurants", summaries.size());
+        return summaries;
+    }
+    
+    /**
+     * Redis에 저장되는 식당 정보 데이터 클래스
+     */
+    public static class PlaceData {
+        private String id;
+        private String placeName;
+        private String addressName;
+        private String placeUrl;
+        private String scheduledTime;
+        
+        public PlaceData() {}
+        
+        public PlaceData(String id, String placeName, String addressName, String placeUrl, String scheduledTime) {
+            this.id = id;
+            this.placeName = placeName;
+            this.addressName = addressName;
+            this.placeUrl = placeUrl;
+            this.scheduledTime = scheduledTime;
+        }
+        
+        // Getters and Setters
+        public String getId() { return id; }
+        public void setId(String id) { this.id = id; }
+        
+        public String getPlaceName() { return placeName; }
+        public void setPlaceName(String placeName) { this.placeName = placeName; }
+        
+        public String getAddressName() { return addressName; }
+        public void setAddressName(String addressName) { this.addressName = addressName; }
+        
+        public String getPlaceUrl() { return placeUrl; }
+        public void setPlaceUrl(String placeUrl) { this.placeUrl = placeUrl; }
+        
+        public String getScheduledTime() { return scheduledTime; }
+        public void setScheduledTime(String scheduledTime) { this.scheduledTime = scheduledTime; }
+    }
+    
+    // === 미작성 리뷰 관리 메서드들 ===
+    
+    /**
+     * 추천서버에서 선택된 식당들을 미작성 리뷰로 저장
+     */
+    public boolean savePendingReviews(String userId, List<ReviewProto.ReviewPlaceInfo> places) {
+        logger.info("=== STARTING savePendingReviews ===");
+        logger.info("Saving {} pending reviews for user: {}", places.size(), userId);
+        
+        try {
+            // 입력 데이터 로깅
+            for (int i = 0; i < places.size(); i++) {
+                ReviewProto.ReviewPlaceInfo place = places.get(i);
+                logger.info("Place {}: id={}, name={}, address={}, scheduledTime={}", 
+                           i, place.getId(), place.getPlaceName(), place.getAddressName(), place.getScheduledTime());
+            }
+            
+            List<PendingReviewEntity> pendingReviews = places.stream()
+                    .map(place -> {
+                        PendingReviewEntity entity = new PendingReviewEntity();
+                        entity.setUserId(userId);
+                        entity.setRestaurantId(place.getId());
+                        entity.setPlaceName(place.getPlaceName());
+                        entity.setAddressName(place.getAddressName());
+                        entity.setPlaceUrl(place.getPlaceUrl());
+                        entity.setScheduledTime(place.getScheduledTime());
+                        
+                        logger.info("Created entity: userId={}, restaurantId={}, scheduledTime={}", 
+                                   entity.getUserId(), entity.getRestaurantId(), entity.getScheduledTime());
+                        return entity;
+                    })
+                    .collect(Collectors.toList());
+            
+            logger.info("Calling repository.saveBatch with {} entities", pendingReviews.size());
+            boolean result = pendingReviewRepository.saveBatch(pendingReviews);
+            logger.info("Repository.saveBatch returned: {}", result);
+            
+            if (result) {
+                logger.info("=== SUCCESSFULLY SAVED {} PENDING REVIEWS ===", places.size());
+            } else {
+                logger.error("=== FAILED TO SAVE PENDING REVIEWS ===");
+            }
+            
+            return result;
+            
+        } catch (Exception e) {
+            logger.error("=== EXCEPTION in savePendingReviews for user: {} ===", userId, e);
+            return false;
+        }
+    }
+    
+    /**
+     * 사용자의 미작성 리뷰 목록 조회
+     */
+    public List<PendingReviewEntity> getPendingReviewsByUserId(String userId) {
+        logger.info("Getting pending reviews for user: {}", userId);
+        return pendingReviewRepository.findIncompleteByUserId(userId);
+    }
+    
+    /**
+     * 미작성 리뷰 삭제 (사용자가 안간 경우)
+     */
+    public boolean deletePendingReview(String userId, String restaurantId, String scheduledTime) {
+        logger.info("=== STARTING SERVICE LAYER DELETION ===");
+        logger.info("Deleting pending review for user: {}, restaurant: {}, scheduledTime: {}", userId, restaurantId, scheduledTime);
+        
+        // 먼저 사용자의 모든 미작성 리뷰를 조회해서 실제 키 패턴 확인
+        List<PendingReviewEntity> allReviews = pendingReviewRepository.findByUserId(userId);
+        logger.info("User {} has {} pending reviews total:", userId, allReviews.size());
+        
+        for (PendingReviewEntity review : allReviews) {
+            logger.info("  Existing review: restaurantId={}, scheduledTime={}, compositeKey={}", 
+                       review.getRestaurantId(), review.getScheduledTime(), review.getRestaurantIdScheduledTime());
+        }
+        
+        // 정확한 매칭을 위해 기존 데이터에서 복합키 찾기
+        Optional<PendingReviewEntity> targetReview = allReviews.stream()
+            .filter(review -> restaurantId.equals(review.getRestaurantId()) && scheduledTime.equals(review.getScheduledTime()))
+            .findFirst();
+        
+        if (targetReview.isEmpty()) {
+            logger.error("=== NO MATCHING REVIEW FOUND ===");
+            logger.error("Looking for restaurantId: {}, scheduledTime: {}", restaurantId, scheduledTime);
+            allReviews.forEach(review -> 
+                logger.error("  Available: restaurantId={}, scheduledTime={}", review.getRestaurantId(), review.getScheduledTime()));
+            return false;
+        }
+        
+        // 실제 저장된 복합키 사용
+        String actualCompositeKey = targetReview.get().getRestaurantIdScheduledTime();
+        logger.info("=== USING ACTUAL STORED COMPOSITE KEY: {} ===", actualCompositeKey);
+        
+        boolean result = pendingReviewRepository.delete(userId, actualCompositeKey);
+        logger.info("=== SERVICE LAYER DELETION RESULT: {} ===", result);
+        
+        return result;
+    }
+    
+    /**
+     * 리뷰 작성 완료 시 미작성 리뷰를 완료 처리
+     */
+    public boolean markPendingReviewAsCompleted(String userId, String restaurantId, String scheduledTime) {
+        logger.info("Marking pending review as completed for user: {}, restaurant: {}", userId, restaurantId);
+        
+        String compositeKey = restaurantId + "#" + scheduledTime;
+        return pendingReviewRepository.markAsCompleted(userId, compositeKey);
+    }
+    
+    /**
+     * 특정 미작성 리뷰 상세 조회
+     */
+    public Optional<PendingReviewEntity> getPendingReviewDetail(String userId, String scheduledTime, String restaurantId) {
+        logger.info("Getting pending review detail for user: {}, restaurant: {}", userId, restaurantId);
+        
+        String compositeKey = restaurantId + "#" + scheduledTime;
+        return pendingReviewRepository.findByUserIdAndCompositeKey(userId, compositeKey);
+    }
+    
+    // 내부 클래스: 리뷰 생성 결과
+    public static class ReviewCreateResult {
+        private final ReviewEntity review;
+        private final OcrResultDto ocrResult;
+        private final boolean success;
+        private final String message;
+        
+        public ReviewCreateResult(ReviewEntity review, OcrResultDto ocrResult, boolean success, String message) {
+            this.review = review;
+            this.ocrResult = ocrResult;
+            this.success = success;
+            this.message = message;
+        }
+        
+        public ReviewEntity getReview() { return review; }
+        public OcrResultDto getOcrResult() { return ocrResult; }
+        public boolean isSuccess() { return success; }
+        public String getMessage() { return message; }
+    }
+}

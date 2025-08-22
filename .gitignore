@@ -72,6 +72,8 @@ local.properties
 # Reference: https://intellij-support.jetbrains.com/hc/en-us/articles/206544839
 
 # User-specific stuff
+**/.idea/
+
 .idea/**/workspace.xml
 .idea/**/tasks.xml
 .idea/**/usage.statistics.xml
@@ -281,6 +283,15 @@ sketch
 !.vscode/extensions.json
 !.vscode/*.code-snippets
 
+### Build output ###
+.next/
+dist/
+out/
+
+### Env files ###
+.env
+.env.*
+
 # Local History for Visual Studio Code
 .history/
 
@@ -318,4 +329,11 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
+**/application.properties
 # End of https://www.toptal.com/developers/gitignore/api/java,macos,windows,intellij,react,maven,eclipse,visualstudiocode
+
+**/googleapis/
+target/
+build/
+.gradle/
+

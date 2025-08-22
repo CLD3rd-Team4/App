@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: review
+  cloud:
+    config:
+      uri: http://config.service-platform.svc.cluster.local:8888
+      fail-fast: true
+      retry:
+        initial-interval: 3000
+        max-attempts: 5
+        max-interval: 10000
+        multiplier: 1.2
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
