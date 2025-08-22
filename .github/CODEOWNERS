@@ -1,0 +1,20 @@
+# 팀원 이름
+# 박시윤 @siiiirru
+# 한동연 @1dyn
+# 양정모 @kaiju782
+# 서예은 @michelle259
+# 조성민 @csm123455
+# 조성욱 @KingZuto
+
+# 특정 디렉토리 오너
+/backend/auth/ @1dyn
+/backend/config/ @KingZuto
+/backend/gateway/ @siiiirru
+/backend/recommend/ @michelle259
+/backend/review/ @csm123455
+/backend/schedule/ @kaiju782
+
+
+
+# 특정 파일 오너
+# /.github/workflows/deploy.yml @devops-lead

@@ -1,0 +1,134 @@
+# Recommend 서비스 설정 (EKS 환경 기본)
+
+server:
+  port: 8082
+spring:
+  application:
+    name: recommend
+
+  
+
+  datasource:
+    url: jdbc:postgresql://recommend-db.mapzip.shop:5432/recommend_db 
+    username: mapzip
+    password: '{cipher}831b8fc2d97a893e91fbc1a6b04553fb81b73c4664a9a309210f8ea138c78f01'
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  data:
+    redis:
+      host: recommend-cache.mapzip.shop
+      port: 6379
+      ssl:
+        enabled: true
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: ${REDIS_POOL_MAX_ACTIVE:16}
+          max-idle: ${REDIS_POOL_MAX_IDLE:16}
+          min-idle: ${REDIS_POOL_MIN_IDLE:4}
+          max-wait: ${REDIS_POOL_MAX_WAIT:3000ms}
+
+  kafka:
+    bootstrap-servers: >
+      b-1.mapzipdevmain.2sgil5.c4.kafka.ap-northeast-2.amazonaws.com:9094,
+      b-2.mapzipdevmain.2sgil5.c4.kafka.ap-northeast-2.amazonaws.com:9094,
+      b-3.mapzipdevmain.2sgil5.c4.kafka.ap-northeast-2.amazonaws.com:9094
+    properties:
+      security.protocol: SSL
+      ssl.endpoint.identification.algorithm: https
+      client.dns.lookup: use_all_dns_ips
+    admin:
+      auto-create: true
+      fail-fast: true
+      properties:
+        security.protocol: SSL
+        ssl.endpoint.identification.algorithm: https
+        client.dns.lookup: use_all_dns_ips
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      retries: 3
+      max-request-size: 5242880 
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      group-id: recommend-service
+      auto-offset-reset: earliest
+      max-partition-fetch-bytes: 5242880
+
+
+  cloud:
+    kubernetes:
+      discovery:
+        enabled: true
+
+eureka:
+  client:
+    enabled: false
+
+# gRPC 서버
+grpc:
+  server:
+    port: 9092
+    reflection-service-enabled: true
+
+# 다른 서비스 gRPC 엔드포인트
+schedule:
+  grpc:
+    host: schedule.service-schedule.svc.cluster.local
+    port: 9090
+review:
+  grpc:
+    host: review.service-review.svc.cluster.local
+    port: 50051
+
+# 외부 API
+external:
+  api:
+    kakao:
+      url: https://dapi.kakao.com
+      key: '{cipher}5e6799bfe52a76fc8362127264c67899155e5aa6c2294b727ed94aca80e20cec6903d90dd40647a792c4bea4ff29f82fd757a8c5f29e35cda3728c6cc1a38283'
+    tmap:
+      url: https://apis.openapi.sk.com
+      key: '{cipher}93a42bb0a5f441413c827ee80d726b09915682372d7dde466a57567901c02d52e495c5897b35fdcd98c3a2b272188990c539491a7d085b1722e6fef577426914'
+
+# AWS/Bedrock
+aws:
+  region: ap-northeast-2
+bedrock:
+  model-id: apac.anthropic.claude-3-sonnet-20240229-v1:0
+
+# Actuator/Prometheus
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http:
+          server:
+            requests: true
+      slo:
+        http.server.requests: 100ms,200ms,500ms,1s,2s
+    tags:
+      application: ${spring.application.name}
+      environment: ${ENVIRONMENT:prod}
+      region: ${AWS_REGION:ap-northeast-2}
+      

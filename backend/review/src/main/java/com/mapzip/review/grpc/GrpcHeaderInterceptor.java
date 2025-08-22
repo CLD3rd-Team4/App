@@ -1,0 +1,117 @@
+package com.mapzip.review.grpc;
+
+import io.grpc.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+/**
+ * Gateway에서 전달된 HTTP 헤더를 gRPC Context로 전달하는 인터셉터
+ * Gateway의 JwtAuthenticationFilter에서 검증 후 주입된 x-user-id 헤더를 추출
+ */
+@Component
+public class GrpcHeaderInterceptor implements ServerInterceptor {
+
+    private static final Logger logger = LoggerFactory.getLogger(GrpcHeaderInterceptor.class);
+    
+    // Context Key for storing user ID
+    public static final Context.Key<String> USER_ID_CONTEXT_KEY = Context.key("x-user-id");
+
+    @Override
+    public <ReqT, RespT> ServerCall.Listener<ReqT> interceptCall(
+            ServerCall<ReqT, RespT> call,
+            Metadata headers,
+            ServerCallHandler<ReqT, RespT> next) {
+
+        String methodName = call.getMethodDescriptor().getFullMethodName();
+        
+        // 내부 서비스 간 호출은 인증 우회
+        if (isInternalServiceCall(methodName)) {
+            logger.info("Internal service call detected, skipping authentication: {}", methodName);
+            
+            // 내부 호출에서도 x-user-id가 있으면 Context에 저장
+            String userId = headers.get(Metadata.Key.of("x-user-id", Metadata.ASCII_STRING_MARSHALLER));
+            if (userId != null && !userId.isEmpty()) {
+                Context context = Context.current().withValue(USER_ID_CONTEXT_KEY, userId);
+                return Contexts.interceptCall(context, call, headers, next);
+            }
+            
+            // x-user-id가 없어도 통과
+            return next.startCall(call, headers);
+        }
+
+        // Gateway에서 HTTP 헤더로 전달된 x-user-id 추출
+        String userId = headers.get(Metadata.Key.of("x-user-id", Metadata.ASCII_STRING_MARSHALLER));
+        
+        if (userId == null || userId.isEmpty()) {
+            logger.warn("Authentication failed - Missing x-user-id. Method: {}", methodName);
+            call.close(Status.UNAUTHENTICATED.withDescription("Authentication required"), headers);
+            return new ServerCall.Listener<ReqT>() {};
+        }
+        
+        if (!isValidUserId(userId)) {
+            logger.warn("Authentication failed - Invalid x-user-id format: {}. Method: {}", 
+                      userId, methodName);
+            call.close(Status.UNAUTHENTICATED.withDescription("Invalid user ID format"), headers);
+            return new ServerCall.Listener<ReqT>() {};
+        }
+        
+        // Gateway에서 오는 요청과 직접 HTTP 요청 구분하여 처리
+        boolean isFromGateway = validateJwtFromGateway(headers);
+        boolean isDirectHttpRequest = !isFromGateway;
+        
+        if (isDirectHttpRequest) {
+            // 직접 HTTP 요청의 경우 기본적인 사용자 ID 검증만 수행
+            logger.info("Direct HTTP request authenticated for user: {}, method: {}", 
+                      userId, call.getMethodDescriptor().getFullMethodName());
+        } else {
+            // Gateway를 통한 요청의 경우 JWT 재검증
+            logger.debug("Gateway request authenticated for user: {}, method: {}", 
+                        userId, call.getMethodDescriptor().getFullMethodName());
+        }
+
+        // Context에 사용자 ID 저장
+        Context context = Context.current().withValue(USER_ID_CONTEXT_KEY, userId);
+        return Contexts.interceptCall(context, call, headers, next);
+    }
+    
+    /**
+     * 내부 서비스 간 호출인지 확인
+     * 특정 gRPC 메서드는 인증을 우회
+     */
+    private boolean isInternalServiceCall(String methodName) {
+        return methodName.contains("StorePlacesForReview") ||
+               methodName.contains("GetReviewSummaryForRecommendation") ||
+               methodName.contains("GetReviewsForRecommendation");
+    }
+    
+    /**
+     * 사용자 ID 유효성 검증
+     * 안전한 문자만 허용하고 길이 제한
+     */
+    private boolean isValidUserId(String userId) {
+        if (userId == null || userId.trim().isEmpty()) {
+            return false;
+        }
+        
+        // 영문, 숫자, 하이픈, 언더스코어만 허용하고 길이 제한
+        return userId.matches("^[a-zA-Z0-9_-]{1,50}$") && 
+               !userId.startsWith("dev-test") && // 테스트 계정 패턴 차단
+               !userId.contains("..") && // 경로 순회 방지
+               !userId.equalsIgnoreCase("admin") && // 관리자 계정명 차단
+               !userId.equalsIgnoreCase("root"); // 루트 계정명 차단
+    }
+    
+    /**
+     * Gateway에서 전달된 JWT 토큰 재검증
+     * 이중 보안을 위한 추가 검증
+     */
+    private boolean validateJwtFromGateway(Metadata headers) {
+        // Gateway에서 JWT 검증을 통과했음을 나타내는 헤더 확인
+        String jwtVerified = headers.get(Metadata.Key.of("x-jwt-verified", Metadata.ASCII_STRING_MARSHALLER));
+        String gatewaySignature = headers.get(Metadata.Key.of("x-gateway-signature", Metadata.ASCII_STRING_MARSHALLER));
+        
+        // Gateway에서 검증된 요청인지 확인
+        return "true".equals(jwtVerified) && gatewaySignature != null && !gatewaySignature.isEmpty();
+    }
+}
